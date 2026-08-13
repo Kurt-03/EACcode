@@ -3,11 +3,13 @@
 Aktive Arbeitsstränge und offene Entscheidungen. *(Pointer: aktueller Code-
 und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 
-## Aktive Phase: D — Coding-Stärke (2026-08-13)
+## Aktive Phase: — (Phase D KOMPLETT ✅, 2026-08-13)
 
-**Fortschritt:** D0–D6 geplant (→ [[10-projects/phase-d.md|phase-d]]) · C1–C3 ✅
-**C4 (Telegram) + C5 (Packaging): bewusst auf später verschoben (Nutzer).**
-→ Ziel: Claude-Code-Level beim Coden. DoD: fremdes Issue → Implementierung → Suite → PR.
+**Phase D (Coding-Stärke) abgeschlossen:** D0–D4 + D6, DoD erfüllt
+(Übungs-Repo: Issue→Implementierung→Suite→Commit, live).
+**Offen (auf später verschoben, Nutzer):** C4 Gateway/Telegram, C5 Packaging,
+D5 Coding-Routing (optionale Idee), D6-Reste.
+→ Nächste große Blöcke: C4/C5 oder Feinschliff — Entscheidung offen.
 
 ## Abgeschlossen
 

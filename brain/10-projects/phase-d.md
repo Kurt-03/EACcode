@@ -72,21 +72,21 @@ bewusst **viel später** → D wird jetzt aktiv.
 refactor/recherche/routine) + Modell je Task-Typ (stark für Code, günstig
 für Routine) + Fallback-Kette. Nicht Teil der Roadmap.
 
-## D6 — Browser (3 Tasks)
+## D6 — Browser ✅ (2026-08-13, live)
 
-| Task | Inhalt | Verifikation |
-|---|---|---|
-| D6.1 | Playwright: Navigate/Click/Extract (optional dependency) | eigene Seite |
-| D6.2 | Screenshots + Session-Persistenz | Screenshot + Wiederkehr |
-| D6.3 | Fehler-Isolation + Timeout | kaputte Seite |
+- `src/eaccode/browser.py` — Playwright-Session (lazy, locked, atexit),
+  Tools navigate/click/type/extract/screenshot/status
+- Live: example.com geöffnet + Inhalt extrahiert; Screenshot-PNG erzeugt
+- Dependency: playwright + `playwright install chromium` (einmalig)
 
 ---
 
 ## Reihenfolge & Regeln
-D0 → D1 → D2 → D3 → D4 → D6; ein Feature einzeln bauen und
-verifizieren (TDD, 4-Stufen-Regel, Brain-Notiz + Test-Map pro Schritt).
-Browser (D6) ist der größte Brocken — wird am Ende gemacht, der DoD
-braucht ihn nicht. D5 (Routing) wurde vom Nutzer entfernt → optionale Idee.
+D0 → D1 → D2 → D3 → D4 → D6 ✅ KOMPLETT (2026-08-13) — ein Feature einzeln
+bauen und verifizieren (TDD, 4-Stufen-Regel, Brain-Notiz + Test-Map pro
+Schritt). D5 (Routing) wurde vom Nutzer entfernt → optionale Idee.
+**DoD erfüllt:** fremdes Issue → Implementierung → Suite → Commit
+(live auf Übungs-Repo bewiesen). C4/C5 bleiben auf später verschoben.
 
 ## Verknüpft
 [[10-projects/README.md|Dashboard]] · [[15-features/README.md|Feature-Register]] · [[50-archive/phase-b.md|phase-b]] · [[15-features/system/agent-core.md|Agent Core]]
