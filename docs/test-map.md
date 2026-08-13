@@ -48,11 +48,11 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | D0.1 Commands | `/skill new x --description "mehrere Worte"` im REPL | Beschreibung komplett übernommen; `/job list` + `/mcp list` im REPL verfügbar | ✅ 08-13 (live) |
 | D0.2 Memory-Lock | 2 eaccode-Prozesse parallel `/memory add` | beide Einträge da, kein Verlust (File-Lock + Verify) | ✅ 08-13 (live) |
 
-## Phase D — Coding-Stärke (D0 ✅, D1–D4/D6 geplant)
+## Phase D — Coding-Stärke (D0 ✅, D1 ✅, D2–D4/D6 geplant)
 
 | Feature | Wie testen | Erwartung | Status |
 |---|---|---|---|
-| D1 Repo-Verständnis | `repo_scan`/`repo_search`/Context-Packs | Struktur-Index, .gitignore-respekt | ⏳ |
+| D1 Repo-Verständnis | Chat: „Scanne C:\Projekte\_ref\hermes", „Suche nach turns_since_memory", „Kontext zu memory_manager.py" | Scan (2000 Dateien/34 MB), 8 Suchtreffer, Context-Pack mit Tests | ✅ 08-13 (live, Hermes-Repo) |
 | D2 Diff-Editing | `patch_file` + Syntax-Check + Rollback | Patch anwendbar, kaputter Edit abgefangen | ⏳ |
 | D3 Test-Runner | `run_tests` + Fehler-Parsing + Loop | rot→fix→grün | ⏳ |
 | D4 Git/PR | status/diff/commit/PR-Tools | nie bei roten Tests committen | ⏳ |
