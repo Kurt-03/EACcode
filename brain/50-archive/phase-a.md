@@ -28,6 +28,9 @@ tags: [type/snapshot, project/phase-a]
 - `eaccode -p "…"` One-Shot, sauberer Fehlerpfad ohne Key
 - `eaccode tui` rendert, Input-Fokus gesetzt
 - 150 Tests grün, ruff clean (Stand 2026-08-13)
+- **2026-08-13: User-Live-Test komplett durchgelaufen** — „geht alles";
+  MiniMax als erster Provider mit Key + Live-Ping (`minimax/MiniMax-M3` → pong),
+  Chat-Calls mit Antwort; Default auf MiniMax-M3 gesetzt
 
 ## Lessons
 

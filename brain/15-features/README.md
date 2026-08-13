@@ -38,4 +38,4 @@ eintragen.
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|Learning-Loop]] |
 | Session-Store (FTS5) | system | planned | B3 | — (wird bei B3 angelegt) |
 
-*Stand: 2026-08-13 (Phase A abgeschlossen)*
+*Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*
