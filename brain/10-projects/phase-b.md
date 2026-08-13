@@ -19,7 +19,7 @@ Ziel: Das Lern- und Gedächtnis-Herz — der Unterschied zu „normalen" Agents.
    (Discovery/Scroll/Browse), Session-Links
 4. **B4 Memory-Hierarchie ✅** — global vs. projektbezogen, Char-Budget,
    Batch-Kuration, Konflikte
-5. **B5 Subagents** — isolierte Kontexte, eigene Tool-Sets, Limits
+5. **B5 Subagents ✅** — isolierte Kontexte, eigene Tool-Sets, Limits
 6. **B6 Parallel-Execution** — mehrere Tool-Calls gleichzeitig, Fehler-Isolation
 
 ## DoD

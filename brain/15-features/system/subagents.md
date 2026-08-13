@@ -1,7 +1,7 @@
 ---
 name: subagents
 type: system
-status: active
+status: done
 phase: B5
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -22,11 +22,13 @@ Warteschlange für den Rest.
 - **Agent-Loop:** mehrere Tool-Calls eines Turns laufen parallel
   (ThreadPoolExecutor) — dadurch laufen 2 `spawn_subagent`-Calls echt parallel
 
-## Verifiziert (live, 2026-08-13)
-- (wird beim Live-Test ergänzt)
+## Verifiziert (live, 2026-08-13 — DoD erfüllt)
+- 2 Subagents parallel gespawnt (nur `http_get`), example.com → Titel,
+  example.org → 403 sauber gemeldet; beide liefen gleichzeitig (17 s gesamt)
 
 ## Tests
-`tests/test_subagents.py` + Parallel-Loop-Test in `tests/test_agent.py`
+`tests/test_subagents.py` (8: Pool, Kontext, Fehler, Timeout, Limit,
+Tool-Auswahl) + Parallel-Loop-Test in `tests/test_agent.py`
 
 ## Offene Punkte
 - Timeout-Abbruch hängender Subagents (Thread läuft als daemon weiter)

@@ -8,7 +8,7 @@ und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 Ziel: Skill-System mit Learning-Loop, Session-Suche, Memory-Hierarchie,
 Subagents, Parallel-Execution. → [[10-projects/phase-b.md|Phase B]]
 
-**Fortschritt:** B1 Skill-System ✅ · B2 Learning-Loop ✅ · B3 Session-Store ✅ · B4 Memory-Hierarchie ✅ · B5 Subagents ⏳ · B6 Parallel ⏳
+**Fortschritt:** B1 ✅ · B2 ✅ · B3 ✅ · B4 ✅ · B5 ✅ · B6 ⏳ (Parallel-Kern ist durch B5 schon drin — B6 formalisiert)
 
 ## Abgeschlossen
 
