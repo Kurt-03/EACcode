@@ -87,17 +87,23 @@ def _extract_text(response: Any) -> str:
         return str(response)
 
 
-def completion_text(
+def completion_response(
     model_id: str,
     messages: list[dict[str, str]],
     conf: dict[str, Any],
     timeout: float = 60.0,
-) -> str:
-    """One completion call against ``model_id``; raises ModelError on failure."""
+    extra_kwargs: dict[str, Any] | None = None,
+) -> Any:
+    """One completion call; returns the raw LiteLLM response.
+
+    ``extra_kwargs`` are forwarded to LiteLLM (e.g. tools, max_tokens).
+    """
     provider_name = model_id.split("/", 1)[0]
     provider = (conf.get("providers") or {}).get(provider_name)
     api_key = resolve_api_key(provider)
     kwargs: dict[str, Any] = {"model": model_id, "messages": messages, "timeout": timeout}
+    if extra_kwargs:
+        kwargs.update(extra_kwargs)
     if api_key:
         kwargs["api_key"] = api_key
     if provider and provider.get("base_url"):
@@ -105,9 +111,20 @@ def completion_text(
     try:
         from litellm import completion
 
-        response = completion(**kwargs)
+        return completion(**kwargs)
     except Exception as exc:  # litellm raises a broad family of exceptions
         raise ModelError(f"model call failed ({model_id}): {exc}") from exc
+
+
+def completion_text(
+    model_id: str,
+    messages: list[dict[str, str]],
+    conf: dict[str, Any],
+    timeout: float = 60.0,
+    extra_kwargs: dict[str, Any] | None = None,
+) -> str:
+    """One completion call; returns the extracted reply text."""
+    response = completion_response(model_id, messages, conf, timeout, extra_kwargs)
     return _extract_text(response)
 
 
