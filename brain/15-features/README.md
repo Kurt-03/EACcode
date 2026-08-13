@@ -36,6 +36,7 @@ eintragen.
 | Subagents | agent | done | B5 | [[15-features/system/subagents.md\|subagents]] |
 | Parallel-Execution | system | done | B6 | [[15-features/system/parallel-execution.md\|parallel-execution]] |
 | Permissions (C1) | system | done | C1 | [[15-features/system/permissions.md\|permissions]] |
+| Repo-Verständnis (D1) | system | active | D1 | [[15-features/system/repo-understanding.md\|Repo-Verständnis]] |
 | Cron & Daemon (C2) | system | done | C2 | [[15-features/system/cron-daemon.md\|cron-daemon]] |
 | MCP-Client (C3) | system | done | C3 | [[15-features/system/mcp-client.md\|mcp-client]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |

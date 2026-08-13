@@ -25,6 +25,7 @@ from eaccode.memory import injection_text, make_memory_tools
 from eaccode.permissions import PermissionManager
 from eaccode.permissions import mode_hint as permissions_mode_hint
 from eaccode.repl import run_repl
+from eaccode.repo import make_repo_tools
 from eaccode.store import make_session_tools
 from eaccode.subagents import SubagentPool, make_subagent_tool
 from eaccode.tools import BUILTIN_TOOLS
@@ -46,6 +47,7 @@ def build_agent() -> Agent:
         + make_learning_tools()
         + make_session_tools()
         + make_memory_tools()
+        + make_repo_tools()
     )
     registry = {tool.name: tool for tool in tools}
     pool = SubagentPool()

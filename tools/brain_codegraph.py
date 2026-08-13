@@ -32,6 +32,7 @@ MODULE_NOTES: dict[str, str] = {
     "permissions.py": "15-features/system/permissions.md",
     "cron.py": "15-features/system/cron-daemon.md",
     "mcp.py": "15-features/system/mcp-client.md",
+    "repo.py": "15-features/system/repo-understanding.md",
     # entry points: version (0.0.1) and `python -m eaccode`
     "__init__.py": "15-features/system/repl.md",
     "__main__.py": "15-features/system/repl.md",

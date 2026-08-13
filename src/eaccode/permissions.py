@@ -37,6 +37,9 @@ READ_ONLY_TOOLS = frozenset(
         "list_skills",
         "list_models",
         "model_ping",
+        "repo_scan",
+        "repo_search",
+        "repo_context",
     }
 )
 
