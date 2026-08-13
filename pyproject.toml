@@ -13,6 +13,7 @@ dependencies = [
     "pyyaml>=6.0",
     "textual>=0.80",
     "apscheduler>=3.10,<4",
+    "playwright>=1.40",
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",

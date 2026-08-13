@@ -8,6 +8,7 @@ from typing import TextIO
 from eaccode import __version__
 from eaccode import config as cfg
 from eaccode.agent import DEFAULT_SYSTEM_PROMPT, Agent
+from eaccode.browser import make_browser_tools
 from eaccode.commands import (
     run_config_command,
     run_job_command,
@@ -54,6 +55,7 @@ def build_agent() -> Agent:
         + make_editing_tools()
         + make_test_tools()
         + make_git_tools()
+        + make_browser_tools()
     )
     registry = {tool.name: tool for tool in tools}
     pool = SubagentPool()
