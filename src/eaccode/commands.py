@@ -681,6 +681,72 @@ def run_job_command(args: list[str], stdout: TextIO | None = None) -> int:
     return 1
 
 
+MCP_USAGE = """\
+Usage: mcp <command> [args]
+
+Commands:
+  list                          show configured MCP servers
+  add <name> --command <cmd> [--args ...]
+                                register a stdio MCP server
+  remove <name>                 unregister a server
+"""
+
+
+def run_mcp_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Manage MCP servers (C3)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(MCP_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    conf = cfg.load_config()
+    servers = dict((conf.get("mcp", {}) or {}).get("servers", {}) or {})
+    if command == "list":
+        if not servers:
+            stdout.write("(no servers yet)\n")
+            return 0
+        for name, entry in servers.items():
+            stdout.write(f"{name}  command: {entry.get('command')} {entry.get('args', [])}\n")
+        return 0
+    if command == "add":
+        if len(rest) < 3:
+            stdout.write("Usage: mcp add <name> --command <cmd> [--args ...]\n")
+            return 1
+        name = rest[0]
+        cmd_args: list[str] = []
+        index = 1
+        while index < len(rest):
+            if rest[index] == "--command" and index + 1 < len(rest):
+                cmd_args.append(rest[index + 1])
+                index += 2
+            elif rest[index] == "--args":
+                index += 1
+                while index < len(rest):
+                    cmd_args.append(rest[index])
+                    index += 1
+            else:
+                index += 1
+        if not cmd_args:
+            stdout.write("Error: --command is required\n")
+            return 1
+        servers[name] = {"command": cmd_args[0], "args": cmd_args[1:]}
+        conf.setdefault("mcp", {})["servers"] = servers
+        cfg.save_config(conf)
+        stdout.write(f"server '{name}' added\n")
+        return 0
+    if command == "remove":
+        if len(rest) != 1 or rest[0] not in servers:
+            stdout.write(f"Error: no server: {rest[0] if rest else ''}\n")
+            return 1
+        del servers[rest[0]]
+        conf.setdefault("mcp", {})["servers"] = servers
+        cfg.save_config(conf)
+        stdout.write(f"server '{rest[0]}' removed\n")
+        return 0
+    stdout.write(f"Unknown mcp command: {command}\n\n{MCP_USAGE}")
+    return 1
+
+
 def run_provider_command(args: list[str], stdout: TextIO | None = None) -> int:
     """Dispatch a provider subcommand; returns an exit code (0 = ok)."""
     stdout = stdout or sys.stdout

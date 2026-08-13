@@ -11,6 +11,7 @@ from eaccode.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from eaccode.commands import (
     run_config_command,
     run_job_command,
+    run_mcp_command,
     run_memory_command,
     run_model_command,
     run_permissions_command,
@@ -48,6 +49,12 @@ def build_agent() -> Agent:
     registry = {tool.name: tool for tool in tools}
     pool = SubagentPool()
     tools.append(make_subagent_tool(pool, registry, cfg.load_config()))
+    # C3: MCP servers from config -> discovered tools (mcp__<server>__<tool>)
+    from eaccode.mcp import McpClient, load_servers, make_mcp_tools
+
+    mcp_clients = [McpClient(server) for server in load_servers()]
+    if mcp_clients:
+        tools.extend(make_mcp_tools(mcp_clients))
     return Agent(
         tools=tools,
         system_prompt=system_prompt,
@@ -113,6 +120,8 @@ def main(
         raise SystemExit(run_permissions_command(argv[1:], stdout=stdout))
     if first == "job":
         raise SystemExit(run_job_command(argv[1:], stdout=stdout))
+    if first == "mcp":
+        raise SystemExit(run_mcp_command(argv[1:], stdout=stdout))
     if first == "daemon":
         import contextlib
 
