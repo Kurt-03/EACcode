@@ -2,6 +2,7 @@
 date: 2026-08-13
 status: accepted
 phase: A (komplett)
+tags: [type/adr]
 ---
 
 # 0002 — Phase-A-Architektur (Router, Loop, Memory, TUI)
@@ -22,9 +23,9 @@ und wartbar (200–400 LoC/Datei, Cap 600).
 - **Memory als Markdown-Dateien** (`memory.py`): MEMORY.md/USER.md im
   Datenverzeichnis, Injection in den System-Prompt — kein DB-Zwang (FTS5
   kommt in Phase B für Sessions).
-- **Zwei Oberflächen:** REPL (Verhalten, getestet) + Textual-TUI (Worker-Thread
-  für Agent-Calls, Slash-Commands, Input-Fokus). REPL bleibt Standard,
-  `eaccode tui` für die TUI.
+- **Zwei Oberflächen:** REPL (Verhalten, getestet) + Textual-TUI
+  (Worker-Thread für Agent-Calls, Slash-Commands, Input-Fokus). REPL bleibt
+  Standard, `eaccode tui` für die TUI.
 - **Lazy Agent:** wird erst beim ersten Chat gebaut — Management-Kommandos
   (`/config init` …) funktionieren ohne Konfiguration.
 - **Permission-Gate:** `run_command` fragt in der REPL interaktiv (y/N),
@@ -32,7 +33,7 @@ und wartbar (200–400 LoC/Datei, Cap 600).
 
 ## Konsequenzen
 
-- Phase B kann direkt aufbauen: Skills laden Tools/Agent, Session-Store
+- Phase B baut direkt auf: Skills laden Tools/Agent, Session-Store
   persistiert `history`, Subagents nutzen `Agent` isoliert.
 - `eaccode -p "<prompt>"` = One-Shot-Modus für Skripte/Cron (Phase C).
 - Offen: Modell-Routing nach Task-Typ (D5), Kosten-Metadaten im Katalog.
@@ -40,5 +41,5 @@ und wartbar (200–400 LoC/Datei, Cap 600).
 ## Alternativen (verworfen)
 
 - Eigenes Framework/Agent-SDK — zu viel Abstraktion für den Loop-Umfang.
-- Chat zuerst im REPL ohne TUI — User-Workflow (CMD → eaccode → testen)
-  wollte beide; TUI blieb Skelett (A8).
+- Nur REPL ohne TUI — User-Workflow (CMD → eaccode → testen) wollte beide;
+  TUI blieb Skelett (A8).

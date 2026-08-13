@@ -1,36 +1,37 @@
-# eaccode Brain — Index
+# eaccode Brain — Index (Map of Content)
 
-Das Wissensgedächtnis für die Entwicklung von **eaccode** — dem selbstverbessernden
-Generalist-Agenten (Hermes × Claude Code Hybrid, BYOK, lokal, cross-platform).
+Wissenszentrale des eaccode-Projekts — gepflegt nach dem **LLM-Wiki-Muster**
+(Karpathy): Der Agent integriert neue Erkenntnisse in bestehende Seiten,
+statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 
-> **Regel:** Dieses Brain speichert *Wissen & Entscheidungen*.
-> Pläne, Tasks und Status gehören ins Repo (`C:\Projekte\EACcode V3`) bzw. in
-> `.hermes/plans/` — hier wird nur verlinkt, nicht dupliziert.
+> **Regeln:** siehe [[README|Vault-Handbuch]]. Kern: Fakten sind *timeless*,
+> *dated* oder *Pointer* — nie eine undatierte „aktuelle" Behauptung.
 
-## Bereiche
+## Einstieg
 
 | Bereich | Inhalt |
 |---|---|
-| [[ADR/0001-config-yaml-design\|ADR]] | Architektur-Entscheidungen mit Begründung (`YYYY-NNNN-titel.md`) |
-| [[Concepts/vision\|Concepts]] | Vision, Architektur, Phasen-Konzepte |
-| [[Research/README\|Research]] | Provider- und Tool-Vergleiche, Evaluierungen |
-| [[Backlog/offene-fragen\|Backlog]] | Offene Entscheidungen, Ideen, Fragen |
+| [[10-projects/README\|Projekte]] | Dashboard: aktive Phase, nächste Schritte, offene Entscheidungen |
+| [[20-areas/architecture\|Areas]] | Dauerhaftes Wissen: Architektur, Vision, Tooling, Testing |
+| [[30-research/README\|Research]] | Evaluierungen mit Datum, Kriterien, Ergebnis |
+| [[adr/0002-phase-a-architecture\|ADR]] | Entscheidungslog (Kontext → Entscheidung → Konsequenz) |
+| [[50-archive/phase-a\|Archiv]] | Abgeschlossene Phasen (dated snapshots) |
+| [[wiki/README\|Wiki]] | LLM-gepflegte Querverweise, Logs (ab Phase B aktiv) |
 
-## Aktuelle Entscheidungen
+## Aktuelle Entscheidungen (ADR)
 
-- **2026-08-13** — [[ADR/0001-config-yaml-design|config.yaml + Secrets-Design]] (Phase A2)
-- **2026-08-13** — Version dauerhaft `0.0.1`; interaktive REPL zuerst (Chat kommt in A7)
-- **2026-08-13** — [[ADR/0002-phase-a-architecture|Phase-A-Architektur]] (Router, Loop, Memory, TUI)
+- **0002** — [[adr/0002-phase-a-architecture|Phase-A-Architektur]] (Router, Loop, Memory, TUI) · 2026-08-13
+- **0001** — [[adr/0001-config-yaml-design|config.yaml + Secrets-Design]] · 2026-08-13
 
-## Projekt-Stand (Kurzreferenz)
+## Projekt-Kurzstand
 
-- **Phase A (Foundation & MVP) KOMPLETT ✅** (2026-08-13): A1–A8 umgesetzt, 150 Tests grün
-- Stand: v0.0.1 — eaccode chatfähig (REPL + TUI), BYOK-Router, Memory, Tools
-- **Als Nächstes: Phase B (Hermes-Core)** — Skills + Learning-Loop, Session-Suche, Subagents
-- Master-Plan: `.hermes/plans/2026-08-13_130000-eaccode-v2-master-plan.md`
-- Verifikations-Fahrplan: `docs/manual-test.md` im Repo
-- Repo: `C:\Projekte\EACcode V3` · Tests: `uv run pytest` · Live: `eaccode` in der CMD
+- **Phase A (Foundation & MVP) komplett ✅** — v0.0.1, 150 Tests, chatfähig (REPL + TUI)
+- **Als Nächstes: Phase B (Hermes-Core)** — Skills + Learning-Loop, Session-Suche, Subagents → [[10-projects/phase-b|Skizze]]
+- Repo: `C:\Projekte\EACcode V3` · Master-Plan: `.hermes/plans/2026-08-13_130000-eaccode-v2-master-plan.md`
 
-## Links
+## Offene Entscheidungen (Auszug)
 
-- [[Concepts/vision|Vision]] · [[Concepts/architecture|Architektur]] · [[Backlog/offene-fragen|Offene Fragen]]
+- Provider-Erstauslieferung (O2) · Display-Name (O3) · Dev-Python (O4) → [[10-projects/README|Dashboard]]
+
+---
+*Zuletzt gepflegt: 2026-08-13 (Phase A abgeschlossen, Brain neu strukturiert)*

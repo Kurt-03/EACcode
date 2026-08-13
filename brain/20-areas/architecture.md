@@ -1,4 +1,11 @@
-# Architektur
+---
+date: 2026-08-13
+status: active
+area: architecture
+tags: [area/architecture, type/area]
+---
+
+# Architektur *(timeless — wie das System gebaut ist)*
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -23,30 +30,24 @@
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## Tech-Stack (fixiert)
+## Kern-Entscheidungen (Details in den ADRs)
 
-| Bereich | Wahl |
-|---|---|
-| Sprache | Python 3.12+ |
-| Dependencies | uv |
-| LLM | LiteLLM (BYOK) |
-| TUI | Textual |
-| Memory | SQLite + FTS5 + Markdown (MEMORY.md/USER.md) |
-| Cron | APScheduler + Daemon |
-| Interop | MCP-Protokoll |
-| Browser | Playwright |
-| Config | YAML + .env (Keys nie im Repo) |
-| Packaging | PyInstaller / `uv tool` (Win/Linux/macOS) |
-| Qualität | pytest (TDD), ruff, 200–400 LoC/Datei (Cap 600) |
+- **LiteLLM als einzige LLM-Schnittstelle** — `router.py`: alle Provider über
+  `provider/model`-IDs; Keys aus config (env > file); `completion_response`
+  (roh) + `completion_text` (Text) getrennt → [[../adr/0002-phase-a-architecture|ADR 0002]]
+- **ReAct-Loop ohne Framework** — `agent.py`: synchron, testbar, Tools als
+  Dataclasses mit JSON-Schema; Tool-Fehler töten den Loop nie
+- **Memory als Markdown** — MEMORY.md/USER.md + System-Prompt-Injection;
+  Session-Suche (FTS5) kommt in Phase B
+- **Zwei Oberflächen** — REPL (Verhalten, getestet) + Textual-TUI (Worker);
+  `eaccode tui` startet die TUI
+- **Lazy Agent** — wird erst beim ersten Chat gebaut (Management-Kommandos
+  funktionieren ohne Konfiguration)
+- **Permission-Gate** — `run_command` fragt in der REPL y/N, Default-Deny
 
-## Phasen
+## Phasen-Zielbild
 
-- **A — Foundation & MVP:** Gerüst ✅, Config/Secrets ✅, Router, ReAct-Loop,
-  Basis-Tools, Memory, CLI, TUI-Skelett → v0.1.0
-- **B — Hermes-Core:** Skills + Learning-Loop, Session-Suche, Memory-Hierarchie,
-  Subagents, Parallel-Execution
-- **C — Production:** Permissions/Sandbox, Cron+Daemon, MCP, Gateway, Packaging
-- **D — Coding-Stärke:** Repo-Index, Diff-Editing, Test-Runner, Git/PR,
-  Coding-Routing, Browser
-
-Siehe auch: [[Concepts/vision|Vision]] · [[INDEX|Index]]
+- **A — Foundation & MVP ✅** → REPL+TUI, BYOK, Memory, Tools
+- **B — Hermes-Core** → Skills + Learning-Loop, Session-Suche, Subagents
+- **C — Production** → Permissions/Sandbox, Cron+Daemon, MCP, Gateway, Packaging
+- **D — Coding-Stärke** → Repo-Index, Diff-Editing, Test-Runner, Git/PR, Routing, Browser
