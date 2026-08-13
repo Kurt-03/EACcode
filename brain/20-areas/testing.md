@@ -9,7 +9,12 @@ tags: [area/testing, type/area]
 
 ## Grundsätze
 
-- **TDD:** Tests vor Code, RED→GREEN→REFACTOR; kein Commit bei roten Tests
+- **TDD:** Tests vor Code, RED→GREEN→REFACTOR; kein Commit bei roten Tests.
+- **4 Stufen pro Step:** ① pytest grün → ② ruff clean → ③ Live-Check in der
+  eaccode-Session → ④ Commit.
+- **Test-Map:** die fortlaufende „wie wird was getestet"-Liste liegt im Repo
+  (`docs/test-map.md`) — wird bei jedem Schritt ergänzt; ausführliche
+  Anleitungen in `docs/manual-test.md`.
 - **Live-Verifikation ist Pflicht:** Unit-Tests sind kein Beweis — jeder Step
   hat einen echten Kommando-Check (`docs/manual-test.md` im Repo)
 - **Ein Feature pro Iteration:** bauen → verifizieren → committen → weiter
