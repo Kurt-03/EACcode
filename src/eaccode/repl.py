@@ -17,6 +17,7 @@ from eaccode.commands import (
     run_memory_command,
     run_model_command,
     run_provider_command,
+    run_skill_command,
 )
 from eaccode.memory import injection_text
 
@@ -29,6 +30,7 @@ Commands:
   /provider <cmd> manage providers (add, list, remove, set-key)
   /model <cmd>    manage models (list, set-default, ping, ...)
   /memory <cmd>   manage memory (add, show, remove, user add)
+  /skill <cmd>    manage skills (list, view, new, remove)
   /exit           leave eaccode (alias: /quit)
 
 Everything else is sent to the agent as a chat message.
@@ -69,6 +71,8 @@ def _handle_command(
         run_model_command(command.split()[1:], stdout=stdout)
     elif name == "memory":
         run_memory_command(command.split()[1:], stdout=stdout)
+    elif name == "skill":
+        run_skill_command(command.split()[1:], stdout=stdout)
     else:
         stdout.write(f"Unknown command: /{name} - type /help for a list of commands.\n")
     return None

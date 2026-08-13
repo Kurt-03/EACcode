@@ -7,7 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
-from eaccode import memory, router
+from eaccode import memory, router, skills
 
 USAGE = """\
 Usage: config <command> [args]
@@ -397,6 +397,78 @@ def run_memory_command(args: list[str], stdout: TextIO | None = None) -> int:
         return 1
     stdout.write(f"Unknown memory command: {command}\n\n{MEMORY_USAGE}")
     return 1
+
+
+SKILL_USAGE = """\
+Usage: skill <command> [args]
+
+Commands:
+  list                        show all skills with trigger
+  view <name>                 show a skill's full content
+  new <name> --trigger T      create a skill skeleton
+      [--description D]
+  remove <name>               delete a skill
+"""
+
+
+def run_skill_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Dispatch a skill subcommand; returns an exit code (0 = ok)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(SKILL_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    try:
+        if command == "list":
+            registry = skills.list_skills()
+            if not registry:
+                stdout.write("(no skills yet)\n")
+                return 0
+            for skill in registry:
+                stdout.write(f"- {skill.name}: {skill.description} [trigger: {skill.trigger}]\n")
+            return 0
+        if command == "view":
+            if len(rest) != 1:
+                stdout.write("Usage: skill view <name>\n")
+                return 1
+            target = skills.skill_path(rest[0])
+            if not target.exists():
+                stdout.write(f"Error: skill '{rest[0]}' does not exist\n")
+                return 1
+            stdout.write(target.read_text(encoding="utf-8") + "\n")
+            return 0
+        if command == "new":
+            if not rest:
+                stdout.write("Usage: skill new <name> --trigger T [--description D]\n")
+                return 1
+            name = rest[0]
+            try:
+                flags = _parse_flags(rest[1:], ("trigger", "description"))
+            except ValueError as exc:
+                stdout.write(f"Error: {exc}\n")
+                return 1
+            if "trigger" not in flags:
+                stdout.write("Error: --trigger is required\n")
+                return 1
+            skills.create_skill(
+                name,
+                flags.get("description", ""),
+                flags["trigger"],
+                body=f"# {name}\n\n(purpose)\n\n## Steps\n\n1. \n",
+            )
+            stdout.write(f"skill '{name}' created\n")
+            return 0
+        if command == "remove":
+            if len(rest) != 1:
+                stdout.write("Usage: skill remove <name>\n")
+                return 1
+            stdout.write(skills.remove_skill(rest[0]) + "\n")
+            return 0
+        stdout.write(f"Unknown skill command: {command}\n\n{SKILL_USAGE}")
+        return 1
+    except (cfg.ConfigError, skills.SkillError) as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
 
 
 def run_provider_command(args: list[str], stdout: TextIO | None = None) -> int:

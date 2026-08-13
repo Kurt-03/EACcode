@@ -10,11 +10,13 @@ from types import SimpleNamespace
 import pytest
 
 from eaccode import config as cfg
+from eaccode import skills
 from eaccode.commands import (
     run_config_command,
     run_memory_command,
     run_model_command,
     run_provider_command,
+    run_skill_command,
 )
 
 
@@ -426,3 +428,70 @@ class TestMemoryCommands:
         code, out = run("frobnicate")
         assert code == 1
         assert "Unknown memory command" in out
+
+
+class TestSkillCommands:
+    @pytest.fixture
+    def skill_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> callable:
+        monkeypatch.setattr(cfg, "config_path", lambda: tmp_path / "config.yaml")
+        monkeypatch.setattr(cfg, "config_dir", lambda: tmp_path)
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        run_config_command(["init"], stdout=io.StringIO())
+
+        def run(*args: str) -> tuple[int, str]:
+            stdout = io.StringIO()
+            code = run_skill_command(list(args), stdout=stdout)
+            return code, stdout.getvalue()
+
+        return run
+
+    def test_new_and_list(self, skill_runner: callable) -> None:
+        run = skill_runner
+        code, out = run(
+            "new", "zeit-helfer", "--trigger", "uhrzeit", "--description", "Zeit anzeigen"
+        )
+        assert code == 0
+        assert "created" in out
+        code, out = run("list")
+        assert code == 0
+        assert "zeit-helfer" in out
+        assert "uhrzeit" in out
+
+    def test_new_requires_trigger(self, skill_runner: callable) -> None:
+        run = skill_runner
+        code, out = run("new", "x")
+        assert code == 1
+        assert "--trigger is required" in out
+
+    def test_view_shows_content(self, skill_runner: callable) -> None:
+        run = skill_runner
+        run("new", "abc", "--trigger", "abc")
+        code, out = run("view", "abc")
+        assert code == 0
+        assert "name: abc" in out
+
+    def test_view_missing_errors(self, skill_runner: callable) -> None:
+        run = skill_runner
+        code, out = run("view", "ghost")
+        assert code == 1
+        assert "does not exist" in out
+
+    def test_remove(self, skill_runner: callable) -> None:
+        run = skill_runner
+        run("new", "abc", "--trigger", "abc")
+        code, out = run("remove", "abc")
+        assert code == 0
+        assert "removed" in out
+        assert skills.list_skills() == []
+
+    def test_usage_without_args(self, skill_runner: callable) -> None:
+        run = skill_runner
+        code, out = run()
+        assert code == 0
+        assert "Usage: skill" in out
+
+    def test_unknown_command(self, skill_runner: callable) -> None:
+        run = skill_runner
+        code, out = run("frobnicate")
+        assert code == 1
+        assert "Unknown skill command" in out

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from eaccode import config as cfg
-from eaccode import router
+from eaccode import router, skills
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are eaccode, a self-improving generalist agent running locally "
@@ -90,10 +90,12 @@ class Agent:
         conf: dict[str, Any] | None = None,
         tools: list[Tool] | None = None,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
+        use_skills: bool = True,
     ) -> None:
         self.conf = conf or cfg.load_config()
         self.system_prompt = system_prompt
         self.tools = {tool.name: tool for tool in (tools or [])}
+        self.use_skills = use_skills
 
     def _complete(
         self, messages: list[dict[str, Any]], max_output_tokens: int
@@ -129,8 +131,14 @@ class Agent:
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
     ) -> list[dict[str, Any]]:
         """Run the loop; returns the full conversation including tool results."""
+        system_content = self.system_prompt
+        if self.use_skills:
+            last_user = next(
+                (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
+            )
+            system_content = f"{system_content}{skills.injection_block(last_user)}"
         history: list[dict[str, Any]] = [
-            {"role": "system", "content": self.system_prompt}
+            {"role": "system", "content": system_content}
         ]
         history.extend(messages)
 

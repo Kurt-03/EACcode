@@ -12,8 +12,10 @@ from eaccode.commands import (
     run_memory_command,
     run_model_command,
     run_provider_command,
+    run_skill_command,
 )
 from eaccode.config import load_env
+from eaccode.learning import LEARNING_PROMPT, make_learning_tools
 from eaccode.memory import injection_text
 from eaccode.repl import run_repl
 from eaccode.tools import BUILTIN_TOOLS
@@ -25,12 +27,13 @@ DESCRIPTION = (
 
 
 def build_agent() -> Agent:
-    """Build the agent with built-in tools and memory injection."""
-    system_prompt = DEFAULT_SYSTEM_PROMPT
+    """Build the agent with built-in tools, learning loop and memory injection."""
+    system_prompt = f"{DEFAULT_SYSTEM_PROMPT}\n\n{LEARNING_PROMPT}"
     memory_block = injection_text()
     if memory_block:
         system_prompt = f"{system_prompt}\n\n{memory_block}"
-    return Agent(tools=list(BUILTIN_TOOLS), system_prompt=system_prompt)
+    tools = list(BUILTIN_TOOLS) + make_learning_tools()
+    return Agent(tools=tools, system_prompt=system_prompt)
 
 
 def _run_once(prompt: str, stdout: TextIO) -> int:
@@ -83,5 +86,7 @@ def main(
         raise SystemExit(run_model_command(argv[1:], stdout=stdout))
     if first == "memory":
         raise SystemExit(run_memory_command(argv[1:], stdout=stdout))
+    if first == "skill":
+        raise SystemExit(run_skill_command(argv[1:], stdout=stdout))
     stdout.write(f"Unknown command: {first} - try 'eaccode --help'\n")
     raise SystemExit(2)

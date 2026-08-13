@@ -1,8 +1,9 @@
-"""Tests for the agent core loop (Phase A4)."""
+"""Tests for the agent core loop (Phase A4, B1 skill injection)."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -199,3 +200,58 @@ class TestAgentLoop:
         tool_msg = received["tool_msg"]
         assert tool_msg["role"] == "tool"
         assert tool_msg["tool_call_id"] == "c9"
+
+
+class TestSkillInjection:
+    def test_matching_skill_injected_into_system_prompt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import litellm
+
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(
+            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        )
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        from eaccode import skills as skill_mod
+
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit", body="Nutze current_time!")
+        agent = Agent(conf=_conf(), use_skills=True)
+        agent.run([{"role": "user", "content": "Wie spät? UHRZEIT bitte"}])
+        system = captured["messages"][0]["content"]
+        assert "## Relevant skills" in system
+        assert "Nutze current_time!" in system
+
+    def test_no_match_keeps_prompt_clean(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import litellm
+
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(
+            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        )
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        from eaccode import skills as skill_mod
+
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
+        agent = Agent(conf=_conf(), use_skills=True)
+        agent.run([{"role": "user", "content": "irgendwas ganz anderes"}])
+        assert "Relevant skills" not in captured["messages"][0]["content"]
+
+    def test_use_skills_false_disables_injection(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import litellm
+
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(
+            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        )
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        from eaccode import skills as skill_mod
+
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
+        agent = Agent(conf=_conf(), use_skills=False)
+        agent.run([{"role": "user", "content": "UHRZEIT"}])
+        assert "Relevant skills" not in captured["messages"][0]["content"]
