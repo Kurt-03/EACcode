@@ -81,10 +81,10 @@ def main() -> int:
     for rel, path in sorted(files.items()):
         text = path.read_text(encoding="utf-8")
 
-        def repl(m: re.Match[str]) -> str:
+        def repl(m: re.Match[str], _rel: str = rel) -> str:
             nonlocal changed
             target, sep, alias = m.group(1), m.group(2), m.group(3)
-            norm = resolve(target, rel)
+            norm = resolve(target, _rel)
             new_alias = ALIAS.get(norm) or Path(norm).stem
             escaped = sep is not None and sep.startswith("\\")
             bar = "\\|" if escaped else "|"
