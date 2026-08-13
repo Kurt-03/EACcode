@@ -24,12 +24,14 @@ Telegram/Discord via C4).
 ## Verifiziert (live, 2026-08-13)
 - `job add morgen` + `job run` → echter LLM-Call, Antwort „Job läuft",
   Log `[ok]`, last_run gesetzt; remove funktioniert
+- **Daemon live**: `eaccode daemon` + Job `* * * * *` → feuerte um 20:01:04,
+  Log `[ok] TICK` — voller Kreislauf (Cron → Subprocess → LLM → Log)
 
 ## Tests
-`tests/test_cron.py` (17: Store, Run, Scheduler, Commands)
+`tests/test_cron.py` (17: Store, Run, Scheduler, Commands) — inkl. deliver-Ziel
 
 ## Offene Punkte
-- Delivery-Ziele außer Log (C4: Telegram)
+- Delivery-Ziele außer Log/stdout (C4: Telegram)
 - Daemon als echter Service (Windows-Dienst/launchd) — später
 
 ## Verknüpft

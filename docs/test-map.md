@@ -52,7 +52,7 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | C1 Permissions | `/permissions status`, `mode read_only` → Chat „Erstelle Datei" | write_file blockiert; ask → `Allow: … [y/N]`-Prompt | ✅ 08-13 |
 | C1 Regeln | `eaccode permissions allow "echo"` → Chat | gezielte Freigabe wirkt | ✅ 08-13 |
 | C2 Jobs | `eaccode job add x --schedule "0 9 * * *" --prompt "…"` + `job run x` | echter LLM-Call, Log `[ok]`, last_run | ✅ 08-13 |
-| C2 Daemon | `eaccode daemon` | startet, Ctrl+C beendet sauber | ⏳ (Unit-getestet) |
+| C2 Daemon | `eaccode daemon` + Job `* * * * *` | Job feuert zur Minute, Log `[ok]` | ✅ 08-13 (live!) |
 | C3 MCP | `eaccode mcp add fake --command …` + Chat „nutze mcp__fake__echo" | Discovery + Permission + `echo:…` | ✅ 08-13 |
 
 ---

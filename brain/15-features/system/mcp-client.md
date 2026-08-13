@@ -24,14 +24,15 @@ Externe Tools über das Model Context Protocol anbinden: stdio-Server
 ## Verifiziert (live, 2026-08-13)
 - Fake-Server registriert → Agent fand `mcp__fake__echo`, Permission-Gate
   fragte (Deny-Beweis), allow-Regel → `echo:hallo-mcp` kam zurück
+- SSE-Client gegen In-Process-SSE-Server getestet (initialize/call)
 
 ## Tests
-`tests/test_mcp.py` (11, inkl. Fake-Server-Subprocess) + `tests/mcp_fake_server.py`
+`tests/test_mcp.py` (17, inkl. Fake-Server-Subprocess + SSE-Server-Fixture)
++ `tests/mcp_fake_server.py`
 
 ## Offene Punkte
-- SSE-Transport
 - Ressourcen/Prompts (nur Tools bisher)
-- Server-Prozesse beim Beenden schließen (aktuell OS-räumt auf)
+- SSE: Notifications werden übersprungen (Request/Response-only)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/permissions.md|Permissions]] · [[15-features/system/agent-core.md|Agent Core]]
