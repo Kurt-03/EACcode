@@ -17,6 +17,7 @@ eintragen.
 | Model Router (BYOK) | system | done | A3 | [[15-features/system/model-router.md|Model Router]] |
 | Provider: OpenRouter | provider | done | A3 | [[15-features/providers/openrouter.md|OpenRouter]] |
 | Provider: Ollama | provider | done | A3 | [[15-features/providers/ollama.md|Ollama]] |
+| Provider: MiniMax | provider | done | A3 | [[15-features/providers/minimax.md|MiniMax]] |
 | Agent Core (ReAct) | system | done | A4 | [[15-features/system/agent-core.md|Agent Core]] |
 | Tool: read_file | tool | done | A5 | [[15-features/tools/read-file.md|Tool: read_file]] |
 | Tool: write_file | tool | done | A5 | [[15-features/tools/write-file.md|Tool: write_file]] |
