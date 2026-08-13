@@ -20,6 +20,8 @@ from eaccode.commands import (
     run_skill_command,
 )
 from eaccode.config import load_env
+from eaccode.editing import make_editing_tools
+from eaccode.git import make_git_tools
 from eaccode.learning import LEARNING_PROMPT, make_learning_tools
 from eaccode.memory import injection_text, make_memory_tools
 from eaccode.permissions import PermissionManager
@@ -28,6 +30,7 @@ from eaccode.repl import run_repl
 from eaccode.repo import make_repo_tools
 from eaccode.store import make_session_tools
 from eaccode.subagents import SubagentPool, make_subagent_tool
+from eaccode.testrunner import make_test_tools
 from eaccode.tools import BUILTIN_TOOLS
 
 DESCRIPTION = (
@@ -48,6 +51,9 @@ def build_agent() -> Agent:
         + make_session_tools()
         + make_memory_tools()
         + make_repo_tools()
+        + make_editing_tools()
+        + make_test_tools()
+        + make_git_tools()
     )
     registry = {tool.name: tool for tool in tools}
     pool = SubagentPool()
