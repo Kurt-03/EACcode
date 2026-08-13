@@ -29,6 +29,12 @@ MODULE_NOTES: dict[str, str] = {
     "subagents.py": "15-features/system/subagents.md",
     "tools.py": "15-features/system/tools-layer.md",
     "tui.py": "15-features/system/tui.md",
+    "permissions.py": "15-features/system/permissions.md",
+    "cron.py": "15-features/system/cron-daemon.md",
+    "mcp.py": "15-features/system/mcp-client.md",
+    # entry points: version (0.0.1) and `python -m eaccode`
+    "__init__.py": "15-features/system/repl.md",
+    "__main__.py": "15-features/system/repl.md",
 }
 
 IMPORT_RE = re.compile(
@@ -123,8 +129,18 @@ def main() -> int:
     graph = module_imports()
     changed = process_notes(graph)
     print(f"{changed} notes updated with Code-Graph")
+    # every src module must be mapped to a note
+    unmapped = sorted(set(SRC.glob("*.py")) - {path for path in _mapped_paths()})
+    if unmapped:
+        print("UNMAPPED SRC MODULES (no note):")
+        for path in unmapped:
+            print(f"  {path.name}")
     audit_reachability()
     return 0
+
+
+def _mapped_paths() -> list[Path]:
+    return [SRC / name for name in MODULE_NOTES]
 
 
 if __name__ == "__main__":

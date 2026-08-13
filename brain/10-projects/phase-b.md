@@ -29,6 +29,7 @@ Session-Suche findet alte Gespräche (B3), Memory kuratiert der Agent selbst
 (B4), 2 Subagents parallel (B5/B6). Restpunkte (bewusst notiert):
 Subagent-Ergebnisse in Session-Store loggen, Permission-Race (C1),
 Timeout-Abbruch laufender Tool-Calls (nach Turn-Grenze).
+→ Abschluss-Snapshot: [[50-archive/phase-b.md|phase-b]]
 
 ## DoD
 

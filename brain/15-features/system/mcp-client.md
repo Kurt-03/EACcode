@@ -35,4 +35,9 @@ Externe Tools über das Model Context Protocol anbinden: stdio-Server
 - SSE: Notifications werden übersprungen (Request/Response-only)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/permissions.md|Permissions]] · [[15-features/system/agent-core.md|Agent Core]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/permissions.md|permissions]] · [[15-features/system/agent-core.md|Agent Core]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/mcp.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|config.yaml]]
+

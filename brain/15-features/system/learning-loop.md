@@ -38,5 +38,5 @@ erstellt und verbessert ihn über Tools. Das ist das Herz von
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/learning.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/skill-system.md|Skill System]]
+- `src/eaccode/learning.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/skill-system.md|skill-system]]
 

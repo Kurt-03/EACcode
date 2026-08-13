@@ -41,3 +41,8 @@ read_only/deny_all), allow-/deny-Regeln (Regex auf Tool-Call), Sandbox
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/permission-gate.md|Permission-Gate]] · [[15-features/system/agent-core.md|Agent Core]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/permissions.py` → [[15-features/system/config.md|config.yaml]]
+

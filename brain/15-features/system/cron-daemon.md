@@ -35,4 +35,9 @@ Telegram/Discord via C4).
 - Daemon als echter Service (Windows-Dienst/launchd) — später
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/one-shot.md|One-Shot]] · [[15-features/system/permissions.md|Permissions]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/one-shot.md|One-Shot]] · [[15-features/system/permissions.md|permissions]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/cron.py` → [[15-features/system/config.md|config.yaml]]
+

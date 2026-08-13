@@ -38,5 +38,5 @@ Fallback-Chain, Live-Ping, Modell-Katalog.
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/router.py` → [[15-features/system/config.md|Config]]
+- `src/eaccode/router.py` → [[15-features/system/config.md|config.yaml]]
 

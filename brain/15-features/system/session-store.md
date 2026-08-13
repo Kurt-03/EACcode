@@ -41,5 +41,5 @@ eaccode sich an frühere Sessions erinnern kann.
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/store.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|Config]]
+- `src/eaccode/store.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|config.yaml]]
 

@@ -47,5 +47,5 @@ Agent-Tools, Char-Budgets, Konsolidierungs-Zwang, atomic writes.
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/memory.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|Config]]
+- `src/eaccode/memory.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|config.yaml]]
 
