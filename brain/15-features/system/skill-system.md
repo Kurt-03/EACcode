@@ -36,4 +36,4 @@ Agent-Kontext.
   geplanten `/`-Commands-Überarbeitung)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/learning-loop.md|Learning-Loop]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/learning-loop.md|learning-loop]]

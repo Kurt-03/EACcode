@@ -17,7 +17,7 @@ eintragen.
 | Model Router (BYOK) | system | done | A3 | [[15-features/system/model-router.md|Model Router]] |
 | Provider: OpenRouter | provider | done | A3 | [[15-features/providers/openrouter.md|OpenRouter]] |
 | Provider: Ollama | provider | done | A3 | [[15-features/providers/ollama.md|Ollama]] |
-| Provider: MiniMax | provider | done | A3 | [[15-features/providers/minimax.md|MiniMax]] |
+| Provider: MiniMax | provider | done | A3 | [[15-features/providers/minimax.md|minimax]] |
 | Agent Core (ReAct) | system | done | A4 | [[15-features/system/agent-core.md|Agent Core]] |
 | Tool: read_file | tool | done | A5 | [[15-features/tools/read-file.md|Tool: read_file]] |
 | Tool: write_file | tool | done | A5 | [[15-features/tools/write-file.md|Tool: write_file]] |
@@ -34,8 +34,9 @@ eintragen.
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
 | Subagents | agent | planned | B5 | [[15-features/agents/README.md\|README]] |
-| Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|Skill-System]] |
-| Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|Learning-Loop]] |
+| Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
+| Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
 | Session-Store (FTS5) | system | planned | B3 | — (wird bei B3 angelegt) |
+| Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|README]] |
 
 *Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*

@@ -34,4 +34,4 @@ erstellt und verbessert ihn über Tools. Das ist das Herz von
 - Skill-Nutzungs-Statistik (welche Skills greifen wann)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/skill-system.md|Skill-System]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/skill-system.md|skill-system]]
