@@ -49,4 +49,4 @@ eintragen.
 | Memory-Hierarchie | system | done | B4 | [[15-features/system/memory.md\|Memory]] |
 | Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|README]] |
 
-*Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*
+*Stand: 2026-08-13 — Phase A ✅ · B ✅ · C1–C3 ✅ · D ✅ KOMPLETT (402 Tests); C4/C5 auf später verschoben*

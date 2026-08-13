@@ -33,7 +33,7 @@ Turn-Budget, JSON-Argumente
 - Interrupt während Calls (REPL-Threading) — C1/UX-Thema
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[adr/0002-phase-a-architecture.md|ADR 0002]]
+[[15-features/README.md|Feature-Register]] · [[ADR/0002-phase-a-architecture.md|0002-phase-a-architecture]]
 
 ## Code-Graph (generiert)
 

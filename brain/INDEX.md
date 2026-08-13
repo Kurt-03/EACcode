@@ -11,29 +11,40 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 
 | Bereich | Inhalt |
 |---|---|
-| [[15-features/README.md\|Feature-Register]] | **Feature-Register**: jedes Feature einzeln getrackt (Tools, Provider, System, Agents) |
+| [[15-features/README.md\|Feature-Register]] | **Feature-Register**: jedes Feature einzeln getrackt (Tools, Provider, System, Commands, Agents) |
 | [[10-projects/README.md\|Dashboard]] | Dashboard: aktive Phase, nächste Schritte, offene Entscheidungen |
+| [[10-projects/phase-d.md\|phase-d]] | Phase D: Coding-Stärke (D0–D6, DoD) |
 | [[20-areas/architecture.md\|Architektur]] · [[20-areas/vision.md\|Vision]] · [[20-areas/tooling.md\|Tooling]] · [[20-areas/testing.md\|Testing]] | Dauerhaftes Wissen |
 | [[30-research/README.md\|Research]] | Evaluierungen mit Datum, Kriterien, Ergebnis |
-| [[adr/0002-phase-a-architecture.md\|ADR 0002]] | Entscheidungslog (Kontext → Entscheidung → Konsequenz) |
-| [[50-archive/phase-a.md\|Phase A]] | Abgeschlossene Phasen (dated snapshots) |
+| [[ADR/0002-phase-a-architecture.md\|0002-phase-a-architecture]] | Entscheidungslog (Kontext → Entscheidung → Konsequenz) |
+| [[50-archive/phase-a.md\|Phase A]] · [[50-archive/phase-b.md\|phase-b]] | Abgeschlossene Phasen (dated snapshots) |
 | [[wiki/README.md\|Wiki]] | LLM-gepflegte Querverweise, Logs (ab Phase B aktiv) |
 | **Test-Map** | fortlaufende „wie wird was getestet"-Liste → `docs/test-map.md` im Repo |
 
 ## Aktuelle Entscheidungen (ADR)
 
-- **0002** — [[adr/0002-phase-a-architecture.md|ADR 0002]] (Router, Loop, Memory, TUI) · 2026-08-13
-- **0001** — [[adr/0001-config-yaml-design.md|ADR 0001]] · 2026-08-13
+- **0002** — [[ADR/0002-phase-a-architecture.md|0002-phase-a-architecture]] (Router, Loop, Memory, TUI) · 2026-08-13
+- **0001** — [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]] · 2026-08-13
 
-## Projekt-Kurzstand
+## Projekt-Kurzstand (2026-08-13)
 
-- **Phase A (Foundation & MVP) komplett ✅** — v0.0.1, 150 Tests, chatfähig (REPL + TUI)
-- **Als Nächstes: Phase B (Hermes-Core)** — Skills + Learning-Loop, Session-Suche, Subagents → [[10-projects/phase-b.md|Phase B]]
-- Repo: `C:\Projekte\EACcode V3` · Master-Plan: `.hermes/plans/2026-08-13_130000-eaccode-v2-master-plan.md`
+- **Phase A (Foundation) ✅** · **Phase B (Hermes-Core) ✅** · **C1–C3 ✅**
+  (C4/C5 bewusst auf später verschoben) · **Phase D (Coding-Stärke) ✅ KOMPLETT**
+  — DoD erfüllt (Übungs-Repo: Issue → Implementierung → Suite → Commit, live)
+- **402 Tests grün** + ruff clean; Live-Verifikationen zu jeder Phase
+  (Test-Map + manual-test.md im Repo)
+- Agent kann heute: Skills lernen, Sessions durchsuchen, Memory kuratieren,
+  Subagents parallel, Permissions, MCP (Roblox Studio), Repo-Verständnis,
+  Diff-Editing, Tests laufen lassen, Git/PR, Browser-Steuerung
+- Repo: `C:\Projekte\EACcode V3` · Remote: `github.com/Kurt-03/EACcode` (gepusht 2026-08-13)
 
 ## Offene Entscheidungen (Auszug)
 
-- Provider-Erstauslieferung (O2) · Display-Name (O3) · Dev-Python (O4) → [[10-projects/README.md|Dashboard]]
+- C4 Gateway/Telegram + C5 Packaging: **später** (Nutzer)
+- Optionale Ideen (nur auf Nachfrage): D5 Coding-Routing, Toolset-Gruppierung
+  → [[10-projects/phase-d.md|phase-d]]
+- Background-Review (Hermes-Learning-Loop) — nach Cron existent, noch offen
+- GitHub-Remote: gesetzt + gepusht (alte `eac-code`-Remote ist Geschichte)
 
 ---
-*Zuletzt gepflegt: 2026-08-13 (Phase A abgeschlossen, Brain neu strukturiert)*
+*Zuletzt gepflegt: 2026-08-13 (Stand: Phase D KOMPLETT, 402 Tests, Repo gepusht)*

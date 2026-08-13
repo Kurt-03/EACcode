@@ -22,7 +22,7 @@ tags: [area/testing, type/area]
 
 ## Test-Matrix (Stand Phase A)
 
-- 150 Tests + 3 POSIX-Skips (laufen in CI auf Linux) — Stand 2026-08-13
+- 402 Tests + 3 POSIX-Skips (laufen in CI auf Linux) — Stand 2026-08-13
 - *(Pointer: aktueller Stand immer via `uv run pytest` im Repo)*
 
 ## CI (GitHub Actions)

@@ -36,8 +36,8 @@ Agent-Kontext.
 - Curator/Pruning mit Konsolidierung (`absorbed_into`-Stil)
 - Skill-Templates + Variablen-Substitution
 - Regex-Trigger + Prioritäten
-- Quote-Parsing für `/skill new --description "mehrere Worte"` (Teil der
-  geplanten `/`-Commands-Überarbeitung)
+- ✅ Quote-Parsing für `/skill new --description "mehrere Worte"` — erledigt
+  in D0.1 (2026-08-13, `parse_args` im REPL)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/learning-loop.md|learning-loop]]

@@ -34,7 +34,7 @@ Fallback-Chain, Live-Ping, Modell-Katalog.
 - Routing nach Task-Typ (D5): starkes Modell für Code, günstiges für Routine
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[adr/0002-phase-a-architecture.md|ADR 0002]]
+[[15-features/README.md|Feature-Register]] · [[ADR/0002-phase-a-architecture.md|0002-phase-a-architecture]]
 
 ## Code-Graph (generiert)
 

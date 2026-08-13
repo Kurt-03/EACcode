@@ -26,7 +26,7 @@ Ablage und sicherem Secret-Handling.
 ```
 
 ## Entscheidungen
-- [[adr/0001-config-yaml-design.md|ADR 0001]] — Design + verworfenes platformdirs
+- [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]] — Design + verworfenes platformdirs
 
 ## Tests
 `tests/test_config.py` + `tests/test_commands.py` (TestConfig/TestMemory…)

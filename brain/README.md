@@ -13,7 +13,7 @@ Jede Notiz ist genau eine von drei Formen:
 1. **Timeless** — kein Datum nötig, verfällt nicht
    `Die Architektur ist in drei Schichten organisiert.`
 2. **Snapshot** — datiert, behauptet nur „was an Datum X wahr war"
-   `2026-08-13: Phase A abgeschlossen, 150 Tests grün.`
+   `2026-08-13: Phase D KOMPLETT, 402 Tests grün.`
 3. **Pointer** — wo die Wahrheit lebt (+ letzter Stand mit Datum)
    `Aktueller Teststand: Repo (uv run pytest). Stand 2026-08-13: 150 passed.`
 

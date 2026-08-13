@@ -23,4 +23,4 @@ Ergebnis, Empfehlung. Keine undatierten „aktuellen" Aussagen.
 - **2026-08-13** — Vault-Konzepte: LLM-Wiki-Muster (Karpathy) + OKM-Faktenregeln
   übernommen → Basis für [[README.md|Vault-Handbuch]]
 - **2026-08-13** — platformdirs auf Windows verdoppelt App-Namen →
-  manuelle Pfade → [[adr/0001-config-yaml-design.md|ADR 0001]]
+  manuelle Pfade → [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]]

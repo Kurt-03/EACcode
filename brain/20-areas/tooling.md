@@ -34,5 +34,5 @@ tags: [area/tooling, type/area]
 - `PYTHONPATH` aus der Hermes-Desktop-Umgebung vor Python-Aufrufen leeren
   (`export PYTHONPATH=`) — sonst bricht das Projekt-venv (pydantic_core-Fehler)
 - `platformdirs` verdoppelt den App-Namen auf Windows → Pfade manuell
-  (siehe [[adr/0001-config-yaml-design.md|ADR 0001]])
+  (siehe [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]])
 - git-bash: `cmd | tail` maskiert Exit-Codes → `set -o pipefail` + `PIPESTATUS`

@@ -35,4 +35,4 @@ CLI-Äquivalent: `eaccode config <cmd>`
 - Quote-Parsing für mehrwortige Werte (Teil der `/`-Überarbeitung)
 
 ## Verknüpft
-[[15-features/commands/README.md|README]] · [[15-features/system/config.md|config.yaml]] · [[adr/0001-config-yaml-design.md|ADR 0001]]
+[[15-features/commands/README.md|README]] · [[15-features/system/config.md|config.yaml]] · [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]]
