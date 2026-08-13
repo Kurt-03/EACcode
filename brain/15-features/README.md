@@ -33,7 +33,8 @@ eintragen.
 | One-Shot `-p` | system | done | A7 | [[15-features/system/one-shot.md|One-Shot]] |
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
-| Subagents | agent | done | B5 | [[15-features/system/subagents.md\|subagents]] |
+| Subagents | agent | done | B5 | [[15-features/system/subagents.md\|Subagents]] |
+| Parallel-Execution | system | active | B6 | [[15-features/system/parallel-execution.md\|Parallel-Execution]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
 | Session-Store (FTS5) | system | done | B3 | [[15-features/system/session-store.md\|session-store]] |

@@ -289,6 +289,44 @@ class TestParallelTools:
         assert elapsed < 0.7  # sequential would take ~0.8s
         assert len([m for m in history if m["role"] == "tool"]) == 2
 
+    def test_parallel_error_isolation(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import time
+
+        import litellm
+
+        def fake_completion(**kwargs: Any) -> SimpleNamespace:
+            if kwargs["messages"][-1]["role"] == "tool":
+                return _response("fertig")
+            return _response(
+                None,
+                [
+                    _tool_call_raw("c1", "boom", "{}"),
+                    _tool_call_raw("c2", "slow", '{"tag": "ok"}'),
+                ],
+            )
+
+        def boom() -> str:
+            raise RuntimeError("kaputt")
+
+        def slow(tag: str) -> str:
+            time.sleep(0.2)
+            return tag
+
+        monkeypatch.setattr(litellm, "completion", fake_completion)
+        agent = Agent(
+            conf=_conf(),
+            tools=[
+                Tool(name="boom", description="b", func=boom),
+                Tool(name="slow", description="s", func=slow),
+            ],
+        )
+        history = agent.run([{"role": "user", "content": "isoliere!"}])
+        tool_messages = [m for m in history if m["role"] == "tool"]
+        contents = [m["content"] for m in tool_messages]
+        assert any("kaputt" in c for c in contents)  # failed tool reported
+        assert any("ok" in c for c in contents)  # other tool still ran
+        assert agent.last_text(history) == "fertig"  # loop survived
+
 
 class TestCancelEvent:
     def test_cancel_stops_loop_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
