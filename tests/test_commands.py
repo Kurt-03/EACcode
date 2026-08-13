@@ -12,6 +12,7 @@ import pytest
 from eaccode import config as cfg
 from eaccode.commands import (
     run_config_command,
+    run_memory_command,
     run_model_command,
     run_provider_command,
 )
@@ -371,3 +372,57 @@ class TestModelCommands:
         code, out = run("frobnicate")
         assert code == 1
         assert "Unknown model command" in out
+
+
+class TestMemoryCommands:
+    @pytest.fixture
+    def memory_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> callable:
+        monkeypatch.setattr(cfg, "config_path", lambda: tmp_path / "config.yaml")
+        monkeypatch.setattr(cfg, "config_dir", lambda: tmp_path)
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        run_config_command(["init"], stdout=io.StringIO())
+
+        def run(*args: str) -> tuple[int, str]:
+            stdout = io.StringIO()
+            code = run_memory_command(list(args), stdout=stdout)
+            return code, stdout.getvalue()
+
+        return run
+
+    def test_add_and_show(self, memory_runner: callable) -> None:
+        run = memory_runner
+        code, out = run("add", "Agent", "fakt")
+        assert code == 0
+        assert out.strip() == "ok"
+        code, out = run("show")
+        assert code == 0
+        assert "- Agent fakt" in out
+
+    def test_user_add(self, memory_runner: callable) -> None:
+        run = memory_runner
+        code, out = run("user", "add", "spricht", "Deutsch")
+        assert code == 0
+        code, out = run("show")
+        assert "- spricht Deutsch" in out
+
+    def test_remove(self, memory_runner: callable) -> None:
+        run = memory_runner
+        run("add", "alter Fakt")
+        run("add", "neuer Fakt")
+        code, out = run("remove", "alter")
+        assert code == 0
+        code, out = run("show")
+        assert "alter Fakt" not in out
+        assert "- neuer Fakt" in out
+
+    def test_usage_without_args(self, memory_runner: callable) -> None:
+        run = memory_runner
+        code, out = run()
+        assert code == 0
+        assert "Usage: memory" in out
+
+    def test_unknown_command(self, memory_runner: callable) -> None:
+        run = memory_runner
+        code, out = run("frobnicate")
+        assert code == 1
+        assert "Unknown memory command" in out

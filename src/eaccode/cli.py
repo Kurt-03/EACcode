@@ -6,13 +6,17 @@ import sys
 from typing import TextIO
 
 from eaccode import __version__
+from eaccode.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from eaccode.commands import (
     run_config_command,
+    run_memory_command,
     run_model_command,
     run_provider_command,
 )
 from eaccode.config import load_env
+from eaccode.memory import injection_text
 from eaccode.repl import run_repl
+from eaccode.tools import BUILTIN_TOOLS
 
 DESCRIPTION = (
     "Self-improving generalist agent - Hermes-inspired orchestration "
@@ -20,29 +24,59 @@ DESCRIPTION = (
 )
 
 
+def build_agent() -> Agent:
+    """Build the agent with built-in tools and memory injection."""
+    system_prompt = DEFAULT_SYSTEM_PROMPT
+    memory_block = injection_text()
+    if memory_block:
+        system_prompt = f"{system_prompt}\n\n{memory_block}"
+    return Agent(tools=list(BUILTIN_TOOLS), system_prompt=system_prompt)
+
+
+def _run_once(prompt: str, stdout: TextIO) -> int:
+    """Non-interactive mode: one user message, print the answer."""
+    agent = build_agent()
+    try:
+        history = agent.run([{"role": "user", "content": prompt}])
+    except Exception as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    stdout.write(f"{agent.last_text(history)}\n")
+    return 0
+
+
 def main(
     argv: list[str] | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
 ) -> None:
-    """Entry point: flags, config subcommands, or the interactive shell."""
+    """Entry point: flags, subcommands, -p one-shot, or the interactive shell."""
     argv = list(sys.argv[1:] if argv is None else argv)
     stdout = stdout or sys.stdout
     load_env()
     if not argv:
-        raise SystemExit(run_repl(stdin, stdout))
+        raise SystemExit(
+            run_repl(stdin=stdin, stdout=stdout, agent_factory=build_agent)
+        )
     first = argv[0]
     if first in ("--version", "-V"):
         stdout.write(f"eaccode {__version__}\n")
         raise SystemExit(0)
     if first in ("--help", "-h"):
-        stdout.write(f"{DESCRIPTION}\n\nUsage: eaccode [--version] [config <command>]\n")
+        stdout.write(f"{DESCRIPTION}\n\nUsage: eaccode [--version] [-p <prompt>] [command]\n")
         raise SystemExit(0)
+    if first in ("-p", "--prompt"):
+        if len(argv) < 2:
+            stdout.write("Usage: eaccode -p <prompt>\n")
+            raise SystemExit(2)
+        raise SystemExit(_run_once(" ".join(argv[1:]), stdout))
     if first == "config":
         raise SystemExit(run_config_command(argv[1:], stdout=stdout, stdin=stdin))
     if first == "provider":
         raise SystemExit(run_provider_command(argv[1:], stdout=stdout))
     if first == "model":
         raise SystemExit(run_model_command(argv[1:], stdout=stdout))
+    if first == "memory":
+        raise SystemExit(run_memory_command(argv[1:], stdout=stdout))
     stdout.write(f"Unknown command: {first} - try 'eaccode --help'\n")
     raise SystemExit(2)

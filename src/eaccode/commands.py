@@ -7,7 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
-from eaccode import router
+from eaccode import memory, router
 
 USAGE = """\
 Usage: config <command> [args]
@@ -353,6 +353,50 @@ def _cmd_model_ping(rest: list[str], stdout: TextIO) -> int:
         return 1
     stdout.write(f"{rest[0]} replied: {reply}\n")
     return 0
+
+
+MEMORY_USAGE = """\
+Usage: memory <command> [args]
+
+Commands:
+  show                 show MEMORY.md and USER.md
+  add <text>           append a fact to MEMORY.md
+  user add <text>      append a fact to USER.md
+  remove <substring>   remove MEMORY.md entries containing substring
+"""
+
+
+def run_memory_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Dispatch a memory subcommand; returns an exit code (0 = ok)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(MEMORY_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    if command == "show":
+        memory_block = memory.injection_text()
+        stdout.write(memory_block if memory_block else "(memory is empty)\n")
+        return 0
+    if command == "add":
+        if not rest:
+            stdout.write("Usage: memory add <text>\n")
+            return 1
+        stdout.write(memory.add_entry(memory.memory_path(), " ".join(rest)) + "\n")
+        return 0
+    if command == "remove":
+        if len(rest) != 1:
+            stdout.write("Usage: memory remove <substring>\n")
+            return 1
+        stdout.write(memory.remove_entry(memory.memory_path(), rest[0]) + "\n")
+        return 0
+    if command == "user":
+        if rest and rest[0] == "add" and len(rest) > 1:
+            stdout.write(memory.add_entry(memory.user_path(), " ".join(rest[1:])) + "\n")
+            return 0
+        stdout.write("Usage: memory user add <text>\n")
+        return 1
+    stdout.write(f"Unknown memory command: {command}\n\n{MEMORY_USAGE}")
+    return 1
 
 
 def run_provider_command(args: list[str], stdout: TextIO | None = None) -> int:
