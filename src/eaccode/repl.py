@@ -132,11 +132,18 @@ def _handle_chat(
         return
     answer = agent.last_text(history)
     stdout.write(f"eaccode> {answer}\n")
-    chat_history[:] = history[1:]  # keep the conversation (drop the system message)
     if session_id:
         with contextlib.suppress(Exception):
-            store.add_message(session_id, "user", text)
-            store.add_message(session_id, "assistant", answer)
+            # persist ONLY the new messages of this round — including tool
+            # results (subagent answers etc.), so sessions are complete
+            new_messages = history[len(chat_history) + 1 :]
+            for message in new_messages:
+                role = message.get("role")
+                if role in ("user", "assistant", "tool"):
+                    store.add_message(
+                        session_id, role, str(message.get("content", ""))
+                    )
+    chat_history[:] = history[1:]  # keep the conversation (drop the system message)
 
 
 def _wire_permission_prompt(

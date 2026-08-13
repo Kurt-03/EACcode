@@ -193,6 +193,25 @@ class TestChat:
         assert [m["role"] for m in messages] == ["user", "assistant"]
         assert messages[0]["content"] == "hallo welt"
 
+    def test_tool_messages_persisted(self, isolated_config: Path) -> None:
+        class ToolAgent(FakeAgent):
+            def run(self, messages: list[dict[str, str]], **kwargs: Any) -> list[dict[str, Any]]:
+                return [{"role": "system", "content": "s"}] + messages + [
+                    {"role": "assistant", "content": ""},
+                    {"role": "tool", "content": "subagent-ergbnis: 42"},
+                    {"role": "assistant", "content": "finale antwort"},
+                ]
+
+        code = run_repl(
+            io.StringIO("starte subagenten\n/exit\n"),
+            io.StringIO(),
+            agent=ToolAgent(),
+        )
+        assert code == 0
+        roles = [m["role"] for m in store.show(store.browse()[0].id)]
+        assert roles == ["user", "assistant", "tool", "assistant"]
+        assert "subagent-ergbnis: 42" in store.show(store.browse()[0].id)[2]["content"]
+
     def test_session_command_in_repl(self, isolated_config: Path) -> None:
         agent = FakeAgent(reply="antwort")
         run_repl(io.StringIO("wichtige frage\n/exit\n"), io.StringIO(), agent=agent)
