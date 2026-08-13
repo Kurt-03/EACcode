@@ -8,6 +8,7 @@ is optional (pytest-cov when installed).
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -21,44 +22,58 @@ SUMMARY_RE = re.compile(
 )
 
 
+def _pytest_attempts(test_file: str | None, coverage: bool) -> list[list[str]]:
+    """Candidate pytest invocations, most isolated first."""
+    base = ["-q", "--tb=short", "--no-header"]
+    if test_file:
+        base.append(test_file)
+    if coverage:
+        base.extend(["--cov=", "--cov-report=term-missing"])
+    attempts = [[sys.executable, "-m", "pytest", *base]]
+    if shutil.which("uv"):
+        attempts.append(["uv", "run", "pytest", *base])
+    if shutil.which("pytest"):
+        attempts.append(["pytest", *base])
+    return attempts
+
+
 def run_tests(
     path: str = ".",
     test_file: str | None = None,
     timeout: int = 600,
     coverage: bool = False,
 ) -> str:
-    """Run pytest in a directory; returns a structured report."""
+    """Run pytest in a directory; returns a structured report.
+
+    Falls back from the isolated interpreter to `uv run pytest` and a
+    PATH `pytest` when the module is not installed (e.g. tool venvs).
+    """
     base = Path(path).expanduser().resolve()
     if not base.exists():
         return f"Error: no such directory: {path}"
-    command = [
-        sys.executable,
-        "-m",
-        "pytest",
-        "-q",
-        "--tb=short",
-        "--no-header",
-    ]
-    if test_file:
-        command.append(test_file)
-    if coverage:
-        command.extend(["--cov=", "--cov-report=term-missing"])
-    try:
-        result = subprocess.run(
-            command,
-            cwd=str(base),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            encoding="utf-8",
-            errors="replace",
-        )
-    except subprocess.TimeoutExpired:
-        return f"Error: tests timed out after {timeout}s"
-    except OSError as exc:
-        return f"Error: cannot run pytest: {exc}"
-    output = (result.stdout or "") + (result.stderr or "")
-    return format_report(output, result.returncode)
+    last_output = "Error: no pytest found on any path"
+    for attempt in _pytest_attempts(test_file, coverage):
+        try:
+            result = subprocess.run(
+                attempt,
+                cwd=str(base),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                encoding="utf-8",
+                errors="replace",
+            )
+        except subprocess.TimeoutExpired:
+            return f"Error: tests timed out after {timeout}s"
+        except OSError as exc:
+            last_output = f"Error: cannot run pytest: {exc}"
+            continue
+        output = (result.stdout or "") + (result.stderr or "")
+        if result.returncode != 0 and "No module named" in output:
+            last_output = output  # try the next interpreter
+            continue
+        return format_report(output, result.returncode)
+    return format_report(last_output, 1)
 
 
 def parse_failures(output: str) -> list[str]:

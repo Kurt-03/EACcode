@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -44,6 +46,29 @@ class TestRunTests:
     def test_single_test_file(self, green_repo: Path) -> None:
         report = testrunner.run_tests(str(green_repo), test_file="test_ok.py")
         assert "passed 1" in report
+
+    def test_fallback_to_path_pytest(
+        self, green_repo: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """First interpreter lacks pytest -> falls back to uv/PATH pytest."""
+        import subprocess as sp
+
+        calls: list[list[str]] = []
+
+        def fake_run(command: list[str], **kwargs: Any) -> sp.CompletedProcess:
+            calls.append(command)
+            if command[0] == sys.executable:
+                return sp.CompletedProcess(
+                    command, 1, stdout="No module named pytest\n", stderr=""
+                )
+            return sp.CompletedProcess(
+                command, 0, stdout="1 passed in 0.1s\n", stderr=""
+            )
+
+        monkeypatch.setattr(testrunner.subprocess, "run", fake_run)
+        report = testrunner.run_tests(str(green_repo))
+        assert "OK (exit 0)" in report
+        assert len(calls) >= 2
 
 
 class TestParsing:
