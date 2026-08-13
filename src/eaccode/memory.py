@@ -9,6 +9,7 @@ the agent to merge/remove first), atomic writes and an all-or-nothing
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 import threading
 from pathlib import Path
@@ -23,6 +24,29 @@ USER_FILE_NAME = "USER.md"
 ENTRY_DELIMITER = "\n§\n"
 MEMORY_CHAR_LIMIT = 2200
 USER_CHAR_LIMIT = 1375
+
+# Prompt-injection / exfiltration patterns (Hermes parity). Content matching
+# any of these is rejected before it ever touches the memory files.
+_SUSPICIOUS_PATTERNS = (
+    r"```",  # markdown fences could break out of the injected block
+    r"~~~",
+    r"ignore\s+(all\s+)?previous\s+instructions",
+    r"vergiss\s+(alle\s+)?(bisherigen\s+)?anweisungen",
+    r"system\s+prompt",
+    r"you\s+are\s+now",
+    r"du\s+bist\s+jetzt",
+    r"do\s+not\s+follow",
+    r"##\s*agent\s+memory",
+    r"##\s*about\s+the\s+user",
+)
+
+
+def scan_memory_content(content: str) -> str | None:
+    """Return an error message when content looks like prompt injection."""
+    for pattern in _SUSPICIOUS_PATTERNS:
+        if re.search(pattern, content, re.IGNORECASE):
+            return f"suspicious content rejected (matches: {pattern!r})"
+    return None
 
 _locks: dict[str, threading.Lock] = {}
 
@@ -102,10 +126,13 @@ def _reload_locked(target: Path) -> list[str]:
 
 
 def add_entry(target: Path, text: str) -> str:
-    """Append an entry; refuses when it would exceed the char budget."""
+    """Append an entry; refuses duplicates, budget overflows and injection."""
     text = text.strip()
     if not text:
         return "Error: empty entry"
+    scan_error = scan_memory_content(text)
+    if scan_error:
+        return f"Error: {scan_error}"
     with _lock_for(target):
         current = _reload_locked(target)
         if text in current:
@@ -130,6 +157,9 @@ def replace_entry(target: Path, old_text: str, new_content: str) -> str:
     new_content = new_content.strip()
     if not old_text or not new_content:
         return "Error: old_text and new_content are required"
+    scan_error = scan_memory_content(new_content)
+    if scan_error:
+        return f"Error: {scan_error}"
     with _lock_for(target):
         current = _reload_locked(target)
         matches = [i for i, entry in enumerate(current) if old_text in entry]
@@ -171,6 +201,15 @@ def apply_batch(target: Path, operations: list[dict[str, Any]]) -> str:
     """
     if not operations:
         return "Error: operations list is empty"
+    # scan every add/replace payload BEFORE touching disk — one poisoned
+    # operation rejects the whole batch (Hermes parity)
+    for index, op in enumerate(operations):
+        action = (op or {}).get("action")
+        content = (op or {}).get("content") or ""
+        if action in ("add", "replace") and content:
+            scan_error = scan_memory_content(content)
+            if scan_error:
+                return f"Error: operation {index + 1}: {scan_error}"
     with _lock_for(target):
         working = _reload_locked(target)
         limit = _char_limit(target)
