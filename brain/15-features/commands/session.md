@@ -28,4 +28,4 @@ CLI-Äquivalent: `eaccode session <cmd>`
 `tests/test_commands.py` (TestSessionCommands)
 
 ## Verknüpft
-[[15-features/commands/README.md|Commands-Index]] · [[15-features/system/session-store.md|Session-Store]]
+[[15-features/commands/README.md|README]] · [[15-features/system/session-store.md|session-store]]

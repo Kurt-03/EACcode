@@ -38,3 +38,8 @@ eaccode sich an frühere Sessions erinnern kann.
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/memory.md|Memory]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/store.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|config.yaml]]
+

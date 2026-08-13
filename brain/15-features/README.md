@@ -33,11 +33,11 @@ eintragen.
 | One-Shot `-p` | system | done | A7 | [[15-features/system/one-shot.md|One-Shot]] |
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
-| Subagents | agent | done | B5 | [[15-features/system/subagents.md\|Subagents]] |
+| Subagents | agent | done | B5 | [[15-features/system/subagents.md\|subagents]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
-| Session-Store (FTS5) | system | done | B3 | [[15-features/system/session-store.md\|Session-Store]] |
+| Session-Store (FTS5) | system | done | B3 | [[15-features/system/session-store.md\|session-store]] |
 | Memory-Hierarchie | system | done | B4 | [[15-features/system/memory.md\|Memory]] |
-| Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|Commands-Index]] |
+| Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|README]] |
 
 *Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*

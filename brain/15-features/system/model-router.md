@@ -35,3 +35,8 @@ Fallback-Chain, Live-Ping, Modell-Katalog.
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[adr/0002-phase-a-architecture.md|ADR 0002]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/router.py` → [[15-features/system/config.md|config.yaml]]
+

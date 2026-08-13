@@ -18,3 +18,8 @@ Implementierung, Tests). **Neue Commands → eigene Notiz + Zeile hier.**
 | `/tui`-Start | `eaccode tui` startet die TUI | done (A8) | [[15-features/commands/tui.md\|tui]] |
 
 *Stand: 2026-08-13 — 10 Commands aktiv, alle mit eigener Notiz*
+
+## Code-Graph (generiert)
+
+- `src/eaccode/commands.py` → [[15-features/system/config.md|config.yaml]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]]
+

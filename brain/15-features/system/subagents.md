@@ -39,4 +39,9 @@ Tool-Auswahl, Reasoning-only) + Parallel-Loop- & Cancel-Tests in `test_agent.py`
 - Permission-Race bei parallelen `run_command`-Prompts (C1)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/session-store.md|Session-Store]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/session-store.md|session-store]] · [[15-features/agents/README.md|README]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/subagents.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/config.md|config.yaml]]
+

@@ -35,3 +35,8 @@ Memory in REPL
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/tui.md|TUI]] · [[15-features/system/one-shot.md|One-Shot]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/repl.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/commands/README.md|README]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
+

@@ -27,7 +27,7 @@ Jede Notiz ist genau eine von drei Formen:
 
 | Ordner | Rolle | Wann anlegen |
 |---|---|---|
-| `00-inbox/` | Schnell-Erfassung | jederzeit; wird bei Kuration sortiert |
+| `00-inbox/` | Schnell-Erfassung | jederzeit; wird bei Kuration sortiert → [[00-inbox/README.md\|README]] |
 | `10-projects/` | Aktive Arbeitsstränge + Dashboard | Phase startet / ändert sich |
 | `15-features/` | **Feature-Register**: eine Notiz pro Feature | **jedes neue Feature** (Tool, Provider, System, Agent) |
 | `20-areas/` | Dauerhaftes Wissen (Architektur, Vision, …) | Wissen entsteht |
@@ -36,7 +36,7 @@ Jede Notiz ist genau eine von drei Formen:
 | `50-archive/` | Abgeschlossenes (dated snapshots) | Phase endet |
 | `adr/` | Entscheidungslog `NNNN-titel.md` | Architektur-Entscheidung |
 | `wiki/` | LLM-gepflegte Seiten + `logs/` (datiert) | ab Phase B |
-| `_templates/` | Notiz-Templates | — |
+| `_templates/` | Notiz-Templates: [[_templates/adr.md\|adr]] · [[_templates/area.md\|area]] · [[_templates/feature.md\|feature]] · [[_templates/project.md\|project]] · [[_templates/research.md\|research]] | — |
 
 ## Feature-Regel
 

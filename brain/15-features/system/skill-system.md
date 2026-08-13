@@ -41,3 +41,8 @@ Agent-Kontext.
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/learning-loop.md|learning-loop]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/skills.py` → [[15-features/system/config.md|config.yaml]]
+

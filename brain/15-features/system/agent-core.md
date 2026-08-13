@@ -34,3 +34,8 @@ Turn-Budget, JSON-Argumente
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[adr/0002-phase-a-architecture.md|ADR 0002]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/agent.py` → [[15-features/system/config.md|config.yaml]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|skill-system]]
+

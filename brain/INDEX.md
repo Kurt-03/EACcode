@@ -13,7 +13,7 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 |---|---|
 | [[15-features/README.md\|Feature-Register]] | **Feature-Register**: jedes Feature einzeln getrackt (Tools, Provider, System, Agents) |
 | [[10-projects/README.md\|Dashboard]] | Dashboard: aktive Phase, nächste Schritte, offene Entscheidungen |
-| [[20-areas/architecture.md\|Architektur]] | Dauerhaftes Wissen: Architektur, Vision, Tooling, Testing |
+| [[20-areas/architecture.md\|Architektur]] · [[20-areas/vision.md\|Vision]] · [[20-areas/tooling.md\|Tooling]] · [[20-areas/testing.md\|Testing]] | Dauerhaftes Wissen |
 | [[30-research/README.md\|Research]] | Evaluierungen mit Datum, Kriterien, Ergebnis |
 | [[adr/0002-phase-a-architecture.md\|ADR 0002]] | Entscheidungslog (Kontext → Entscheidung → Konsequenz) |
 | [[50-archive/phase-a.md\|Phase A]] | Abgeschlossene Phasen (dated snapshots) |

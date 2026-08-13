@@ -36,3 +36,8 @@ Ablage und sicherem Secret-Handling.
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/secrets.md|Secrets]] · [[15-features/system/model-router.md|Model Router]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/config.py` → —
+

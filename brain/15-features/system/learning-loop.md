@@ -35,3 +35,8 @@ erstellt und verbessert ihn über Tools. Das ist das Herz von
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/skill-system.md|skill-system]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/learning.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/skill-system.md|skill-system]]
+
