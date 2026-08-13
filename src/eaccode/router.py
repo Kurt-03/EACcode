@@ -110,9 +110,10 @@ def completion_response(
     if provider and provider.get("base_url"):
         kwargs["api_base"] = provider["base_url"]
     try:
-        from litellm import completion
+        import litellm
 
-        return completion(**kwargs)
+        litellm.suppress_debug_info = True  # keep errors clean for the user
+        return litellm.completion(**kwargs)
     except Exception as exc:  # litellm raises a broad family of exceptions
         raise ModelError(f"model call failed ({model_id}): {exc}") from exc
 

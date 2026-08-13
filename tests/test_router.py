@@ -36,6 +36,18 @@ class TestApiKey:
         assert router.resolve_api_key({}) is None
         assert router.resolve_api_key(None) is None
 
+    def test_litellm_debug_banner_suppressed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A model call must silence LiteLLM's 'Give Feedback' noise."""
+        import litellm
+
+        def boom(**kwargs: object) -> None:
+            raise RuntimeError("kaputt")
+
+        monkeypatch.setattr(litellm, "completion", boom)
+        with pytest.raises(router.ModelError):
+            router.completion_response("openrouter/x", [], _conf())
+        assert litellm.suppress_debug_info is True
+
     def test_env_var_set_but_empty_falls_back_to_file(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
