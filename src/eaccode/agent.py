@@ -91,11 +91,14 @@ class Agent:
         tools: list[Tool] | None = None,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         use_skills: bool = True,
+        memory_nudge_interval: int = 10,
     ) -> None:
         self.conf = conf or cfg.load_config()
         self.system_prompt = system_prompt
         self.tools = {tool.name: tool for tool in (tools or [])}
         self.use_skills = use_skills
+        self.memory_nudge_interval = memory_nudge_interval
+        self._memory_runs = 0
 
     def _complete(
         self, messages: list[dict[str, Any]], max_output_tokens: int
@@ -118,6 +121,8 @@ class Agent:
         tool = self.tools.get(call.name)
         if tool is None:
             return f"Error: unknown tool: {call.name}"
+        if call.name.startswith("memory_"):
+            self._memory_runs = 0  # agent curated memory -> nudge timer resets
         try:
             result = tool.func(**call.arguments)
         except Exception as exc:  # tool bugs must not kill the loop
@@ -131,12 +136,20 @@ class Agent:
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
     ) -> list[dict[str, Any]]:
         """Run the loop; returns the full conversation including tool results."""
+        self._memory_runs += 1
         system_content = self.system_prompt
         if self.use_skills:
             last_user = next(
                 (m["content"] for m in reversed(messages) if m["role"] == "user"), ""
             )
             system_content = f"{system_content}{skills.injection_block(last_user)}"
+        if self.memory_nudge_interval and self._memory_runs % self.memory_nudge_interval == 0:
+            system_content += (
+                "\n\n## Memory nudge\n"
+                "Review your persistent memory (memory_add/replace/remove/apply_batch): "
+                "merge overlapping facts, remove stale ones, store anything important "
+                "you learned recently. Keep it compact."
+            )
         history: list[dict[str, Any]] = [
             {"role": "system", "content": system_content}
         ]

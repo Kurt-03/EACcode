@@ -17,7 +17,7 @@ from eaccode.commands import (
 )
 from eaccode.config import load_env
 from eaccode.learning import LEARNING_PROMPT, make_learning_tools
-from eaccode.memory import injection_text
+from eaccode.memory import injection_text, make_memory_tools
 from eaccode.repl import run_repl
 from eaccode.store import make_session_tools
 from eaccode.tools import BUILTIN_TOOLS
@@ -34,7 +34,12 @@ def build_agent() -> Agent:
     memory_block = injection_text()
     if memory_block:
         system_prompt = f"{system_prompt}\n\n{memory_block}"
-    tools = list(BUILTIN_TOOLS) + make_learning_tools() + make_session_tools()
+    tools = (
+        list(BUILTIN_TOOLS)
+        + make_learning_tools()
+        + make_session_tools()
+        + make_memory_tools()
+    )
     return Agent(tools=tools, system_prompt=system_prompt)
 
 

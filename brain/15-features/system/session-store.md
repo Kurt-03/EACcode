@@ -1,7 +1,7 @@
 ---
 name: session-store
 type: system
-status: active
+status: done
 phase: B3
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -22,8 +22,12 @@ eaccode sich an frühere Sessions erinnern kann.
 - Kommandos: `/session browse|search|show` → [[15-features/commands/session.md|session]]
 - Agent-Tool: `session_search` (Agent kann alte Gespräche durchsuchen)
 
+## Verifiziert (live, 2026-08-13)
+- Chat-Runde gespeichert, Titel automatisch gesetzt
+- `/session search LiteLLM` fand die Session mit Snippet
+
 ## Tests
-`tests/test_store.py`
+`tests/test_store.py` (11) + TestSessionCommands + REPL-Persistenz-Tests
 
 ## Offene Punkte
 - Scroll-Modus mit around_message_id (für Agent-Detailabruf)

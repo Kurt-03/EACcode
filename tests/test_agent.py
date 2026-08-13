@@ -255,3 +255,52 @@ class TestSkillInjection:
         agent = Agent(conf=_conf(), use_skills=False)
         agent.run([{"role": "user", "content": "UHRZEIT"}])
         assert "Relevant skills" not in captured["messages"][0]["content"]
+
+
+class TestMemoryNudge:
+    def test_nudge_appears_every_interval(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import litellm
+
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(
+            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        )
+        agent = Agent(conf=_conf(), memory_nudge_interval=2)
+        agent.run([{"role": "user", "content": "eins"}])
+        assert "Memory nudge" not in captured["messages"][0]["content"]
+        agent.run([{"role": "user", "content": "zwei"}])
+        assert "Memory nudge" in captured["messages"][0]["content"]
+
+    def test_memory_tool_call_resets_nudge(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import litellm
+
+        captured: dict[str, Any] = {}
+
+        def fake_completion(**kwargs: Any) -> SimpleNamespace:
+            captured["messages"] = kwargs["messages"]
+            if kwargs["messages"][-1]["role"] == "tool":
+                return _response("ok")
+            return _response(
+                None,
+                [
+                    _tool_call_raw(
+                        "c1", "memory_add", '{"target": "agent", "content": "fakt"}'
+                    )
+                ],
+            )
+
+        monkeypatch.setattr(litellm, "completion", fake_completion)
+
+        def memory_add(target: str, content: str) -> str:
+            return "ok"
+
+        agent = Agent(
+            conf=_conf(),
+            memory_nudge_interval=2,
+            tools=[Tool(name="memory_add", description="m", func=memory_add)],
+        )
+        agent.run([{"role": "user", "content": "eins"}])  # tool call resets counter
+        agent.run([{"role": "user", "content": "zwei"}])
+        agent.run([{"role": "user", "content": "drei"}])
+        system = captured["messages"][0]["content"]
+        assert "Memory nudge" not in system  # counter was reset by the tool call
