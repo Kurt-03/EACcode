@@ -9,13 +9,15 @@ import sys
 from typing import TextIO
 
 from eaccode import __version__
+from eaccode.commands import run_config_command
 
 HELP_TEXT = """\
 Commands:
-  /help       show this help
-  /version    show eaccode version
-  /clear      clear the screen
-  /exit       leave eaccode (alias: /quit)
+  /help           show this help
+  /version        show eaccode version
+  /clear          clear the screen
+  /config <cmd>   manage configuration (init, show, set, ...)
+  /exit           leave eaccode (alias: /quit)
 
 Chat mode arrives in Phase A7 - for now this shell only runs commands.
 """
@@ -33,7 +35,7 @@ def _clear_screen(stdout: TextIO) -> None:
         stdout.write("\x1b[2J\x1b[H")
 
 
-def _handle_command(command: str, stdout: TextIO) -> int | None:
+def _handle_command(command: str, stdout: TextIO, stdin: TextIO) -> int | None:
     """Dispatch one slash-command; return an exit code or None to continue."""
     name = command.split()[0] if command else ""
     if name in ("exit", "quit"):
@@ -42,6 +44,8 @@ def _handle_command(command: str, stdout: TextIO) -> int | None:
         stdout.write(HELP_TEXT)
     elif name == "version":
         stdout.write(f"eaccode {__version__}\n")
+    elif name == "config":
+        run_config_command(command.split()[1:], stdout=stdout, stdin=stdin)
     elif name == "clear":
         _clear_screen(stdout)
     else:
@@ -60,7 +64,7 @@ def run_repl(stdin: TextIO | None = None, stdout: TextIO | None = None) -> int:
             if not line:
                 continue
             if line.startswith("/"):
-                code = _handle_command(line[1:], stdout)
+                code = _handle_command(line[1:], stdout, stdin)
                 if code is not None:
                     stdout.write("bye\n")
                     return code

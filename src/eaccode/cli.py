@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-import argparse
+import sys
 from typing import TextIO
 
 from eaccode import __version__
+from eaccode.commands import run_config_command
+from eaccode.config import load_env
 from eaccode.repl import run_repl
 
 DESCRIPTION = (
@@ -14,25 +16,25 @@ DESCRIPTION = (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
-    """Build the argument parser (kept separate for testability)."""
-    parser = argparse.ArgumentParser(
-        prog="eaccode",
-        description=DESCRIPTION,
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"eaccode {__version__}",
-    )
-    return parser
-
-
 def main(
     argv: list[str] | None = None,
     stdin: TextIO | None = None,
     stdout: TextIO | None = None,
 ) -> None:
-    """Entry point: flags like --version, otherwise start the interactive shell."""
-    build_parser().parse_args(argv)
-    raise SystemExit(run_repl(stdin, stdout))
+    """Entry point: flags, config subcommands, or the interactive shell."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    stdout = stdout or sys.stdout
+    load_env()
+    if not argv:
+        raise SystemExit(run_repl(stdin, stdout))
+    first = argv[0]
+    if first in ("--version", "-V"):
+        stdout.write(f"eaccode {__version__}\n")
+        raise SystemExit(0)
+    if first in ("--help", "-h"):
+        stdout.write(f"{DESCRIPTION}\n\nUsage: eaccode [--version] [config <command>]\n")
+        raise SystemExit(0)
+    if first == "config":
+        raise SystemExit(run_config_command(argv[1:], stdout=stdout, stdin=stdin))
+    stdout.write(f"Unknown command: {first} - try 'eaccode --help'\n")
+    raise SystemExit(2)

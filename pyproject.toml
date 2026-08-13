@@ -7,6 +7,10 @@ requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "eaccode contributors" }]
 keywords = ["agent", "ai", "byok", "cli", "autonomous"]
+dependencies = [
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Environment :: Console",
