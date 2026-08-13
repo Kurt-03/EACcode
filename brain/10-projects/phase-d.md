@@ -68,9 +68,13 @@ bewusst **viel später** → D wird jetzt aktiv.
 
 ## D5 — ~~Coding-Routing~~ *(entfernt 2026-08-13, Nutzer)*
 
-→ **Optionale Idee (nur auf Nachfrage):** Task-Klassifikation (code/test/
-refactor/recherche/routine) + Modell je Task-Typ (stark für Code, günstig
-für Routine) + Fallback-Kette. Nicht Teil der Roadmap.
+→ **Optionale Ideen (nur auf Nachfrage des Nutzers):**
+- **Coding-Routing:** Task-Klassifikation (code/test/refactor/recherche/
+  routine) + Modell je Task-Typ (stark für Code, günstig für Routine) +
+  Fallback-Kette. Nicht Teil der Roadmap.
+- **Toolset-Gruppierung** (angemerkt 2026-08-13): Tools nach Domänen
+  sortieren (file/shell/web/memory/coding/git/browser/mcp/…), Permissions
+  je Gruppe, spätere Token-Optimierung (nur relevante Sets injizieren).
 
 ## D6 — Browser ✅ (2026-08-13, live)
 
