@@ -9,7 +9,11 @@ import sys
 from typing import TextIO
 
 from eaccode import __version__
-from eaccode.commands import run_config_command
+from eaccode.commands import (
+    run_config_command,
+    run_model_command,
+    run_provider_command,
+)
 
 HELP_TEXT = """\
 Commands:
@@ -17,6 +21,8 @@ Commands:
   /version        show eaccode version
   /clear          clear the screen
   /config <cmd>   manage configuration (init, show, set, ...)
+  /provider <cmd> manage providers (add, list, remove, set-key)
+  /model <cmd>    manage models (list, set-default, ping, ...)
   /exit           leave eaccode (alias: /quit)
 
 Chat mode arrives in Phase A7 - for now this shell only runs commands.
@@ -46,6 +52,10 @@ def _handle_command(command: str, stdout: TextIO, stdin: TextIO) -> int | None:
         stdout.write(f"eaccode {__version__}\n")
     elif name == "config":
         run_config_command(command.split()[1:], stdout=stdout, stdin=stdin)
+    elif name == "provider":
+        run_provider_command(command.split()[1:], stdout=stdout)
+    elif name == "model":
+        run_model_command(command.split()[1:], stdout=stdout)
     elif name == "clear":
         _clear_screen(stdout)
     else:

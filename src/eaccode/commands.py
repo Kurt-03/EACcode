@@ -7,6 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
+from eaccode import router
 
 USAGE = """\
 Usage: config <command> [args]
@@ -19,6 +20,29 @@ Commands:
   set <key> <value>  set a value (comma-separated -> list)
   set-key <key>      store a secret via hidden prompt
   unset <key>        remove a value
+"""
+
+PROVIDER_USAGE = """\
+Usage: provider <command> [args]
+
+Commands:
+  list                            show providers with key status
+  add <name> [--base-url URL]     register a provider
+      [--api-key-env VAR]         ... key comes from this env variable
+  remove <name>                   unregister a provider
+  set-key <name>                  store the api key via hidden prompt
+"""
+
+MODEL_USAGE = """\
+Usage: model <command> [args]
+
+Commands:
+  list                           show the model catalog with default/fallback
+  add <provider/model>           register a custom model (e.g. ollama/deepseek-r1)
+      [--base-url URL]           ... set the provider base url (local servers)
+  set-default <provider/model>   set the default model
+  set-fallback <m1,m2,...>       set the fallback chain
+  ping <provider/model>          send a live test call (expects 'pong')
 """
 
 
@@ -163,6 +187,216 @@ def run_config_command(
         if command == "unset":
             return _cmd_unset(rest, stdout)
         stdout.write(f"Unknown config command: {command}\n\n{USAGE}")
+        return 1
+    except cfg.ConfigError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+
+
+# ---------------------------------------------------------------------------
+# provider / model subcommands (Phase A3 - model router)
+# ---------------------------------------------------------------------------
+
+
+def _parse_flags(args: list[str], allowed: tuple[str, ...]) -> dict[str, str]:
+    """Parse --flag value pairs; raises ValueError on unknown flags."""
+    flags: dict[str, str] = {}
+    index = 0
+    while index < len(args):
+        arg = args[index]
+        if arg.startswith("--"):
+            name = arg[2:].replace("-", "_")
+            if name not in allowed:
+                raise ValueError(f"unknown flag: {arg}")
+            if index + 1 >= len(args):
+                raise ValueError(f"missing value for {arg}")
+            flags[name] = args[index + 1]
+            index += 2
+        else:
+            raise ValueError(f"unexpected argument: {arg}")
+    return flags
+
+
+def _cmd_provider_list(stdout: TextIO) -> int:
+    conf = cfg.load_config()
+    names = sorted((conf.get("providers") or {}).keys())
+    if not names:
+        stdout.write("no providers configured - run 'provider add <name>'\n")
+        return 0
+    for name in names:
+        provider = conf["providers"][name] or {}
+        base = provider.get("base_url") or "-"
+        stdout.write(f"{name:<16} key: {cfg.provider_key_status(provider):<28} base_url: {base}\n")
+    return 0
+
+
+def _cmd_provider_add(rest: list[str], stdout: TextIO) -> int:
+    if not rest:
+        stdout.write("Usage: provider add <name> [--base-url URL] [--api-key-env VAR]\n")
+        return 1
+    name = rest[0]
+    try:
+        flags = _parse_flags(rest[1:], ("base_url", "api_key_env"))
+    except ValueError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    conf = cfg.load_config()
+    provider = conf.setdefault("providers", {}).setdefault(name, {})
+    if flags.get("base_url"):
+        provider["base_url"] = flags["base_url"]
+    if flags.get("api_key_env"):
+        provider["api_key_env"] = flags["api_key_env"]
+    cfg.save_config(conf)
+    stdout.write(f"provider '{name}' added\n")
+    return 0
+
+
+def _cmd_provider_remove(rest: list[str], stdout: TextIO) -> int:
+    if len(rest) != 1:
+        stdout.write("Usage: provider remove <name>\n")
+        return 1
+    name = rest[0]
+    conf = cfg.load_config()
+    providers = conf.get("providers") or {}
+    if name not in providers:
+        stdout.write(f"Error: unknown provider: {name}\n")
+        return 1
+    del providers[name]
+    cfg.save_config(conf)
+    stdout.write(f"provider '{name}' removed\n")
+    return 0
+
+
+def _cmd_provider_set_key(rest: list[str], stdout: TextIO) -> int:
+    if len(rest) != 1:
+        stdout.write("Usage: provider set-key <name>\n")
+        return 1
+    return _cmd_set_key([f"providers.{rest[0]}.api_key"], stdout)
+
+
+def _cmd_model_list(stdout: TextIO) -> int:
+    conf = cfg.load_config()
+    model = conf.get("model") or {}
+    stdout.write(f"default:  {model.get('default') or '(unset)'}\n")
+    stdout.write(f"fallback: {_fmt(model.get('fallback') or [])}\n")
+    known = router.all_model_ids(conf)
+    if not known:
+        stdout.write("no models known - run 'model set-default <provider/model>'\n")
+        return 0
+    stdout.write("catalog:\n")
+    for model_id in known:
+        marker = ""
+        if model_id == model.get("default"):
+            marker = " (default)"
+        elif model_id in (model.get("fallback") or []):
+            marker = " (fallback)"
+        stdout.write(f"  - {model_id}{marker}\n")
+    return 0
+
+
+def _cmd_model_add(rest: list[str], stdout: TextIO) -> int:
+    if not rest:
+        stdout.write("Usage: model add <provider/model> [--base-url URL]\n")
+        return 1
+    model_id = rest[0]
+    if "/" not in model_id:
+        stdout.write("Error: model id must look like '<provider>/<model>'\n")
+        return 1
+    provider_name, model_name = model_id.split("/", 1)
+    try:
+        flags = _parse_flags(rest[1:], ("base_url",))
+    except ValueError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    conf = cfg.load_config()
+    provider = conf.setdefault("providers", {}).setdefault(provider_name, {})
+    if flags.get("base_url"):
+        provider["base_url"] = flags["base_url"]
+    models = provider.setdefault("models", [])
+    if model_id not in models:
+        models.append(model_id)
+    cfg.save_config(conf)
+    stdout.write(f"model '{model_id}' registered\n")
+    return 0
+
+
+def _cmd_model_set_default(rest: list[str], stdout: TextIO) -> int:
+    if len(rest) != 1:
+        stdout.write("Usage: model set-default <provider/model>\n")
+        return 1
+    conf = cfg.load_config()
+    cfg.set_value(conf, "model.default", rest[0])
+    cfg.save_config(conf)
+    stdout.write(f"default model: {rest[0]}\n")
+    return 0
+
+
+def _cmd_model_set_fallback(rest: list[str], stdout: TextIO) -> int:
+    if len(rest) != 1:
+        stdout.write("Usage: model set-fallback <m1,m2,...>\n")
+        return 1
+    conf = cfg.load_config()
+    cfg.set_value(conf, "model.fallback", rest[0])
+    cfg.save_config(conf)
+    stdout.write(f"fallback chain: {_fmt(conf['model']['fallback'])}\n")
+    return 0
+
+
+def _cmd_model_ping(rest: list[str], stdout: TextIO) -> int:
+    if len(rest) != 1:
+        stdout.write("Usage: model ping <provider/model>\n")
+        return 1
+    try:
+        reply = router.ping_model(rest[0])
+    except router.ModelError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    stdout.write(f"{rest[0]} replied: {reply}\n")
+    return 0
+
+
+def run_provider_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Dispatch a provider subcommand; returns an exit code (0 = ok)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(PROVIDER_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    try:
+        if command == "list":
+            return _cmd_provider_list(stdout)
+        if command == "add":
+            return _cmd_provider_add(rest, stdout)
+        if command == "remove":
+            return _cmd_provider_remove(rest, stdout)
+        if command == "set-key":
+            return _cmd_provider_set_key(rest, stdout)
+        stdout.write(f"Unknown provider command: {command}\n\n{PROVIDER_USAGE}")
+        return 1
+    except cfg.ConfigError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+
+
+def run_model_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Dispatch a model subcommand; returns an exit code (0 = ok)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(MODEL_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    try:
+        if command == "list":
+            return _cmd_model_list(stdout)
+        if command == "add":
+            return _cmd_model_add(rest, stdout)
+        if command == "set-default":
+            return _cmd_model_set_default(rest, stdout)
+        if command == "set-fallback":
+            return _cmd_model_set_fallback(rest, stdout)
+        if command == "ping":
+            return _cmd_model_ping(rest, stdout)
+        stdout.write(f"Unknown model command: {command}\n\n{MODEL_USAGE}")
         return 1
     except cfg.ConfigError as exc:
         stdout.write(f"Error: {exc}\n")
