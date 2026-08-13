@@ -106,3 +106,42 @@ class TestSessionTool:
         tools = store.make_session_tools()
         tool = next(t for t in tools if t.name == "session_search")
         assert "no sessions match" in tool.func(query="gibtsnicht")
+
+    def test_session_scroll_tool_returns_latest(self, tmp_store: Path) -> None:
+        session_id = store.new_session(db=tmp_store)
+        store.add_message(session_id, "user", "erste")
+        store.add_message(session_id, "assistant", "zweite")
+        store.add_message(session_id, "user", "dritte")
+        tools = store.make_session_tools()
+        tool = next(t for t in tools if t.name == "session_scroll")
+        out = tool.func(session_id=session_id, window=2)
+        assert "[user] erste" not in out
+        assert "[assistant] zweite" in out
+        assert "[user] dritte" in out
+
+    def test_session_scroll_tool_empty(self, tmp_store: Path) -> None:
+        tools = store.make_session_tools()
+        tool = next(t for t in tools if t.name == "session_scroll")
+        assert "no session" in tool.func(session_id="ghost")
+
+
+class TestScroll:
+    def test_scroll_latest_without_anchor(self, tmp_store: Path) -> None:
+        session_id = store.new_session(db=tmp_store)
+        for index in range(10):
+            store.add_message(session_id, "user", f"nachricht {index}", db=tmp_store)
+        messages = store.scroll(session_id, window=3, db=tmp_store)
+        contents = [m["content"] for m in messages]
+        assert contents == ["nachricht 7", "nachricht 8", "nachricht 9"]
+
+    def test_scroll_around_anchor(self, tmp_store: Path) -> None:
+        session_id = store.new_session(db=tmp_store)
+        anchor = None
+        for index in range(10):
+            anchor = store.add_message(session_id, "user", f"nachricht {index}", db=tmp_store)
+        messages = store.scroll(session_id, around_message_id=anchor - 1, window=1, db=tmp_store)
+        ids = [m["id"] for m in messages]
+        assert ids == [anchor - 2, anchor - 1, anchor]  # anchor ± window
+
+    def test_scroll_unknown_session(self, tmp_store: Path) -> None:
+        assert store.scroll("ghost", db=tmp_store) == []

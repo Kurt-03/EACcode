@@ -11,6 +11,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from eaccode import config as cfg
 from eaccode.agent import Tool
@@ -192,6 +193,55 @@ def show(session_id: str, db: Path | None = None) -> list[dict[str, str]]:
         conn.close()
 
 
+def scroll(
+    session_id: str,
+    around_message_id: int | None = None,
+    window: int = 5,
+    db: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Messages of a session with ids; anchored around a message or latest.
+
+    Returns entries with ``id``, ``role``, ``content``, ``created_at``.
+    Without an anchor the most recent ``window`` messages are returned.
+    """
+    init_db(db)
+    conn = _connect(db)
+    try:
+        if around_message_id is not None:
+            rows = conn.execute(
+                """
+                SELECT id, role, content, created_at FROM messages
+                WHERE session_id = ? AND id BETWEEN ? AND ?
+                ORDER BY id
+                """,
+                (
+                    session_id,
+                    max(1, around_message_id - window),
+                    around_message_id + window,
+                ),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT id, role, content, created_at FROM messages
+                WHERE session_id = ? ORDER BY id DESC LIMIT ?
+                """,
+                (session_id, window),
+            ).fetchall()
+            rows = list(reversed(rows))
+        return [
+            {
+                "id": r["id"],
+                "role": r["role"],
+                "content": r["content"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
 def search(query: str, limit: int = 5, db: Path | None = None) -> list[SearchHit]:
     """Full-text search across all sessions (FTS5, LIKE fallback)."""
     init_db(db)
@@ -276,6 +326,16 @@ def _tool_session_search(query: str) -> str:
     )
 
 
+def _tool_session_scroll(session_id: str, window: int = 8) -> str:
+    """Agent-facing scroll: the most recent messages of one session."""
+    messages = scroll(session_id, window=window)
+    if not messages:
+        return f"(no session or empty: {session_id})"
+    return "\n".join(
+        f"[{m['role']}] {m['content']}" for m in messages
+    )
+
+
 def make_session_tools() -> list[Tool]:
     """Agent tools for the session store (B3)."""
     return [
@@ -289,5 +349,19 @@ def make_session_tools() -> list[Tool]:
                 "properties": {"query": {"type": "string"}},
                 "required": ["query"],
             },
-        )
+        ),
+        Tool(
+            "session_scroll",
+            "Read the most recent messages of a session (use the session id "
+            "from session_search). Use to get full context of a past session.",
+            _tool_session_scroll,
+            {
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string"},
+                    "window": {"type": "integer"},
+                },
+                "required": ["session_id"],
+            },
+        ),
     ]

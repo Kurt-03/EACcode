@@ -8,6 +8,7 @@ TUI (Phase A8).
 from __future__ import annotations
 
 import contextlib
+import re
 import sys
 from typing import Any, TextIO
 
@@ -83,6 +84,30 @@ def _handle_command(
     return None
 
 
+SESSION_LINK_RE = re.compile(r"@session:([A-Za-z0-9_]+)")
+
+
+def _resolve_session_links(text: str) -> list[dict[str, Any]]:
+    """Resolve @session:<id> references into system context messages."""
+    context: list[dict[str, Any]] = []
+    for match in SESSION_LINK_RE.finditer(text):
+        session_id = match.group(1)
+        messages = store.show(session_id)
+        if not messages:
+            continue
+        rendered = "\n".join(f"[{m['role']}] {m['content']}" for m in messages)
+        context.append(
+            {
+                "role": "system",
+                "content": (
+                    f"## Referenced session {session_id} (context for the user's "
+                    f"question):\n{rendered}"
+                ),
+            }
+        )
+    return context
+
+
 def _handle_chat(
     text: str,
     agent: Agent,
@@ -92,6 +117,10 @@ def _handle_chat(
 ) -> None:
     """Send one user message to the agent and print the final answer."""
     messages = list(chat_history) + [{"role": "user", "content": text}]
+    with contextlib.suppress(Exception):
+        linked = _resolve_session_links(text)
+        if linked:
+            messages = list(chat_history) + linked + [{"role": "user", "content": text}]
     try:
         history = agent.run(messages)
     except Exception as exc:  # agent failures must not kill the REPL

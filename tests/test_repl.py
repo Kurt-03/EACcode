@@ -199,3 +199,20 @@ class TestChat:
         _, out = _run("/session browse", "/session search wichtige", "/exit")
         assert "wichtige frage" in out
         assert "2 msgs" in out
+
+    def test_session_link_injects_context(self, isolated_config: Path) -> None:
+        agent = FakeAgent(reply="antwort")
+        run_repl(io.StringIO("erste frage\n/exit\n"), io.StringIO(), agent=agent)
+        session_id = store.browse()[0].id
+        agent2 = FakeAgent(reply="ok")
+        run_repl(
+            io.StringIO(f"was war da? @session:{session_id}\n/exit\n"),
+            io.StringIO(),
+            agent=agent2,
+        )
+        last_call = agent2.calls[-1]
+        roles = [m["role"] for m in last_call]
+        assert roles == ["system", "user"]  # linked context + user question
+        context = last_call[0]["content"]
+        assert "Referenced session" in context
+        assert "erste frage" in context
