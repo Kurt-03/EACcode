@@ -19,78 +19,32 @@ Wie du nach jedem Schritt selbst prüfst, dass eaccode wirklich funktioniert.
 
 ---
 
-## Phase A — Foundation & MVP
+## Phase A — Foundation & MVP ✅ (v0.0.1, Stand 2026-08-13)
 
-### A1 Projektgerüst ✅ (fertig, Commit `df4bbe1`)
+> Alle Live-Checks laufen **in der eaccode-Session**: `eaccode` in der CMD starten,
+> dann die Slash-Commands nutzen. Alternativ `eaccode <command>` direkt.
 
-| Check | Kommando | Erwartung |
+### A1–A8: Kompletter Session-Durchlauf
+
+| Check | Kommando (in der Session) | Erwartung |
 |---|---|---|
-| Version | `uv run eaccode --version` | `eaccode 0.0.1` |
-| Hilfe | `uv run eaccode --help` | Usage + Produktbeschreibung |
-| python -m | `uv run python -m eaccode --version` | `eaccode 0.0.1` |
+| Start | `eaccode` | Banner `eaccode 0.0.1 - self-improving generalist agent. Type /help` |
+| Version | `/version` | `eaccode 0.0.1` |
+| Hilfe | `/help` | Liste aller Befehle |
+| Config | `/config show` | Werte sichtbar, **Keys maskiert** (`sk-***` / `not set`) |
+| Provider | `/provider list` | Provider mit Key-Status + base_url |
+| Modelle | `/model list` | Katalog mit `(default)` / `(fallback)`-Markern |
+| Memory | `/memory add Test` · `/memory show` | `ok` · Eintrag in `## Agent Memory` |
+| Chat | normalen Text senden | `eaccode> <Antwort>` (braucht API-Key) |
+| One-Shot | `eaccode -p "Hallo"` | Antwort ODER sauberer `Error:` (kein Key) |
+| TUI | `eaccode tui` | App startet, **Input-Fokus**, `/help` funktioniert, `Ctrl+Q` beendet |
 
-### A2 Config & Secrets
+### Key eintragen (einmalig, für echte Chat-Calls)
 
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Config anlegen | `uv run eaccode config init` | erstellt `config.yaml` (Pfad wird gezeigt) |
-| Wert setzen | `uv run eaccode config set model.default openrouter/...` | `ok`, Wert in Datei |
-| Config zeigen | `uv run eaccode config show` | Werte sichtbar, **Keys maskiert** (`sk-***`) |
-| Key setzen | `uv run eaccode config set-key <provider>.api_key` | verdeckte Eingabe (kein Echo), Datei mit `chmod 600`, Key **nicht** in `config show` |
-| .env laden | `OPENAI_API_KEY=... uv run eaccode config show` | Key aus .env wird erkannt |
-
-### A3 Model Router (BYOK)
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Katalog | `uv run eaccode model list` | Provider + Modelle mit Kosten-Metadaten |
-| Live-Call remote | `uv run eaccode model ping <dein-remote-model>` | Antwort in < 10 s (z. B. `pong`) |
-| Live-Call lokal | `uv run eaccode model ping ollama/<modell>` | Antwort (Ollama muss laufen) |
-| Fallback | ungültigen Primär-Key setzen, dann `model ping` | Router fällt automatisch auf Fallback-Modell zurück + Warnung |
-
-### A4 Agent Core (ReAct-Loop)
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Erster Chat | `uv run eaccode -p "Antworte nur mit: Hallo"` | exakt `Hallo` |
-| Tool-Call | `uv run eaccode -p "Wie spät ist es?"` | nutzt Info-Tool (im Log/Trace sichtbar), korrekte Zeit |
-| Interrupt | Chat starten, während Antwort `Ctrl+C` | sauberer Abbruch, kein Traceback |
-| Token-Budget | riesigen Prompt schicken | saubere Abbruch-Meldung, kein Crash |
-
-### A5 Basis-Tools
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Files | `uv run eaccode -p "Erstelle test.txt mit Inhalt 'hi' und lies es"` | Datei existiert, Inhalt `hi` |
-| Terminal | `uv run eaccode -p "Führe echo hallo aus"` | Permission-Prompt erscheint; nach Bestätigung: `hallo` |
-| Web | `uv run eaccode -p "Aktuelle Uhrzeit in Tokio?"` | korrekte Antwort mit Zeitzonen-Differenz |
-| Web-Search | `uv run eaccode -p "Suche: Wetter Berlin heute"` | Ergebnis mit Quellenangabe |
-
-### A6 Persistente Memory
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Merken | `uv run eaccode -p "Merke: Lieblingsfarbe grün"` | Eintrag in MEMORY.md |
-| Überleben | **Neue Session:** `uv run eaccode -p "Welche Farbe mag ich?"` | antwortet `grün` (Beweis: Memory überlebt Neustart) |
-| Anzeigen | `uv run eaccode memory show` | MEMORY.md + USER.md Inhalt |
-
-### A7 CLI
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Interaktiv | `uv run eaccode` | Chat startet, `/help` zeigt Befehle |
-| Slash | `/clear` dann Chat | Historie geleert |
-| Exit | `/exit` | sauberes Ende, Exit-Code 0 |
-
-### A8 TUI-Skelett
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Start | `uv run eaccode tui` | App startet, **Input-Fokus liegt im Eingabefeld** |
-| Chat | tippen + Enter | Antwort mit Rollen-Glyphen (❯/⚡/·/◈) |
-| Slash-Overlay | `/` drücken | Fuzzy-Overlay mit Befehlen |
-| Auswahl | Text mit Maus selektieren | `/copy`-Angebot erscheint |
-| Exit | `Ctrl+C` | sauber, kein Traceback |
+```
+/provider set-key openrouter     ← verdeckte Eingabe, kein Echo
+/model ping openrouter/anthropic/claude-sonnet-4   → "replied: pong"
+```
 
 ---
 
