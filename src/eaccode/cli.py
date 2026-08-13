@@ -70,6 +70,11 @@ def main(
             stdout.write("Usage: eaccode -p <prompt>\n")
             raise SystemExit(2)
         raise SystemExit(_run_once(" ".join(argv[1:]), stdout))
+    if first == "tui":
+        from eaccode.tui import EaccodeApp
+
+        EaccodeApp(agent_factory=build_agent).run()
+        raise SystemExit(0)
     if first == "config":
         raise SystemExit(run_config_command(argv[1:], stdout=stdout, stdin=stdin))
     if first == "provider":
