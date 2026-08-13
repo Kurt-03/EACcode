@@ -26,4 +26,4 @@ Textdatei lesen (UTF-8, bis 8000 Zeichen, danach Truncation-Marker).
 - (keine)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../20-areas/architecture|Architektur]]
+[[15-features/README.md|Feature-Register]] · [[20-areas/architecture.md|Architektur]]

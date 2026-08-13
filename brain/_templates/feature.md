@@ -20,4 +20,4 @@ tags: [type/feature, feature/{{typ}}]
 ## Offene Punkte
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[README.md|Vault-Handbuch]]

@@ -39,4 +39,4 @@ tags: [type/snapshot, project/phase-a]
 
 ## Nächste Schritte
 
-→ [[../10-projects/phase-b|Phase B — Hermes-Core]] (Skills, Learning-Loop, Session-Suche, Subagents)
+→ [[10-projects/phase-b.md|Phase B]] (Skills, Learning-Loop, Session-Suche, Subagents)

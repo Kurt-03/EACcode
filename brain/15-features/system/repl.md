@@ -34,4 +34,4 @@ Memory in REPL
 - (keine für A)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../..//tui|TUI]] · [[one-shot|One-Shot]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/tui.md|TUI]] · [[15-features/system/one-shot.md|One-Shot]]

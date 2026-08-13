@@ -32,4 +32,4 @@ Ziel: Das Lern- und Gedächtnis-Herz — der Unterschied zu „normalen" Agents.
 ## Querverweise
 
 - Master-Plan: `.hermes/plans/2026-08-13_130000-eaccode-v2-master-plan.md`
-- Architektur: [[../20-areas/architecture|architecture]]
+- Architektur: [[20-areas/architecture.md|Architektur]]

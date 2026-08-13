@@ -26,4 +26,4 @@ Text in Datei schreiben; legt Eltern-Verzeichnisse automatisch an.
 - (keine)
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

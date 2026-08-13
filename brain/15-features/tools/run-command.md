@@ -29,4 +29,4 @@ REPL, Default-Deny).
 - TUI: aktuell Deny (kein interaktiver Prompt im Skelett)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[permission-gate|Permission-Gate]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/permission-gate.md|Permission-Gate]]

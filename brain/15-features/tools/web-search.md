@@ -26,4 +26,4 @@ Web-Suche (DuckDuckGo HTML) — liefert Titel + URL je Treffer.
 - DDG-HTML kann sich ändern → robusteren Endpunkt/API evaluieren (Research)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../30-research/README|Research]]
+[[15-features/README.md|Feature-Register]] · [[30-research/README.md|Research]]

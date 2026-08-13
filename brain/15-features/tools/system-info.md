@@ -19,4 +19,4 @@ Betriebssystem- und Hardware-Kurzinfo (OS, Release, Architektur).
 `tests/test_tools.py` — nicht leer
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

@@ -20,4 +20,4 @@ Agent-Aufgaben.
 `tests/test_tools.py` — Format-Länge 19
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

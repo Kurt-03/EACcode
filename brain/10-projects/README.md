@@ -6,11 +6,11 @@ und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 ## Aktive Phase: B — Hermes-Core
 
 Ziel: Skill-System mit Learning-Loop, Session-Suche (FTS5), Memory-Hierarchie,
-Subagents, Parallel-Execution. → [[phase-b|Phase-B-Skizze]]
+Subagents, Parallel-Execution. → [[10-projects/phase-b.md|Phase B]]
 
 ## Abgeschlossen
 
-- **Phase A — Foundation & MVP ✅** (2026-08-13) → [[../50-archive/phase-a|Abschluss-Snapshot]]
+- **Phase A — Foundation & MVP ✅** (2026-08-13) → [[50-archive/phase-a.md|Phase A]]
 
 ## Offene Entscheidungen
 

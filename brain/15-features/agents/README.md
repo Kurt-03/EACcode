@@ -16,4 +16,4 @@ Jeder Subagent wird hier eine eigene Feature-Notiz bekommen (Status `planned`).
 | (noch keine definiert) | — | planned |
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../system/agent-core|Agent Core]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]]

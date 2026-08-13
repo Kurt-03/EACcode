@@ -12,7 +12,7 @@ neu zusammengesucht.**
 - Der Agent **aktualisiert** bestehende Seiten (update statt append) und
   markiert Widersprüche
 - Jede Seite: Frontmatter (`date`, `tags`), Wikilinks, Fakten-Regel (siehe
-  [[../README|Vault-Handbuch]])
+  [[README.md|Vault-Handbuch]])
 
 ## Status
 

@@ -36,4 +36,4 @@ REPL-Chat-Tests
 - B3: Session-Store (FTS5) — dann kann der Agent alte Sessions durchsuchen
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../../20-areas/architecture|Architektur]]
+[[15-features/README.md|Feature-Register]] · [[20-areas/architecture.md|Architektur]]

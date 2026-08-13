@@ -16,4 +16,4 @@ tags: [area/{{area}}, type/area]
 
 ## Querverweise
 
-- [[INDEX|Index]]
+- [[INDEX.md|Index]]

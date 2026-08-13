@@ -29,4 +29,4 @@ Commands, Agent-Calls im Worker-Thread (UI blockiert nie).
 - Interaktiver Permission-Prompt (C1)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[repl|REPL]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/repl.md|REPL]]

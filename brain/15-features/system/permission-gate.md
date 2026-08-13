@@ -27,4 +27,4 @@ Shell-Kommandos des Agents brauchen Zustimmung — sicherer Default.
 - TUI-Prompt (Modal)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[../tools/run-command|Tool: run_command]]
+[[15-features/README.md|Feature-Register]] · [[15-features/tools/run-command.md|Tool: run_command]]

@@ -33,4 +33,4 @@ providers:
 - (keine)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[model-router|Model Router]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/model-router.md|Model Router]]

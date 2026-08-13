@@ -26,4 +26,4 @@ Dateien finden, deren Text ein Muster enthält (rekursiv, max. 50 Treffer).
 - D1 (Repo-Verständnis): Ripgrep-basiert + `.gitignore`-Respekt statt rglob
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

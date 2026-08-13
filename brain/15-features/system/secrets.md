@@ -29,4 +29,4 @@ API-Keys gehören dem User, bleiben lokal, erscheinen nie im Klartext.
 `tests/test_config.py` (TestMasking, TestEnv) + `tests/test_router.py` (TestApiKey)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[config|config.yaml]] · [[../../adr/0001-config-yaml-design|ADR 0001]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/config.md|config.yaml]] · [[adr/0001-config-yaml-design.md|ADR 0001]]

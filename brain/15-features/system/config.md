@@ -26,7 +26,7 @@ Ablage und sicherem Secret-Handling.
 ```
 
 ## Entscheidungen
-- [[../../adr/0001-config-yaml-design|ADR 0001]] — Design + verworfenes platformdirs
+- [[adr/0001-config-yaml-design.md|ADR 0001]] — Design + verworfenes platformdirs
 
 ## Tests
 `tests/test_config.py` + `tests/test_commands.py` (TestConfig/TestMemory…)
@@ -35,4 +35,4 @@ Ablage und sicherem Secret-Handling.
 - (keine)
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[secrets|Secrets]] · [[model-router|Router]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/secrets.md|Secrets]] · [[15-features/system/model-router.md|Model Router]]

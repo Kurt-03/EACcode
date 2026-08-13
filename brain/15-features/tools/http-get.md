@@ -26,4 +26,4 @@ URL abrufen und Text-Inhalt zurückgeben (max. 8000 Zeichen, Timeout 15 s).
 - (keine) — Browser-Automatisierung kommt als eigenes Feature (D6)
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

@@ -22,4 +22,4 @@ Verzeichnisinhalt auflisten (Verzeichnisse mit `/`-Suffix, alphabetisch).
 `tests/test_tools.py` — TestFiles (Inhalt, Unterordner-Marker)
 
 ## Verknüpft
-[[../README|Feature-Register]]
+[[15-features/README.md|Feature-Register]]

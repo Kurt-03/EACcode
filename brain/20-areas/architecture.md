@@ -34,7 +34,7 @@ tags: [area/architecture, type/area]
 
 - **LiteLLM als einzige LLM-Schnittstelle** — `router.py`: alle Provider über
   `provider/model`-IDs; Keys aus config (env > file); `completion_response`
-  (roh) + `completion_text` (Text) getrennt → [[../adr/0002-phase-a-architecture|ADR 0002]]
+  (roh) + `completion_text` (Text) getrennt → [[adr/0002-phase-a-architecture.md|ADR 0002]]
 - **ReAct-Loop ohne Framework** — `agent.py`: synchron, testbar, Tools als
   Dataclasses mit JSON-Schema; Tool-Fehler töten den Loop nie
 - **Memory als Markdown** — MEMORY.md/USER.md + System-Prompt-Injection;

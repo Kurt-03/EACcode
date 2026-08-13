@@ -48,6 +48,9 @@ Neue Features → Template `_templates/feature.md` verwenden.
 ## Schreibregeln
 
 - **Frontmatter** (`date`, `status`, `tags`) — siehe `_templates/`.
+- **Wikilinks immer mit Pfad vom Vault-Root + Alias:**
+  `[[15-features/system/repl.md|REPL]]` — nie Kurznamen, nie `../`-Pfade.
+  In Markdown-Tabellen: `\|` als Escape verwenden.
 - **Wikilinks statt Duplikate:** Pläne/Tasks/Code-Doku leben im Repo;
   hier wird *verlinkt*, nicht kopiert.
 - **Eine Idee pro Notiz** (Atomic Notes) — so bleiben Links sauber.
@@ -59,5 +62,5 @@ Neue Features → Template `_templates/feature.md` verwenden.
 
 1. Schneller Gedanke → `00-inbox/` (ein Satz reicht)
 2. Kuration (wöchentlich oder nach Steps) → Bereich, verlinkt, Fakten-Regel geprüft
-3. Architektur-Entscheidung → `adr/` + Eintrag im [[INDEX|Index]]
+3. Architektur-Entscheidung → `adr/` + Eintrag im [[INDEX.md|Index]]
 4. Phase abgeschlossen → Abschluss-Snapshot nach `50-archive/`

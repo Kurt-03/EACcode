@@ -26,4 +26,4 @@ eaccode -p "Erstelle test.txt mit Inhalt 'hi'"    # nutzt Tools
 `tests/test_cli.py` — One-Shot-Fehlerpfad ohne Config
 
 ## Verknüpft
-[[../README|Feature-Register]] · [[repl|REPL]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/repl.md|REPL]]
