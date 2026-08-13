@@ -74,50 +74,34 @@ Chat-Nachricht senden                          → fällt auf Fallback zurück O
 
 ## Phase B — Hermes-Core
 
-### B1 Skill-System
+### B1/B2: Skills & Learning-Loop
 
-| Check | Kommando | Erwartung |
+| Check | Eingabe | Erwartung |
 |---|---|---|
-| Liste | `uv run eaccode skills list` | vorhandene Skills mit Beschreibung |
-| Trigger | Prompt, der einen Skill-Trigger enthält | Skill wird geladen (im Trace sichtbar) |
+| Skill ansehen | `/skill list` | `zeit-helfer` + eigene Skills |
+| Skill-Injection | `Wie spät ist es? UHRZEIT` | Antwort mit echter Zeit (Skill + current_time) |
+| Learning-Loop | `Erstelle einen Skill namens begruessung mit Trigger hallo: Begrüße freundlich` | Agent ruft `create_skill` auf → `skill 'begruessung' created` |
+| Skill wirkt | `Hallo!` | Begrüßung nach Skill |
+| Dedup | `Erstelle nochmal einen Skill mit Trigger hallo` | `Error: trigger 'hallo' is already used` |
+| Aufräumen | `/skill remove begruessung` | `skill 'begruessung' removed` |
 
-### B2 Learning-Loop ⭐ (Herzstück)
+### B3: Session-Store
 
-| Check | Kommando | Erwartung |
+| Check | Eingabe | Erwartung |
 |---|---|---|
-| Skill entsteht | komplexen Task geben (z. B. „Schreibe Skript, das …“) | nach Abschluss: neuer Skill in `skills list` |
-| Skill wird genutzt | denselben Task erneut geben | Trace zeigt Skill-Load (schneller/besser) |
-| Skill verbessert sich | Task mit leichtem Twist dritteln | `skills show <name>` zeigt Verbesserung |
+| Chat wird gespeichert | `Wie baue ich einen Router?` + `/session browse` | Session mit Titel + `2 msgs` |
+| Volltextsuche | `/session search Router` | Session + Snippet (`(2 hits)`) |
+| Session anzeigen | `/session show <id>` | `[user]` + `[assistant]` Zeilen |
+| Agent-Suche | `Durchsuche deine alten Sessions nach Router und fasse zusammen` | Agent nutzt `session_search`, Antwort mit Fundstellen |
 
-### B3 Session-Store
+### B4: Memory-Hierarchie
 
-| Check | Kommando | Erwartung |
+| Check | Eingabe | Erwartung |
 |---|---|---|
-| Sessions | 2 Gespräche führen, dann `uv run eaccode sessions list` | beide sichtbar |
-| Suche | `uv run eaccode sessions search "Stichwort"` | Treffer mit Kontext-Snippet |
-| Link | `@session:<id>` in neuem Chat einfügen | Agent hat Kontext aus alter Session |
-
-### B4 Memory-Hierarchie
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Projekt-Memory | im Repo arbeiten, Fakt merken | Eintrag landet projektbezogen, nicht global |
-| Budget | Memory fast voll | automatische Kuration (alte Einträge werden konsolidiert) |
-| Konflikt | gleichen Fakt mit neuem Wert merken | Update, kein Duplikat |
-
-### B5 Subagents
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Parallel | „Starte 2 Subagenten: Gedicht über Katzen + über Hunde, fasse zusammen“ | beide Ergebnisse kommen zurück |
-| Limit | 10 gleichzeitig anfordern | max. 6 parallel, Rest wartet |
-
-### B6 Parallel-Execution
-
-| Check | Kommando | Erwartung |
-|---|---|---|
-| Parallele Calls | Prompt mit mehreren unabhängigen Tool-Calls | Log zeigt überlappende Timestamps |
-| Fehler-Isolation | ein Tool schlägt fehl | andere laufen weiter, Fehler separat gemeldet |
+| Agent merkt selbst | `Merke dir: Ich trinke Kaffee` | Fakt landet in USER.md |
+| Beweis | `/memory show` | `## About the User` + `- Trinkt Kaffee` |
+| Überleben | `/exit` → `eaccode` → `Was trinke ich?` | erinnert sich (Memory-Injection) |
+| Konsolidierung | viele Fakten hinzufügen (über 2200 Zeichen) | `Consolidate now`-Meldung, nichts wird blind angehängt |
 
 ---
 
