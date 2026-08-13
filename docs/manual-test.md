@@ -93,6 +93,8 @@ Chat-Nachricht senden                          → fällt auf Fallback zurück O
 | Volltextsuche | `/session search Router` | Session + Snippet (`(2 hits)`) |
 | Session anzeigen | `/session show <id>` | `[user]` + `[assistant]` Zeilen |
 | Agent-Suche | `Durchsuche deine alten Sessions nach Router und fasse zusammen` | Agent nutzt `session_search`, Antwort mit Fundstellen |
+| @session:-Link | `Was war in dieser Session? @session:<id>` | Agent bekommt den Session-Inhalt als Kontext und fasst zusammen |
+| Scroll (Agent) | `Schau in die letzte Session und sag mir die letzte Frage` | Agent nutzt `session_scroll` |
 
 ### B4: Memory-Hierarchie
 
@@ -102,6 +104,22 @@ Chat-Nachricht senden                          → fällt auf Fallback zurück O
 | Beweis | `/memory show` | `## About the User` + `- Trinkt Kaffee` |
 | Überleben | `/exit` → `eaccode` → `Was trinke ich?` | erinnert sich (Memory-Injection) |
 | Konsolidierung | viele Fakten hinzufügen (über 2200 Zeichen) | `Consolidate now`-Meldung, nichts wird blind angehängt |
+
+### B5: Subagents
+
+| Check | Eingabe | Erwartung |
+|---|---|---|
+| 2 parallel | `Starte ZWEI Subagenten parallel: A (nur http_get) holt https://example.com, B (nur http_get) holt https://example.org. Nenne beide Titel.` | beide Antworten in ~15–20 s (parallel), 403 von example.org sauber gemeldet |
+| Reasoning-only | `Starte einen Subagenten ohne Tools, der ein Gedicht schreibt.` | Gedicht kommt |
+| Unbekanntes Tool | `Starte einen Subagenten mit dem Tool ghost_tool.` | `Error: unknown tool: ghost_tool (available: …)` |
+| Tool-Restriktion | `Starte einen Subagenten, der nur current_time darf, und frag nach der Zeit.` | nur die Zeit, keine Datei-/Web-Zugriffe |
+
+### B6: Parallel-Execution
+
+| Check | Eingabe | Erwartung |
+|---|---|---|
+| Echte Parallelität | 2 Subagents (oben) | Gesamtzeit ≈ ein Subagent (nicht doppelt) |
+| Fehler-Isolation | Subagent A bekommt kaputte URL (403), B funktioniert | B liefert trotzdem, A meldet sauber, Haupt-Agent fasst beide zusammen |
 
 ---
 
