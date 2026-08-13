@@ -3,12 +3,9 @@
 Aktive Arbeitsstränge und offene Entscheidungen. *(Pointer: aktueller Code-
 und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 
-## Aktive Phase: B — Hermes-Core
+## Aktive Phase: — (Phase B KOMPLETT ✅, 2026-08-13)
 
-Ziel: Skill-System mit Learning-Loop, Session-Suche, Memory-Hierarchie,
-Subagents, Parallel-Execution. → [[10-projects/phase-b.md|Phase B]]
-
-**Fortschritt:** B1 ✅ · B2 ✅ · B3 ✅ · B4 ✅ · B5 ✅ · B6 ⏳ (Parallel-Kern ist durch B5 schon drin — B6 formalisiert)
+**Als Nächstes: Phase C (Production-Reife)** — Permissions/Sandbox, Cron/Daemon, MCP, Gateway, Packaging → [[50-archive/phase-b.md|phase-b]] (wird beim Abschluss angelegt)
 
 ## Abgeschlossen
 

@@ -37,5 +37,5 @@ Turn-Budget, JSON-Argumente
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/agent.py` → [[15-features/system/config.md|config.yaml]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|skill-system]]
+- `src/eaccode/agent.py` → [[15-features/system/config.md|Config]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|Skill System]]
 

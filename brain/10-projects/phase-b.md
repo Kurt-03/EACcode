@@ -20,7 +20,15 @@ Ziel: Das Lern- und Gedächtnis-Herz — der Unterschied zu „normalen" Agents.
 4. **B4 Memory-Hierarchie ✅** — global vs. projektbezogen, Char-Budget,
    Batch-Kuration, Konflikte
 5. **B5 Subagents ✅** — isolierte Kontexte, eigene Tool-Sets, Limits
-6. **B6 Parallel-Execution** — mehrere Tool-Calls gleichzeitig, Fehler-Isolation
+6. **B6 Parallel-Execution ✅** — mehrere Tool-Calls gleichzeitig, Fehler-Isolation
+
+## Phase B — KOMPLETT ✅ (2026-08-13)
+
+DoD erfüllt: Agent hat selbst einen Skill erstellt + verbessert (B1/B2),
+Session-Suche findet alte Gespräche (B3), Memory kuratiert der Agent selbst
+(B4), 2 Subagents parallel (B5/B6). Restpunkte (bewusst notiert):
+Subagent-Ergebnisse in Session-Store loggen, Permission-Race (C1),
+Timeout-Abbruch laufender Tool-Calls (nach Turn-Grenze).
 
 ## DoD
 

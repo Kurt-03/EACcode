@@ -1,7 +1,7 @@
 ---
 name: parallel-execution
 type: system
-status: active
+status: done
 phase: B6
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -35,4 +35,4 @@ Recherchen) — mit stabiler Zusammenführung und Fehler-Isolation.
 - Subagent-Ergebnisse in Session-Store loggen (B3-Erweiterung)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/subagents.md|Subagents]]
+[[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/subagents.md|subagents]]
