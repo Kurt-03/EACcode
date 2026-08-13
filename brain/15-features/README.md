@@ -37,6 +37,9 @@ eintragen.
 | Parallel-Execution | system | done | B6 | [[15-features/system/parallel-execution.md\|parallel-execution]] |
 | Permissions (C1) | system | done | C1 | [[15-features/system/permissions.md\|permissions]] |
 | Repo-Verständnis (D1) | system | done | D1 | [[15-features/system/repo-understanding.md\|repo-understanding]] |
+| Diff-Editing (D2) | system | done | D2 | [[15-features/system/diff-editing.md\|diff-editing]] |
+| Test-Runner (D3) | system | done | D3 | [[15-features/system/test-runner.md\|test-runner]] |
+| Git & PR (D4) | system | done | D4 | [[15-features/system/git-pr.md\|git-pr]] |
 | Cron & Daemon (C2) | system | done | C2 | [[15-features/system/cron-daemon.md\|cron-daemon]] |
 | MCP-Client (C3) | system | done | C3 | [[15-features/system/mcp-client.md\|mcp-client]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
