@@ -1,6 +1,6 @@
 [project]
 name = "eaccode"
-version = "0.1.0"
+version = "0.0.1"
 description = "Self-improving generalist agent — Hermes-inspired orchestration with Claude-Code-level coding"
 readme = "README.md"
 requires-python = ">=3.12"

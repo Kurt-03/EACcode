@@ -5,4 +5,4 @@ model provider via LiteLLM, and learns from experience through persistent
 memory and a skill loop.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"

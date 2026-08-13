@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import argparse
+from typing import TextIO
 
 from eaccode import __version__
+from eaccode.repl import run_repl
 
 DESCRIPTION = (
-    "Self-improving generalist agent — Hermes-inspired orchestration "
+    "Self-improving generalist agent - Hermes-inspired orchestration "
     "with Claude-Code-level coding."
 )
 
@@ -26,6 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> None:
-    """Entry point: parse arguments and dispatch (chat loop arrives in Phase A7)."""
+def main(
+    argv: list[str] | None = None,
+    stdin: TextIO | None = None,
+    stdout: TextIO | None = None,
+) -> None:
+    """Entry point: flags like --version, otherwise start the interactive shell."""
     build_parser().parse_args(argv)
+    raise SystemExit(run_repl(stdin, stdout))

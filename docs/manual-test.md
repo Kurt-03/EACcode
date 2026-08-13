@@ -25,9 +25,9 @@ Wie du nach jedem Schritt selbst prüfst, dass eaccode wirklich funktioniert.
 
 | Check | Kommando | Erwartung |
 |---|---|---|
-| Version | `uv run eaccode --version` | `eaccode 0.1.0` |
+| Version | `uv run eaccode --version` | `eaccode 0.0.1` |
 | Hilfe | `uv run eaccode --help` | Usage + Produktbeschreibung |
-| python -m | `uv run python -m eaccode --version` | `eaccode 0.1.0` |
+| python -m | `uv run python -m eaccode --version` | `eaccode 0.0.1` |
 
 ### A2 Config & Secrets
 

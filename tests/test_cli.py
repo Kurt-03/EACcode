@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+
 import pytest
 
 from eaccode import __version__
@@ -26,6 +28,8 @@ def test_help_flag_describes_agent(capsys: pytest.CaptureFixture[str]) -> None:
     assert "agent" in captured.out.lower()
 
 
-def test_bare_invocation_exits_zero() -> None:
-    """Bare `eaccode` must not crash (chat mode arrives later)."""
-    main([])
+def test_bare_invocation_starts_shell() -> None:
+    """Bare `eaccode` must start the interactive shell and exit cleanly on EOF."""
+    with pytest.raises(SystemExit) as exc_info:
+        main([], stdin=io.StringIO(""), stdout=io.StringIO())
+    assert exc_info.value.code == 0
