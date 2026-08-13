@@ -12,6 +12,7 @@ import os
 import re
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -58,6 +59,59 @@ def _lock_for(target: Path) -> threading.Lock:
     return _locks[key]
 
 
+class MemoryLockError(MemoryError):
+    """Raised when the memory file is locked by another process."""
+
+
+class _FileLock:
+    """Cross-process exclusive lock via <target>.lock (msvcrt/fcntl)."""
+
+    def __init__(self, target: Path, timeout: float = 5.0) -> None:
+        self._path = target.with_suffix(target.suffix + ".lock")
+        self._handle: Any = None
+        self._timeout = timeout
+
+    def __enter__(self) -> _FileLock:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        self._handle = open(self._path, "a+")
+        start = time.monotonic()
+        while True:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                return self
+            except OSError:
+                if time.monotonic() - start > self._timeout:
+                    raise MemoryLockError(
+                        f"memory file is locked by another process "
+                        f"({self._path.name})"
+                    ) from None
+                time.sleep(0.1)
+
+    def __exit__(self, *exc: Any) -> None:
+        if self._handle is not None:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    self._handle.seek(0)
+                    msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            self._handle.close()
+            self._handle = None
+
+
 def memory_dir() -> Path:
     """Directory holding the memory files (data dir)."""
     return cfg.data_dir()
@@ -80,17 +134,26 @@ def _raw(target: Path) -> str:
 
 
 def _write_atomic(target: Path, content: str) -> None:
-    """Write via temp file + os.replace (crash-safe, no partial writes)."""
+    """Write via temp file + os.replace, under a cross-process lock.
+
+    Read-back verification catches concurrent writers (drift guard).
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
-            handle.write(content)
-        os.replace(tmp_name, target)
-    except BaseException:
-        with __import__("contextlib").suppress(OSError):
-            os.unlink(tmp_name)
-        raise
+    with _FileLock(target):
+        fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="") as handle:
+                handle.write(content)
+            os.replace(tmp_name, target)
+        except BaseException:
+            with __import__("contextlib").suppress(OSError):
+                os.unlink(tmp_name)
+            raise
+        if _raw(target) != content:
+            raise MemoryLockError(
+                "concurrent modification detected while writing "
+                f"{target.name} - file may be inconsistent"
+            )
 
 
 def _migrate_legacy(content: str) -> str:

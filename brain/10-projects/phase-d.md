@@ -63,12 +63,11 @@ bewusst **viel später** → D wird jetzt aktiv.
 | D4.3 | Branch/PR-Workflow via gh-CLI (falls verfügbar) | Feature-Branch + Dry-Run |
 | D4.4 | Abbruch + Revert-Pfade | Rollback-Szenario |
 
-## D5 — Coding-Routing (2 Tasks)
+## D5 — ~~Coding-Routing~~ *(entfernt 2026-08-13, Nutzer)*
 
-| Task | Inhalt | Verifikation |
-|---|---|---|
-| D5.1 | Task-Klassifikation (code/test/refactor/recherche/routine) | Beispiel-Tasks |
-| D5.2 | Router: Modell je Task-Typ (stark für Code, günstig für Routine) + Fallback | echte Aufgabe mit Routing |
+→ **Optionale Idee (nur auf Nachfrage):** Task-Klassifikation (code/test/
+refactor/recherche/routine) + Modell je Task-Typ (stark für Code, günstig
+für Routine) + Fallback-Kette. Nicht Teil der Roadmap.
 
 ## D6 — Browser (3 Tasks)
 
@@ -81,10 +80,10 @@ bewusst **viel später** → D wird jetzt aktiv.
 ---
 
 ## Reihenfolge & Regeln
-D0 → D1 → D2 → D3 → D4 → D5 → D6; ein Feature einzeln bauen und
+D0 → D1 → D2 → D3 → D4 → D6; ein Feature einzeln bauen und
 verifizieren (TDD, 4-Stufen-Regel, Brain-Notiz + Test-Map pro Schritt).
 Browser (D6) ist der größte Brocken — wird am Ende gemacht, der DoD
-braucht ihn nicht.
+braucht ihn nicht. D5 (Routing) wurde vom Nutzer entfernt → optionale Idee.
 
 ## Verknüpft
 [[10-projects/README.md|Dashboard]] · [[15-features/README.md|Feature-Register]] · [[50-archive/phase-b.md|phase-b]] · [[15-features/system/agent-core.md|Agent Core]]

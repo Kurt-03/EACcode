@@ -16,6 +16,8 @@ from eaccode import __version__, store
 from eaccode.agent import Agent
 from eaccode.commands import (
     run_config_command,
+    run_job_command,
+    run_mcp_command,
     run_memory_command,
     run_model_command,
     run_permissions_command,
@@ -37,6 +39,8 @@ Commands:
   /skill <cmd>    manage skills (list, view, new, remove)
   /session <cmd>  search past sessions (browse, search, show)
   /permissions    permission modes and rules (status, mode, allow, deny)
+  /job <cmd>      scheduled jobs (list, add, remove, pause, resume, run)
+  /mcp <cmd>      MCP servers (list, add, import, remove)
   /exit           leave eaccode (alias: /quit)
 
 Everything else is sent to the agent as a chat message.
@@ -55,11 +59,47 @@ def _clear_screen(stdout: TextIO) -> None:
         stdout.write("\x1b[2J\x1b[H")
 
 
+def parse_args(text: str) -> list[str]:
+    """Split command text into arguments, honoring single/double quotes.
+
+    Backslashes are NOT escapes (Windows paths stay intact). Unterminated
+    quotes raise ValueError.
+    """
+    args: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    for char in text.strip():
+        if quote is not None:
+            if char == quote:
+                quote = None
+            else:
+                current.append(char)
+        elif char in ("'", '"'):
+            quote = char
+        elif char.isspace():
+            if current:
+                args.append("".join(current))
+                current = []
+        else:
+            current.append(char)
+    if quote is not None:
+        raise ValueError("unterminated quote in command")
+    if current:
+        args.append("".join(current))
+    return args
+
+
 def _handle_command(
     command: str, stdout: TextIO, stdin: TextIO, chat_history: list[dict[str, Any]]
 ) -> int | None:
     """Dispatch one slash-command; return an exit code or None to continue."""
-    name = command.split()[0] if command else ""
+    try:
+        parts = parse_args(command)
+    except ValueError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return None
+    name = parts[0] if parts else ""
+    rest = parts[1:]
     if name in ("exit", "quit"):
         return 0
     if name == "help":
@@ -70,19 +110,23 @@ def _handle_command(
         _clear_screen(stdout)
         chat_history.clear()
     elif name == "config":
-        run_config_command(command.split()[1:], stdout=stdout, stdin=stdin)
+        run_config_command(rest, stdout=stdout, stdin=stdin)
     elif name == "provider":
-        run_provider_command(command.split()[1:], stdout=stdout)
+        run_provider_command(rest, stdout=stdout)
     elif name == "model":
-        run_model_command(command.split()[1:], stdout=stdout)
+        run_model_command(rest, stdout=stdout)
     elif name == "memory":
-        run_memory_command(command.split()[1:], stdout=stdout)
+        run_memory_command(rest, stdout=stdout)
     elif name == "skill":
-        run_skill_command(command.split()[1:], stdout=stdout)
+        run_skill_command(rest, stdout=stdout)
     elif name == "session":
-        run_session_command(command.split()[1:], stdout=stdout)
+        run_session_command(rest, stdout=stdout)
     elif name == "permissions":
-        run_permissions_command(command.split()[1:], stdout=stdout)
+        run_permissions_command(rest, stdout=stdout)
+    elif name == "job":
+        run_job_command(rest, stdout=stdout)
+    elif name == "mcp":
+        run_mcp_command(rest, stdout=stdout)
     else:
         stdout.write(f"Unknown command: /{name} - type /help for a list of commands.\n")
     return None

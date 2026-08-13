@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from eaccode import __version__, store
+from eaccode import __version__, repl, store
 from eaccode import config as cfg
 from eaccode.repl import run_repl
 
@@ -139,6 +139,43 @@ def test_config_error_does_not_kill_repl(isolated_config: Path) -> None:
     assert "bye" in out
 
 
+class TestParseArgs:
+    def test_simple_split(self) -> None:
+        assert repl.parse_args("memory add wichtiger Fakt") == [
+            "memory",
+            "add",
+            "wichtiger",
+            "Fakt",
+        ]
+
+    def test_double_quotes_group(self) -> None:
+        assert repl.parse_args('skill new x --description "mehrere Worte hier"') == [
+            "skill",
+            "new",
+            "x",
+            "--description",
+            "mehrere Worte hier",
+        ]
+
+    def test_single_quotes_group(self) -> None:
+        assert repl.parse_args("memory add 'ein Fakt'") == ["memory", "add", "ein Fakt"]
+
+    def test_windows_path_keeps_backslashes(self) -> None:
+        assert repl.parse_args('config show "C:\\Users\\kurtj"') == [
+            "config",
+            "show",
+            "C:\\Users\\kurtj",
+        ]
+
+    def test_unterminated_quote_raises(self) -> None:
+        with pytest.raises(ValueError):
+            repl.parse_args('memory add "kaputt')
+
+    def test_empty_and_whitespace(self) -> None:
+        assert repl.parse_args("") == []
+        assert repl.parse_args("   ") == []
+
+
 class TestChat:
     def test_plain_text_goes_to_agent(self, isolated_config: Path) -> None:
         agent = FakeAgent(reply="hallo zurück")
@@ -174,6 +211,29 @@ class TestChat:
     def test_memory_show_in_repl(self, isolated_config: Path) -> None:
         _, out = _run("/memory show", "/exit")
         assert "(memory is empty)" in out
+
+    def test_unterminated_quote_reports_error(
+        self, isolated_config: Path
+    ) -> None:
+        _, out = _run('/memory add "kaputt', "/exit")
+        assert "unterminated quote" in out
+
+    def test_memory_add_with_quoted_text(self, isolated_config: Path) -> None:
+        _, out = _run('/memory add "wichtiger Fakt"', "/memory show", "/exit")
+        assert "ok" in out
+        assert "wichtiger Fakt" in out
+
+    def test_job_command_in_repl(self, isolated_config: Path) -> None:
+        _, out = _run("/job list", "/exit")
+        assert "no jobs yet" in out
+
+    def test_mcp_command_in_repl(
+        self, isolated_config: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(cfg, "config_dir", lambda: isolated_config)
+        cfg.ensure_config()
+        _, out = _run("/mcp list", "/exit")
+        assert "no servers yet" in out
 
     def test_memory_add_in_repl(self, isolated_config: Path) -> None:
         _, out = _run("/memory add wichtiger Fakt", "/memory show", "/exit")

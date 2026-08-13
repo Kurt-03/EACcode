@@ -211,6 +211,34 @@ class TestInjectionScan:
         assert memory.entries(memory.memory_path()) == []  # nothing written
 
 
+class TestFileLock:
+    def test_second_writer_times_out(self, tmp_memory: Path) -> None:
+        target = tmp_memory / "MEMORY.md"
+        memory.add_entry(target, "erster")
+        lock = memory._FileLock(target, timeout=0.3)
+        lock.__enter__()
+        try:
+            with pytest.raises(memory.MemoryLockError):
+                memory.add_entry(target, "zweiter")
+        finally:
+            lock.__exit__(None, None, None)
+
+    def test_lock_released_after_write(self, tmp_memory: Path) -> None:
+        target = tmp_memory / "MEMORY.md"
+        memory.add_entry(target, "a")
+        memory.add_entry(target, "b")  # second write works -> lock released
+        assert "b" in memory.entries(target)
+
+    def test_lock_file_remains_unlocked(self, tmp_memory: Path) -> None:
+        # the .lock file stays on disk (deleting it would race); it must
+        # not block the next writer though
+        target = tmp_memory / "MEMORY.md"
+        memory.add_entry(target, "a")
+        memory.add_entry(target, "b")
+        assert (tmp_memory / "MEMORY.md.lock").exists()
+        assert memory.entries(target) == ["a", "b"]
+
+
 class TestMemoryTools:
     def test_tools_registered(self) -> None:
         names = {tool.name for tool in memory.make_memory_tools()}
