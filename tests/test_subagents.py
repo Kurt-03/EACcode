@@ -74,6 +74,7 @@ def test_pool_timeout(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     pool = SubagentPool(agent_factory=_factory(delay=5.0))
     out = pool.run("x", [], timeout=0.3)
     assert "timed out" in out
+    assert "cancelled" in out
 
 
 def test_pool_concurrency_limit(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -112,12 +113,14 @@ def test_spawn_tool_unknown_tool(tmp_path: Any, monkeypatch: pytest.MonkeyPatch)
     assert "unknown tool" in out
 
 
-def test_spawn_tool_no_tools_rejected(tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_spawn_tool_reasoning_only_allowed(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
-    pool = SubagentPool(agent_factory=_factory())
+    pool = SubagentPool(agent_factory=_factory("gedicht"))
     tool = make_subagent_tool(pool, {}, {})
-    out = tool.func(task="x", tools=[])
-    assert "at least one tool" in out
+    out = tool.func(task="Schreibe ein Gedicht", tools=[])
+    assert out == "gedicht"
 
 
 def test_spawn_tool_runs_with_selected_tools(

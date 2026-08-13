@@ -290,6 +290,27 @@ class TestParallelTools:
         assert len([m for m in history if m["role"] == "tool"]) == 2
 
 
+class TestCancelEvent:
+    def test_cancel_stops_loop_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import threading
+
+        import litellm
+
+        captured: dict[str, Any] = {}
+        monkeypatch.setattr(
+            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        )
+        agent = Agent(conf=_conf())
+        cancel = threading.Event()
+        cancel.set()
+        history = agent.run(
+            [{"role": "user", "content": "hallo"}], cancel_event=cancel
+        )
+        assert agent.last_text(history) == "(cancelled by timeout guard)"
+        assert len(history) == 3  # system + user + cancellation note
+        assert "messages" not in captured  # no model call happened
+
+
 class TestMemoryNudge:
     def test_nudge_appears_every_interval(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import litellm

@@ -135,8 +135,14 @@ class Agent:
         messages: list[dict[str, str]],
         max_turns: int = MAX_TURNS,
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
+        cancel_event: Any | None = None,
     ) -> list[dict[str, Any]]:
-        """Run the loop; returns the full conversation including tool results."""
+        """Run the loop; returns the full conversation including tool results.
+
+        ``cancel_event``: a threading.Event that is checked between turns —
+        when set, the loop stops cleanly with a cancellation message (used
+        by the subagent timeout guard).
+        """
         self._memory_runs += 1
         system_content = self.system_prompt
         if self.use_skills:
@@ -157,6 +163,11 @@ class Agent:
         history.extend(messages)
 
         for _ in range(max_turns):
+            if cancel_event is not None and cancel_event.is_set():
+                history.append(
+                    {"role": "assistant", "content": "(cancelled by timeout guard)"}
+                )
+                return history
             content, calls = self._complete(history, max_output_tokens)
             if not calls:
                 history.append({"role": "assistant", "content": content or ""})
@@ -180,8 +191,10 @@ class Agent:
             history.append(assistant_message)
             # Parallel tool execution: independent calls of one turn run
             # concurrently (subagents and long-running tools benefit).
+            # Capped so a turn with many calls cannot spawn unbounded threads.
             if len(calls) > 1:
-                with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+                workers = min(len(calls), 6)
+                with ThreadPoolExecutor(max_workers=workers) as pool:
                     results = list(pool.map(self._execute_tool, calls))
             else:
                 results = [self._execute_tool(calls[0])]

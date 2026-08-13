@@ -85,11 +85,16 @@ class SubagentPool:
             messages.append({"role": "system", "content": f"## Context\n{context}"})
         messages.append({"role": "user", "content": task})
 
+        cancel_event = threading.Event()
         result: dict[str, Any] = {}
 
         def work() -> None:
             try:
-                history = agent.run(messages, max_turns=SUBAGENT_MAX_TURNS)
+                history = agent.run(
+                    messages,
+                    max_turns=SUBAGENT_MAX_TURNS,
+                    cancel_event=cancel_event,
+                )
                 result["answer"] = agent.last_text(history)
             except Exception as exc:
                 result["error"] = str(exc)
@@ -98,7 +103,10 @@ class SubagentPool:
         thread.start()
         thread.join(timeout)
         if thread.is_alive():
-            return f"Error: subagent timed out after {timeout:.0f}s"
+            # Signal the loop to stop at the next turn boundary; the daemon
+            # thread then exits on its own (no uncontrolled tool actions).
+            cancel_event.set()
+            return f"Error: subagent timed out after {timeout:.0f}s (cancelled)"
         if "error" in result:
             return f"Error: subagent failed: {result['error']}"
         return result.get("answer") or "(no answer)"
@@ -124,8 +132,7 @@ def make_subagent_tool(
                 available = ", ".join(sorted(tool_registry))
                 return f"Error: unknown tool: {name} (available: {available})"
             selected.append(tool)
-        if not selected:
-            return "Error: specify at least one tool for the subagent"
+        # tools may be empty: a reasoning-only subagent is valid
         return pool.run(task, selected, context)
 
     return Tool(
