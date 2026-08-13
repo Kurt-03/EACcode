@@ -29,7 +29,11 @@ Agent-Kontext.
 ## Tests
 `tests/test_skills.py` (21) + Injection-Tests in `tests/test_agent.py`
 
-## Offene Punkte
+## Offene Punkte (Hermes-Vergleich 2026-08-13)
+- Skill-Kategorien + Pinning (Hermes-Struktur)
+- Linked Files (references/scripts/templates) + `skill_view`-Tool für den Agent
+- Skill-Index-Injection (Descriptions) statt Body-Injection bei vielen Skills
+- Curator/Pruning mit Konsolidierung (`absorbed_into`-Stil)
 - Skill-Templates + Variablen-Substitution
 - Regex-Trigger + Prioritäten
 - Quote-Parsing für `/skill new --description "mehrere Worte"` (Teil der

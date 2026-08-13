@@ -34,9 +34,13 @@ Agent-Tools, Char-Budgets, Konsolidierungs-Zwang, atomic writes.
 ## Tests
 `tests/test_memory.py` (21) + Memory-Tool-Tests + Nudge-Tests (test_agent)
 
-## Offene Punkte
-- Konflikt-Auflösung bei parallelen Prozessen (Datei-Lock statt Thread-Lock)
-- Memory-Kuration als eigene Skill-Logik (B2-Verzahnung)
+## Offene Punkte (Hermes-Vergleich 2026-08-13)
+- 🚨 **Injection-Scan fehlt**: Hermes prüft Memory-Einträge auf Prompt-Injection/
+  Exfiltration vor dem Speichern (`_scan_memory_content`) — muss nachgerüstet werden
+- Drift-Erkennung explizit (Hermes: Fehler statt stillem Überschreiben bei externem Edit)
+- Nudge auf LLM-Turns statt Runs zählen
+- Externer Memory-Provider (Supermemory-Stil) — nur bei Bedarf
+- Konflikt-Auflösung bei parallelen Prozessen (Datei-Lock)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/commands/memory.md|/memory]] · [[15-features/system/session-store.md|Session-Store]]

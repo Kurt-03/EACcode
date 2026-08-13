@@ -29,9 +29,11 @@ eaccode sich an frühere Sessions erinnern kann.
 ## Tests
 `tests/test_store.py` (11) + TestSessionCommands + REPL-Persistenz-Tests
 
-## Offene Punkte
-- Scroll-Modus mit around_message_id (für Agent-Detailabruf)
-- Session-Links/Referenzen (@session:…)
+## Offene Punkte (Hermes-Vergleich 2026-08-13)
+- 🚨 **Scroll-Modus fehlt**: around_message_id + Fenster (Hermes `session_search` scroll)
+- **Session-Links fehlen**: `@session:<id>`-Referenzen, die der Agent auflösen kann
+- Profil-Scoping (Hermes: pro Profil getrennte Stores)
+- Dedup nach Session-Linie bei Discovery-Treffern
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/memory.md|Memory]]
