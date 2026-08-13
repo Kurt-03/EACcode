@@ -11,6 +11,7 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 
 | Bereich | Inhalt |
 |---|---|
+| [[15-features/README\|Features]] | **Feature-Register**: jedes Feature einzeln getrackt (Tools, Provider, System, Agents) |
 | [[10-projects/README\|Projekte]] | Dashboard: aktive Phase, nächste Schritte, offene Entscheidungen |
 | [[20-areas/architecture\|Areas]] | Dauerhaftes Wissen: Architektur, Vision, Tooling, Testing |
 | [[30-research/README\|Research]] | Evaluierungen mit Datum, Kriterien, Ergebnis |

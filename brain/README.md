@@ -29,6 +29,7 @@ Jede Notiz ist genau eine von drei Formen:
 |---|---|---|
 | `00-inbox/` | Schnell-Erfassung | jederzeit; wird bei Kuration sortiert |
 | `10-projects/` | Aktive Arbeitsstränge + Dashboard | Phase startet / ändert sich |
+| `15-features/` | **Feature-Register**: eine Notiz pro Feature | **jedes neue Feature** (Tool, Provider, System, Agent) |
 | `20-areas/` | Dauerhaftes Wissen (Architektur, Vision, …) | Wissen entsteht |
 | `30-research/` | Evaluierungen (immer dated) | vor Entscheidungen |
 | `40-people/` | Personen-Kontext (User, Contributors) | Person relevant wird |
@@ -36,6 +37,13 @@ Jede Notiz ist genau eine von drei Formen:
 | `adr/` | Entscheidungslog `NNNN-titel.md` | Architektur-Entscheidung |
 | `wiki/` | LLM-gepflegte Seiten + `logs/` (datiert) | ab Phase B |
 | `_templates/` | Notiz-Templates | — |
+
+## Feature-Regel
+
+**Jedes Feature bekommt eine eigene Notiz in `15-features/`** (`tools/`,
+`providers/`, `system/`, `agents/`) mit Frontmatter (name/type/status/phase)
+und einen Eintrag in der Register-Tabelle. Status: `planned → active → done`.
+Neue Features → Template `_templates/feature.md` verwenden.
 
 ## Schreibregeln
 
