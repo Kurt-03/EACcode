@@ -32,6 +32,15 @@ class TestModes:
         assert manager.check("write_file", {}).allow
         assert not manager.check("run_command", {}).allow
 
+    def test_ask_readonly_tools_run_freely(self, perm_conf: dict) -> None:
+        manager = PermissionManager(perm_conf)
+        assert manager.check("read_file", {}).allow  # no handler needed
+        assert manager.check("current_time", {}).allow
+        assert manager.check("web_search", {}).allow
+        assert not manager.check("write_file", {}).allow  # mutating -> ask
+        assert not manager.check("run_command", {}).allow
+        assert not manager.check("spawn_subagent", {}).allow
+
     def test_allow_all(self, perm_conf: dict) -> None:
         perm_conf["permissions"]["mode"] = "allow_all"
         manager = PermissionManager(perm_conf)

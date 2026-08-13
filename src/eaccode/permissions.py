@@ -93,6 +93,11 @@ class PermissionManager:
             return Decision(True, "mode=read_only (read-only tool)", self.mode)
         if self.mode == "allow_all":
             return Decision(True, "mode=allow_all", self.mode)
+        if self.mode == "ask" and tool_name in READ_ONLY_TOOLS:
+            # read-only tools run freely; only mutating tools need approval
+            return Decision(
+                True, "read-only tool (no approval needed)", self.mode
+            )
         if self.ask_handler is not None:
             # serialized: parallel tool calls must not race the stdin prompt
             with self._ask_lock:
@@ -132,8 +137,10 @@ def mode_hint(mode: str) -> str:
         )
     return (
         "\n\n## Permission mode: ASK\n"
-        "Tool calls that need approval show an interactive prompt to the user. "
-        "Proceed normally; the user decides per call."
+        "Read-only tools (read_file, search, web, time, sessions) run freely. "
+        "Mutating tools (write_file, run_command, memory, skills, subagents, "
+        "mcp calls) show an interactive prompt; the user decides per call.\n"
+        "Proceed normally."
     )
 
 
