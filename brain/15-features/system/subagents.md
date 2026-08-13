@@ -32,11 +32,12 @@ Warteschlange für den Rest.
 Tool-Auswahl, Reasoning-only) + Parallel-Loop- & Cancel-Tests in `test_agent.py`
 
 ## Offene Punkte
-- Timeout-Guard ✅: `cancel_event` im Agent-Loop — Subagent stoppt an der
-  nächsten Turn-Grenze (keine unkontrollierten Tool-Aktionen mehr)
-- Worker-Cap ✅: parallele Tool-Calls auf 6 pro Turn gedeckelt
-- Subagent-Ergebnisse in Session-Store loggen
-- Permission-Race bei parallelen `run_command`-Prompts (C1)
+- ✅ Timeout-Guard ✅ (cancel_event)
+- ✅ Worker-Cap ✅ (6 pro Turn)
+- ✅ Subagent-/Tool-Ergebnisse in Session-Store ✅ (2026-08-13: volle
+  Runden-Persistenz inkl. tool-Messages)
+- ✅ Permission-Race bei parallelen Prompts ✅ (ask_handler serialisiert)
+- Nächste Stufe: Task-Delegation mit Ergebnis-Schema (D-Phase)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/agent-core.md|Agent Core]] · [[15-features/system/session-store.md|session-store]] · [[15-features/agents/README.md|README]]

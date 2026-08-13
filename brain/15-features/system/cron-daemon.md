@@ -16,10 +16,13 @@ Telegram/Discord via C4).
 
 ## Implementierung
 - `src/eaccode/cron.py` — Job-Definitionen in `data/jobs.yaml`
-  (id, schedule, prompt, enabled, last_run/status), APScheduler-CronTrigger,
-  `run_job` via subprocess `eaccode -p`, Log in `data/jobs/<id>.log`
+  (id, schedule, prompt, enabled, deliver, last_run/status),
+  APScheduler-CronTrigger, `run_job` via subprocess `eaccode -p`,
+  Delivery: Log-Datei oder stdout, per Job wählbar
 - CLI: `eaccode job list|add|remove|pause|resume|run <id>`
 - Daemon: `eaccode daemon` (BlockingScheduler, beendbar per Ctrl+C)
+- **Versions-Check 2026-08-13 (Web):** APScheduler 4.0 ist Pre-Release
+  („do NOT use"-Hinweis der Maintainer) — Pin `>=3.10,<4` ist korrekt
 
 ## Verifiziert (live, 2026-08-13)
 - `job add morgen` + `job run` → echter LLM-Call, Antwort „Job läuft",

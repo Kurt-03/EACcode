@@ -10,29 +10,36 @@ tags: [type/feature, feature/system]
 # System: MCP-Client (C3)
 
 ## Zweck
-Externe Tools über das Model Context Protocol anbinden: stdio-Server
-(SSE später), Tool-Discovery, Permission-Integration (C1).
+Externe Tools über das Model Context Protocol anbinden: stdio + Streamable
+HTTP (aktueller Standard), Tool-Discovery, Permission-Integration (C1).
 
-## Implementierung
-- `src/eaccode/mcp.py` — `McpClient` (JSON-RPC 2.0 über stdin/stdout,
-  NEWLINE-delimited, Thread-Timeout 30 s, McpError)
-- Server in config.yaml: `mcp.servers: {name: {command, args}}`
+## Implementierung (Standard-Stand 2026-08-13, Web-Recherche)
+- `src/eaccode/mcp.py`:
+  - **Streamable HTTP** (aktueller Standard seit 2025-03-26, ersetzt SSE;
+    Removal-Deadline 2026) — `McpHttpClient`: ein Endpoint, POST JSON-RPC,
+    Antwort JSON oder SSE-Stream, `Mcp-Session-Id`-Echo
+  - **stdio**: `McpClient` (JSON-RPC über stdin/stdout, Thread-Timeout)
+  - **SSE nur noch als Legacy** (`transport: sse` in der Config)
+  - Protokoll-Version: `2026-07-28` (aktuelle Spec, RC; Server antworten
+    mit ihrer Version)
+- Server in config.yaml: `mcp.servers: {name: {command|url, transport}}`
 - `eaccode mcp list|add|remove`; Tools heißen `mcp__<server>__<tool>`
   und laufen durch den PermissionManager (C1)
-- build_agent startet konfigurierte Server und entdeckt Tools
+- `build_mcp_clients` + Registry + `atexit close_all` (keine Leaks)
 
-## Verifiziert (live, 2026-08-13)
+## Verifiziert (live + Tests, 2026-08-13)
 - Fake-Server registriert → Agent fand `mcp__fake__echo`, Permission-Gate
   fragte (Deny-Beweis), allow-Regel → `echo:hallo-mcp` kam zurück
-- SSE-Client gegen In-Process-SSE-Server getestet (initialize/call)
+- Streamable HTTP gegen echten In-Process-HTTP-Server getestet
+  (JSON-Antwort + SSE-Antwort + Session-Id-Echo)
 
 ## Tests
-`tests/test_mcp.py` (17, inkl. Fake-Server-Subprocess + SSE-Server-Fixture)
-+ `tests/mcp_fake_server.py`
+`tests/test_mcp.py` (25: stdio-Fake, SSE-Legacy, HTTP-Streamable,
+build/load/commands) + `tests/mcp_fake_server.py`
 
 ## Offene Punkte
 - Ressourcen/Prompts (nur Tools bisher)
-- SSE: Notifications werden übersprungen (Request/Response-only)
+- Multi Round-Trip Requests (2026-07-28) — bei Bedarf
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/permissions.md|permissions]] · [[15-features/system/agent-core.md|Agent Core]]
