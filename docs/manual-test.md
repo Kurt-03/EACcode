@@ -46,6 +46,30 @@ Wie du nach jedem Schritt selbst prüfst, dass eaccode wirklich funktioniert.
 /model ping openrouter/anthropic/claude-sonnet-4   → "replied: pong"
 ```
 
+### A5-Tools live testen (Chat-Nachrichten in der Session)
+
+| Tool | Eingabe (als Chat) | Erwartung |
+|---|---|---|
+| current_time | `Wie spät ist es gerade?` | Antwort mit Uhrzeit |
+| system_info | `Was für ein System bin ich?` | OS + Hardware |
+| write_file | `Erstelle test.txt mit Inhalt "Hallo eaccode"` | `written …` |
+| read_file | `Lies test.txt` | Inhalt |
+| list_files | `Was liegt in <ordner>?` | Dateiliste |
+| search_files | `Suche in <ordner> nach "<muster>"` | Pfade |
+| run_command (erlauben) | `Führe echo hallo aus` | `Allow: … [y/N]` → `y` → `hallo` |
+| run_command (verweigern) | `Führe dir /b aus` | `n` → `permission denied` |
+| http_get | `Lade https://example.com und fasse zusammen` | Zusammenfassung |
+| web_search | `Suche im Web: Wetter Berlin heute` | Titel + Links |
+
+### Fallback-Chain testen
+
+```
+/model set-default minimax/gibt-es-nicht      ← kaputtes Default
+Chat-Nachricht senden                          → fällt auf Fallback zurück ODER
+                                                sauberer "all models failed"-Error
+/model set-default minimax/MiniMax-M3          ← zurücksetzen
+```
+
 ---
 
 ## Phase B — Hermes-Core
