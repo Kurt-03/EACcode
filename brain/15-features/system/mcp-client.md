@@ -32,6 +32,10 @@ HTTP (aktueller Standard), Tool-Discovery, Permission-Integration (C1).
   fragte (Deny-Beweis), allow-Regel → `echo:hallo-mcp` kam zurück
 - Streamable HTTP gegen echten In-Process-HTTP-Server getestet
   (JSON-Antwort + SSE-Antwort + Session-Id-Echo)
+- 🎮 **Echter MCP-Server live (Roblox Studio MCP)**: `cmd.exe /c
+  %LOCALAPPDATA%\Roblox\mcp.bat` → StudioMCP.exe; Agent entdeckte alle
+  Tools (execute_luau, script_read/search/grep, multi_edit, …) und führte
+  `script_search "Hello"` mit echter Studio-Antwort aus
 
 ## Tests
 `tests/test_mcp.py` (25: stdio-Fake, SSE-Legacy, HTTP-Streamable,

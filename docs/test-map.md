@@ -59,6 +59,7 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | C3 MCP stdio | `eaccode mcp add fake --command …` + Chat „nutze mcp__fake__echo" | Discovery + Permission + `echo:…` | ✅ 08-13 |
 | C3 MCP HTTP | Server mit `url:` (Streamable HTTP) | JSON- und SSE-Antworten, Session-Id | ✅ 08-13 (Unit gegen echten HTTP-Server) |
 | C3 MCP Legacy | Server mit `transport: sse` | SSE-Client nutzbar | ✅ 08-13 |
+| C3 MCP echt | Roblox-Studio-MCP (`cmd /c %LOCALAPPDATA%\Roblox\mcp.bat`), allow-Regel `mcp__Roblox_Studio__.*`, Chat: „script_search Hello" | Discovery aller Tools + echte Studio-Antwort | ✅ 08-13 (live) |
 | Subagent-Logging | Subagent-Chat → `/session show <id>` | tool-Zeile mit Subagent-Ergebnis | ✅ 08-13 |
 
 ---
