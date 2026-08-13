@@ -25,7 +25,7 @@ KNOWN_MODELS: dict[str, list[str]] = {
     "google": ["gemini/gemini-1.5-pro", "gemini/gemini-1.5-flash"],
     "xai": ["xai/grok-2"],
     "deepseek": ["deepseek/deepseek-chat"],
-    "minimax": ["minimax/minimax-text-01"],
+    "minimax": ["minimax/MiniMax-M3", "minimax/minimax-text-01"],
     "ollama": ["ollama/llama3.2", "ollama/qwen2.5"],
     "vllm": [],
     "lmstudio": [],

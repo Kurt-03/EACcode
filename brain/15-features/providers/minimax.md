@@ -29,11 +29,14 @@ providers:
 
 ## Status
 - ✅ Key gesetzt (Stand 2026-08-13)
-- ✅ Live-Ping erfolgreich (`minimax/minimax-text-01` → `pong`)
+- ✅ Live-Pings erfolgreich: `minimax/MiniMax-M3` → `pong`, `minimax/minimax-text-01` → `pong`
+
+## Modelle (Katalog)
+- `minimax/MiniMax-M3` (2026-08-13 live getestet)
+- `minimax/minimax-text-01` (2026-08-13 live getestet)
 
 ## Offene Punkte
-- Weitere MiniMax-Modelle in den Katalog (`KNOWN_MODELS` in router.py)
-- MiniMax als Default testen: `/model set-default minimax/minimax-text-01`
+- MiniMax als Default testen: `/model set-default minimax/MiniMax-M3`
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/model-router.md|Model Router]]
