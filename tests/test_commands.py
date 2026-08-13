@@ -16,6 +16,7 @@ from eaccode.commands import (
     run_memory_command,
     run_model_command,
     run_provider_command,
+    run_session_command,
     run_skill_command,
 )
 
@@ -495,3 +496,74 @@ class TestSkillCommands:
         code, out = run("frobnicate")
         assert code == 1
         assert "Unknown skill command" in out
+
+
+class TestSessionCommands:
+    @pytest.fixture
+    def session_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> callable:
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        run_config_command(["init"], stdout=io.StringIO())
+
+        def run(*args: str) -> tuple[int, str]:
+            stdout = io.StringIO()
+            code = run_session_command(list(args), stdout=stdout)
+            return code, stdout.getvalue()
+
+        return run
+
+    def test_browse_empty(self, session_runner: callable) -> None:
+        run = session_runner
+        code, out = run("browse")
+        assert code == 0
+        assert "no sessions yet" in out
+
+    def test_browse_lists_sessions(self, session_runner: callable) -> None:
+        run = session_runner
+        from eaccode import store
+
+        session_id = store.new_session(title="Mein Titel")
+        store.add_message(session_id, "user", "hallo")
+        code, out = run("browse")
+        assert code == 0
+        assert session_id in out
+        assert "Mein Titel" in out
+
+    def test_search_finds_content(self, session_runner: callable) -> None:
+        run = session_runner
+        from eaccode import store
+
+        session_id = store.new_session(title="Router")
+        store.add_message(session_id, "user", "Wie baue ich LiteLLM ein?")
+        code, out = run("search", "LiteLLM")
+        assert code == 0
+        assert session_id in out
+
+    def test_search_no_hits(self, session_runner: callable) -> None:
+        run = session_runner
+        code, out = run("search", "gibtsnicht")
+        assert code == 0
+        assert "no sessions match" in out
+
+    def test_show_session(self, session_runner: callable) -> None:
+        run = session_runner
+        from eaccode import store
+
+        session_id = store.new_session()
+        store.add_message(session_id, "user", "frage")
+        store.add_message(session_id, "assistant", "antwort")
+        code, out = run("show", session_id)
+        assert code == 0
+        assert "[user] frage" in out
+        assert "[assistant] antwort" in out
+
+    def test_show_unknown_errors(self, session_runner: callable) -> None:
+        run = session_runner
+        code, out = run("show", "ghost")
+        assert code == 1
+        assert "no session" in out
+
+    def test_usage_without_args(self, session_runner: callable) -> None:
+        run = session_runner
+        code, out = run()
+        assert code == 0
+        assert "Usage: session" in out

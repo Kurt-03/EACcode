@@ -8,9 +8,15 @@ from typing import Any
 
 import pytest
 
-from eaccode import __version__
+from eaccode import __version__, store
 from eaccode import config as cfg
 from eaccode.repl import run_repl
+
+
+@pytest.fixture(autouse=True)
+def _isolated_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every REPL test gets a temp data dir (no real DB writes)."""
+    monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
 
 
 @pytest.fixture
@@ -173,3 +179,23 @@ class TestChat:
         _, out = _run("/memory add wichtiger Fakt", "/memory show", "/exit")
         assert "ok" in out
         assert "wichtiger Fakt" in out
+
+    def test_chat_persisted_to_store(self, isolated_config: Path) -> None:
+        agent = FakeAgent(reply="hallo zurück")
+        code = run_repl(
+            io.StringIO("hallo welt\n/exit\n"), io.StringIO(), agent=agent
+        )
+        assert code == 0
+        sessions = store.browse()
+        assert len(sessions) == 1
+        assert sessions[0].title == "hallo welt"
+        messages = store.show(sessions[0].id)
+        assert [m["role"] for m in messages] == ["user", "assistant"]
+        assert messages[0]["content"] == "hallo welt"
+
+    def test_session_command_in_repl(self, isolated_config: Path) -> None:
+        agent = FakeAgent(reply="antwort")
+        run_repl(io.StringIO("wichtige frage\n/exit\n"), io.StringIO(), agent=agent)
+        _, out = _run("/session browse", "/session search wichtige", "/exit")
+        assert "wichtige frage" in out
+        assert "2 msgs" in out

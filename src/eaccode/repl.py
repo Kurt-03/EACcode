@@ -7,16 +7,18 @@ TUI (Phase A8).
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from typing import Any, TextIO
 
-from eaccode import __version__
+from eaccode import __version__, store
 from eaccode.agent import Agent
 from eaccode.commands import (
     run_config_command,
     run_memory_command,
     run_model_command,
     run_provider_command,
+    run_session_command,
     run_skill_command,
 )
 from eaccode.memory import injection_text
@@ -31,6 +33,7 @@ Commands:
   /model <cmd>    manage models (list, set-default, ping, ...)
   /memory <cmd>   manage memory (add, show, remove, user add)
   /skill <cmd>    manage skills (list, view, new, remove)
+  /session <cmd>  search past sessions (browse, search, show)
   /exit           leave eaccode (alias: /quit)
 
 Everything else is sent to the agent as a chat message.
@@ -73,6 +76,8 @@ def _handle_command(
         run_memory_command(command.split()[1:], stdout=stdout)
     elif name == "skill":
         run_skill_command(command.split()[1:], stdout=stdout)
+    elif name == "session":
+        run_session_command(command.split()[1:], stdout=stdout)
     else:
         stdout.write(f"Unknown command: /{name} - type /help for a list of commands.\n")
     return None
@@ -83,6 +88,7 @@ def _handle_chat(
     agent: Agent,
     stdout: TextIO,
     chat_history: list[dict[str, Any]],
+    session_id: str | None = None,
 ) -> None:
     """Send one user message to the agent and print the final answer."""
     messages = list(chat_history) + [{"role": "user", "content": text}]
@@ -94,6 +100,10 @@ def _handle_chat(
     answer = agent.last_text(history)
     stdout.write(f"eaccode> {answer}\n")
     chat_history[:] = history[1:]  # keep the conversation (drop the system message)
+    if session_id:
+        with contextlib.suppress(Exception):
+            store.add_message(session_id, "user", text)
+            store.add_message(session_id, "assistant", answer)
 
 
 def _wire_permission_prompt(stdin: TextIO, stdout: TextIO) -> None:
@@ -128,7 +138,10 @@ def run_repl(
     stdout = stdout or sys.stdout
     active_agent = agent
     chat_history: list[dict[str, Any]] = []
+    session_id: str | None = None
     _print_banner(stdout)
+    with contextlib.suppress(Exception):
+        session_id = store.new_session(platform="cli")  # store unavailable -> None
 
     def get_agent() -> Agent:
         nonlocal active_agent
@@ -157,7 +170,10 @@ def run_repl(
                 except Exception as exc:
                     stdout.write(f"Error: {exc}\n")
                     continue
-                _handle_chat(line, active, stdout, chat_history)
+                if session_id and not chat_history:
+                    with contextlib.suppress(Exception):
+                        store.set_title(session_id, line)
+                _handle_chat(line, active, stdout, chat_history, session_id)
     except KeyboardInterrupt:
         stdout.write("\nbye\n")
         return 0

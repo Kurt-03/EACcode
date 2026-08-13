@@ -36,7 +36,7 @@ eintragen.
 | Subagents | agent | planned | B5 | [[15-features/agents/README.md\|README]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
-| Session-Store (FTS5) | system | planned | B3 | — (wird bei B3 angelegt) |
-| Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|README]] |
+| Session-Store (FTS5) | system | active | B3 | [[15-features/system/session-store.md\|Session-Store]] |
+| Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|Commands-Index]] |
 
 *Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*

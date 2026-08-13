@@ -7,7 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
-from eaccode import memory, router, skills
+from eaccode import memory, router, skills, store
 
 USAGE = """\
 Usage: config <command> [args]
@@ -469,6 +469,64 @@ def run_skill_command(args: list[str], stdout: TextIO | None = None) -> int:
     except (cfg.ConfigError, skills.SkillError) as exc:
         stdout.write(f"Error: {exc}\n")
         return 1
+
+
+SESSION_USAGE = """\
+Usage: session <command> [args]
+
+Commands:
+  browse                     show the most recent sessions
+  search <query>             full-text search across all sessions
+  show <session-id>          show one session's messages
+"""
+
+
+def run_session_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Dispatch a session subcommand; returns an exit code (0 = ok)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(SESSION_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    if command == "browse":
+        sessions = store.browse()
+        if not sessions:
+            stdout.write("(no sessions yet)\n")
+            return 0
+        for session in sessions:
+            title = session.title or "(untitled)"
+            stdout.write(
+                f"{session.id}  {session.started_at}  {session.message_count:>3} msgs  {title}\n"
+            )
+        return 0
+    if command == "search":
+        if len(rest) < 1:
+            stdout.write("Usage: session search <query>\n")
+            return 1
+        hits = store.search(" ".join(rest))
+        if not hits:
+            stdout.write(f"no sessions match: {' '.join(rest)}\n")
+            return 0
+        for hit in hits:
+            stdout.write(
+                f"{hit.session_id}  {hit.started_at}  ({hit.matches} hits)  {hit.title}\n"
+            )
+            if hit.snippet:
+                stdout.write(f"    …{hit.snippet}…\n")
+        return 0
+    if command == "show":
+        if len(rest) != 1:
+            stdout.write("Usage: session show <session-id>\n")
+            return 1
+        messages = store.show(rest[0])
+        if not messages:
+            stdout.write(f"Error: no session with id {rest[0]}\n")
+            return 1
+        for message in messages:
+            stdout.write(f"[{message['role']}] {message['content']}\n")
+        return 0
+    stdout.write(f"Unknown session command: {command}\n\n{SESSION_USAGE}")
+    return 1
 
 
 def run_provider_command(args: list[str], stdout: TextIO | None = None) -> int:
