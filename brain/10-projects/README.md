@@ -5,7 +5,7 @@ und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 
 ## Aktive Phase: — (Phase D KOMPLETT ✅, 2026-08-13)
 
-**Phase D (Coding-Stärke) abgeschlossen:** D0–D4 + D6, DoD erfüllt
+**Phase D (Coding-Stärke) abgeschlossen:** D0–D4 + D6 (→ [[10-projects/phase-d.md|phase-d]]), DoD erfüllt
 (Übungs-Repo: Issue→Implementierung→Suite→Commit, live).
 **Offen (auf später verschoben, Nutzer):** C4 Gateway/Telegram, C5 Packaging,
 D5 Coding-Routing (optionale Idee), D6-Reste.
