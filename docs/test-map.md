@@ -51,10 +51,16 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 |---|---|---|---|
 | C1 Permissions | `/permissions status`, `mode read_only` → Chat „Erstelle Datei" | write_file blockiert; ask → `Allow: … [y/N]`-Prompt | ✅ 08-13 |
 | C1 Regeln | `eaccode permissions allow "echo"` → Chat | gezielte Freigabe wirkt | ✅ 08-13 |
+| C1 ask-Semantik | Chat: `Wie spät ist es?` (ohne Prompt!) | current_time/read_file laufen **frei**; write_file fragt | ✅ 08-13 (live) |
+| C1 Modus-Injection | `mode read_only` + Chat „Erstelle Datei" | Agent versucht Schreib-Tools gar nicht erst | ✅ 08-13 (live) |
 | C2 Jobs | `eaccode job add x --schedule "0 9 * * *" --prompt "…"` + `job run x` | echter LLM-Call, Log `[ok]`, last_run | ✅ 08-13 |
 | C2 Daemon | `eaccode daemon` + Job `* * * * *` | Job feuert zur Minute, Log `[ok]` | ✅ 08-13 (live!) |
-| C3 MCP | `eaccode mcp add fake --command …` + Chat „nutze mcp__fake__echo" | Discovery + Permission + `echo:…` | ✅ 08-13 |
+| C2 Delivery | `job add … --deliver stdout` | Ausgabe auf stdout statt Log | ✅ 08-13 |
+| C3 MCP stdio | `eaccode mcp add fake --command …` + Chat „nutze mcp__fake__echo" | Discovery + Permission + `echo:…` | ✅ 08-13 |
+| C3 MCP HTTP | Server mit `url:` (Streamable HTTP) | JSON- und SSE-Antworten, Session-Id | ✅ 08-13 (Unit gegen echten HTTP-Server) |
+| C3 MCP Legacy | Server mit `transport: sse` | SSE-Client nutzbar | ✅ 08-13 |
+| Subagent-Logging | Subagent-Chat → `/session show <id>` | tool-Zeile mit Subagent-Ergebnis | ✅ 08-13 |
 
 ---
 
-*Stand: 2026-08-13 — Phase A+B komplett durchgetestet (Live-Runde + Aufräumen), 253 Tests grün.*
+*Stand: 2026-08-13 — Phasen A+B komplett durchgetestet (Live-Runde + Aufräumen); C1–C3 mit Härtungs-Runde; **307 Tests grün** (pytest) + ruff clean.*
