@@ -12,6 +12,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "textual>=0.80",
+    "apscheduler>=3.10,<4",
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",

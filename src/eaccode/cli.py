@@ -10,6 +10,7 @@ from eaccode import config as cfg
 from eaccode.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from eaccode.commands import (
     run_config_command,
+    run_job_command,
     run_memory_command,
     run_model_command,
     run_permissions_command,
@@ -110,5 +111,15 @@ def main(
         raise SystemExit(run_session_command(argv[1:], stdout=stdout))
     if first == "permissions":
         raise SystemExit(run_permissions_command(argv[1:], stdout=stdout))
+    if first == "job":
+        raise SystemExit(run_job_command(argv[1:], stdout=stdout))
+    if first == "daemon":
+        import contextlib
+
+        from eaccode.cron import make_scheduler
+
+        with contextlib.suppress(KeyboardInterrupt, SystemExit):
+            make_scheduler().start()
+        return 0
     stdout.write(f"Unknown command: {first} - try 'eaccode --help'\n")
     raise SystemExit(2)

@@ -7,7 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
-from eaccode import memory, permissions, router, skills, store
+from eaccode import cron, memory, permissions, router, skills, store
 
 USAGE = """\
 Usage: config <command> [args]
@@ -594,6 +594,90 @@ def run_permissions_command(args: list[str], stdout: TextIO | None = None) -> in
         stdout.write(f"Error: {exc}\n")
         return 1
     stdout.write(f"Unknown permissions command: {command}\n\n{PERMISSIONS_USAGE}")
+    return 1
+
+
+JOB_USAGE = """\
+Usage: job <command> [args]
+
+Commands:
+  list                        show all jobs
+  add <id> --schedule <cron> --prompt <text>
+                              add a scheduled job (cron: "0 9 * * *")
+  remove <id>                 delete a job
+  pause <id> | resume <id>    enable/disable a job
+  run <id>                    run a job now (writes its log)
+"""
+
+
+def run_job_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Manage scheduled jobs (C2)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(JOB_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    if command == "list":
+        jobs = cron.load_jobs()
+        if not jobs:
+            stdout.write("(no jobs yet)\n")
+            return 0
+        for job in jobs:
+            state = "enabled" if job.enabled else "paused"
+            stdout.write(
+                f"{job.id}  [{state}]  {job.schedule}  last: {job.last_run or '-'}\n"
+            )
+        return 0
+    if command == "add":
+        if len(rest) < 3:
+            stdout.write("Usage: job add <id> --schedule <cron> --prompt <text>\n")
+            return 1
+        job_id = rest[0]
+        schedule = ""
+        prompt_parts: list[str] = []
+        index = 1
+        while index < len(rest):
+            if rest[index] == "--schedule" and index + 1 < len(rest):
+                schedule = rest[index + 1]
+                index += 2
+            elif rest[index] == "--prompt":
+                index += 1
+                while index < len(rest):
+                    prompt_parts.append(rest[index])
+                    index += 1
+            else:
+                index += 1
+        try:
+            message = cron.add_job(job_id, schedule, " ".join(prompt_parts))
+        except ValueError as exc:
+            stdout.write(f"Error: {exc}\n")
+            return 1
+        stdout.write(f"{message}\n")
+        return 0
+    if command == "remove":
+        if len(rest) != 1:
+            stdout.write("Usage: job remove <id>\n")
+            return 1
+        stdout.write(f"{cron.remove_job(rest[0])}\n")
+        return 0
+    if command in ("pause", "resume"):
+        if len(rest) != 1:
+            stdout.write(f"Usage: job {command} <id>\n")
+            return 1
+        stdout.write(f"{cron.set_enabled(rest[0], command == 'resume')}\n")
+        return 0
+    if command == "run":
+        if len(rest) != 1:
+            stdout.write("Usage: job run <id>\n")
+            return 1
+        try:
+            output = cron.run_job_by_id(rest[0])
+        except Exception as exc:  # subprocess timeouts etc.
+            stdout.write(f"Error: job failed: {exc}\n")
+            return 1
+        stdout.write(f"{output}\n(log: {cron.job_log_path(rest[0])})\n")
+        return 0
+    stdout.write(f"Unknown job command: {command}\n\n{JOB_USAGE}")
     return 1
 
 
