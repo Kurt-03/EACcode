@@ -38,7 +38,7 @@ tags: [area/architecture, type/area]
 - **ReAct-Loop ohne Framework** — `agent.py`: synchron, testbar, Tools als
   Dataclasses mit JSON-Schema; Tool-Fehler töten den Loop nie
 - **Memory als Markdown** — MEMORY.md/USER.md + System-Prompt-Injection;
-  Session-Suche (FTS5) kommt in Phase B
+  Session-Suche (FTS5) gebaut in Phase B (B3)
 - **Zwei Oberflächen** — REPL (Verhalten, getestet) + Textual-TUI (Worker);
   `eaccode tui` startet die TUI
 - **Lazy Agent** — wird erst beim ersten Chat gebaut (Management-Kommandos

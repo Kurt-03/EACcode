@@ -1,7 +1,7 @@
 ---
 name: cmd-session
 type: command
-status: active
+status: done
 phase: B3
 date: 2026-08-13
 tags: [type/feature, feature/command]

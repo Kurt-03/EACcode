@@ -1,6 +1,6 @@
 ---
 date: 2026-08-13
-status: active
+status: done
 area: projects
 tags: [project, phase-b]
 ---

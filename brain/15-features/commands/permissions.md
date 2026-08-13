@@ -1,4 +1,5 @@
 ---
+status: done
 name: command-permissions
 type: command
 phase: C1

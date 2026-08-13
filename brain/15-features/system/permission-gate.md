@@ -1,11 +1,17 @@
 ---
 name: permission-gate
 type: system
-status: active
+status: done
 phase: A5/C1
 date: 2026-08-13
 tags: [type/feature, feature/system]
 ---
+
+# System: Permission-Gate (A5 → C1 abgelöst)
+
+> **Hinweis:** Seit C1 ist [[15-features/system/permissions.md|permissions]]
+> die zentrale Instanz (PermissionManager für ALLE Tools). Diese Notiz
+> dokumentiert den A5-Ursprung (Terminal-Gate) als Historie.
 
 # System: Permission-Gate
 

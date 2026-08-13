@@ -1,4 +1,5 @@
 ---
+status: done
 name: command-mcp
 type: command
 phase: C3

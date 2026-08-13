@@ -1,4 +1,5 @@
 ---
+status: done
 name: command-job
 type: command
 phase: C2
