@@ -1,7 +1,7 @@
 ---
 name: skill-system
 type: system
-status: active
+status: done
 phase: B1
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -22,12 +22,18 @@ Agent-Kontext.
 - Injection: gematchte Skills werden beim Agent-Run an den System-Prompt
   angehängt (max. 3)
 
+## Verifiziert (live, 2026-08-13)
+- Agent hat `zeit-helfer` selbst per `create_skill` angelegt (B2-DoD)
+- Trigger `uhrzeit` matchte → Skill injiziert → Agent nutzte `current_time`
+
 ## Tests
-`tests/test_skills.py`
+`tests/test_skills.py` (21) + Injection-Tests in `tests/test_agent.py`
 
 ## Offene Punkte
-- Skill-Templates + Variablen-Substitution (B2/B)
+- Skill-Templates + Variablen-Substitution
 - Regex-Trigger + Prioritäten
+- Quote-Parsing für `/skill new --description "mehrere Worte"` (Teil der
+  geplanten `/`-Commands-Überarbeitung)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/learning-loop.md|Learning-Loop]]

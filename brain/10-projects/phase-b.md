@@ -11,10 +11,10 @@ Ziel: Das Lern- und Gedächtnis-Herz — der Unterschied zu „normalen" Agents.
 
 ## Schritte
 
-1. **B1 Skill-System** — SKILL.md (Frontmatter: name/description/trigger),
-   Skill-Verzeichnisse, Laden per Trigger, Skill-Skripte/Templates
-2. **B2 Learning-Loop ⭐** — nach komplexen Tasks bewertet der Agent selbst,
-   ob ein Skill entsteht; erstellt und verbessert ihn; dedupliziert
+1. **B1 Skill-System ✅** — SKILL.md (Frontmatter: name/description/trigger),
+   Skill-Verzeichnisse, Laden per Trigger, Skill-View, Skill-Skripte/Templates
+2. **B2 Learning-Loop ✅** — Post-Task-Review (wann ein Skill entsteht),
+   Skill-Erstellung als Tool-Aktion, Skill-Verbesserung (patch), Dedup/Pruning
 3. **B3 Session-Store** — SQLite + FTS5, `session_search`
    (Discovery/Scroll/Browse), Session-Links
 4. **B4 Memory-Hierarchie** — global vs. projektbezogen, Char-Budget,

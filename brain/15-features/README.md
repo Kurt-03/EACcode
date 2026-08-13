@@ -34,8 +34,8 @@ eintragen.
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
 | Subagents | agent | planned | B5 | [[15-features/agents/README.md\|README]] |
-| Skill-System | system | active | B1 | [[15-features/system/skill-system.md\|Skill-System]] |
-| Learning-Loop | system | active | B2 | [[15-features/system/learning-loop.md\|Learning-Loop]] |
+| Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|Skill-System]] |
+| Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|Learning-Loop]] |
 | Session-Store (FTS5) | system | planned | B3 | — (wird bei B3 angelegt) |
 
 *Stand: 2026-08-13 (Phase A abgeschlossen)*
