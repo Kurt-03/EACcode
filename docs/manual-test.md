@@ -121,6 +121,18 @@ Chat-Nachricht senden                          → fällt auf Fallback zurück O
 | Echte Parallelität | 2 Subagents (oben) | Gesamtzeit ≈ ein Subagent (nicht doppelt) |
 | Fehler-Isolation | Subagent A bekommt kaputte URL (403), B funktioniert | B liefert trotzdem, A meldet sauber, Haupt-Agent fasst beide zusammen |
 
+### D6: Browser
+
+| Check | Eingabe | Erwartung |
+|---|---|---|
+| Navigieren | `Öffne https://example.com` | Titel + URL zurück |
+| Lesen | `Lies den Inhalt der Seite` | Text der Seite (browser_extract) |
+| Screenshot | `Mache einen Screenshot nach C:\Users\...\browser-test.png` | PNG-Datei entsteht (einmalig: `playwright install chromium` nötig) |
+| Session | `Öffne example.com, dann example.org` + `Wo bin ich gerade?` | Agent nutzt browser_status, URL bleibt erhalten |
+| Fehlerpfad | `Öffne https://example.com/definitiv-nicht-da` | saubere Fehlermeldung, kein Crash |
+
+Hinweis: Browser-Tools sind mutierend → Permission-Prompt `Allow: browser_navigate … [y/N]` → `y`.
+
 ---
 
 ## Phase C — Production-Reife
