@@ -136,6 +136,90 @@ class TestRollback:
         assert len(session) == editing.MAX_UNDO
 
 
+class TestLineEdits:
+    def test_append(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("x = 1\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "append", text="y = 2")
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "x = 1\ny = 2\n"
+
+    def test_insert_after_line(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\nb = 2\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "insert", line=1, text="c = 3")
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "a = 1\nc = 3\nb = 2\n"
+
+    def test_insert_at_top(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("b = 2\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "insert", line=0, text="a = 1")
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "a = 1\nb = 2\n"
+
+    def test_replace_single_line(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\nb = 2\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "replace", line=2, text="b = 9")
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "a = 1\nb = 9\n"
+
+    def test_replace_range(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+        result = editing.edit_lines(
+            str(target), "replace", line=1, end_line=2, text="x = 0"
+        )
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "x = 0\nc = 3\n"
+
+    def test_delete_range(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\nb = 2\nc = 3\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "delete", line=1, end_line=2)
+        assert result.ok
+        assert target.read_text(encoding="utf-8") == "c = 3\n"
+
+    def test_line_out_of_range(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "delete", line=5)
+        assert not result.ok
+        assert "out of range" in result.message
+
+    def test_unknown_action(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "shred", line=1)
+        assert not result.ok
+        assert "unknown action" in result.message
+
+    def test_syntax_error_rejected(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("def ok():\n    pass\n", encoding="utf-8")
+        result = editing.edit_lines(str(target), "append", text="def kaputt(:")
+        assert not result.ok
+        assert "syntax error" in result.message
+
+    def test_edit_undoable(self, work_dir: Path) -> None:
+        target = work_dir / "a.py"
+        target.write_text("a = 1\n", encoding="utf-8")
+        editing.edit_lines(str(target), "append", text="b = 2")
+        assert "b = 2" in target.read_text(encoding="utf-8")
+        message = editing._session.undo()
+        assert "reverted" in message
+        assert target.read_text(encoding="utf-8") == "a = 1\n"
+
+    def test_tool_registered(self, work_dir: Path) -> None:
+        tools = {tool.name: tool for tool in editing.make_editing_tools()}
+        assert "file_edit" in tools
+        target = work_dir / "a.py"
+        target.write_text("a = 1\n", encoding="utf-8")
+        out = tools["file_edit"].func(str(target), "append", None, None, "b = 2")
+        assert "append" in out
+
+
 class TestMultiPatch:
     def test_applies_all(self, work_dir: Path) -> None:
         a = work_dir / "a.py"
@@ -170,7 +254,12 @@ class TestMultiPatch:
 class TestTools:
     def test_make_editing_tools(self) -> None:
         tools = {tool.name: tool for tool in editing.make_editing_tools()}
-        assert set(tools) == {"patch_file", "patch_multiple", "undo_edit"}
+        assert set(tools) == {
+            "patch_file",
+            "patch_multiple",
+            "undo_edit",
+            "file_edit",
+        }
 
     def test_tool_patch_and_undo(self, work_dir: Path) -> None:
         target = work_dir / "a.py"

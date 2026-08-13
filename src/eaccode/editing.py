@@ -218,6 +218,103 @@ def apply_multiple(edits: list[dict[str, Any]], allow_syntax_errors: bool = Fals
     return f"applied {len(edits)} edits"
 
 
+def edit_lines(
+    path: str,
+    action: str,
+    line: int | None = None,
+    end_line: int | None = None,
+    text: str | None = None,
+) -> EditResult:
+    """Line-based edits: insert / replace / delete / append.
+
+    Actions:
+      insert  - insert ``text`` after line ``line`` (0 = at the top)
+      replace - replace lines ``line..end_line`` (or just ``line``) with ``text``
+      delete  - delete lines ``line..end_line`` (or just ``line``)
+      append  - append ``text`` at the end of the file
+    Backs up before writing (undoable) and syntax-checks .py files.
+    """
+    target = Path(path)
+    if not target.exists():
+        return EditResult(False, f"Error: no such file: {path}")
+    try:
+        lines = target.read_text(encoding="utf-8").splitlines(keepends=True)
+    except OSError as exc:
+        return EditResult(False, f"Error: cannot read {path}: {exc}")
+    count = len(lines)
+    action = action.lower()
+    if action == "append":
+        if text is None:
+            return EditResult(False, "Error: append needs 'text'")
+        new_lines = lines + [text if text.endswith("\n") else text + "\n"]
+    elif action == "insert":
+        if line is None or text is None:
+            return EditResult(False, "Error: insert needs 'line' and 'text'")
+        if line < 0 or line > count:
+            return EditResult(
+                False, f"Error: line {line} out of range (file has {count} lines)"
+            )
+        block = [t if t.endswith("\n") else t + "\n" for t in text.split("\n") if t != ""]
+        new_lines = lines[:line] + block + lines[line:]
+    elif action == "replace":
+        if line is None or text is None:
+            return EditResult(False, "Error: replace needs 'line' and 'text'")
+        start = max(1, line)
+        stop = min(end_line if end_line is not None else line, count)
+        if start > count or stop < start:
+            return EditResult(
+                False, f"Error: line {line} out of range (file has {count} lines)"
+            )
+        block = [t if t.endswith("\n") else t + "\n" for t in text.split("\n") if t != ""]
+        new_lines = lines[: start - 1] + block + lines[stop:]
+    elif action == "delete":
+        if line is None:
+            return EditResult(False, "Error: delete needs 'line'")
+        start = max(1, line)
+        stop = min(end_line if end_line is not None else line, count)
+        if start > count or stop < start:
+            return EditResult(
+                False, f"Error: line {line} out of range (file has {count} lines)"
+            )
+        new_lines = lines[: start - 1] + lines[stop:]
+    else:
+        return EditResult(
+            False, f"Error: unknown action '{action}' (use insert/replace/delete/append)"
+        )
+    new_content = "".join(new_lines)
+    if not new_content.endswith("\n") and new_content:
+        new_content += "\n"
+    _session.backup(target)
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", delete=False, encoding="utf-8"
+    ) as probe:
+        probe.write(new_content)
+        probe_name = probe.name
+    try:
+        issue = syntax_check(Path(probe_name))
+    finally:
+        with __import__("contextlib").suppress(OSError):
+            os.unlink(probe_name)
+    if issue:
+        return EditResult(False, f"Error: {issue}")
+    try:
+        target.write_text(new_content, encoding="utf-8")
+    except OSError as exc:
+        return EditResult(False, f"Error: cannot write {path}: {exc}")
+    return EditResult(True, f"{action}: {path} ({count} -> {len(new_lines)} lines)")
+
+
+def _tool_file_edit(
+    path: str,
+    action: str,
+    line: int | None = None,
+    end_line: int | None = None,
+    text: str | None = None,
+) -> str:
+    result = edit_lines(path, action, line, end_line, text)
+    return result.message
+
+
 def _tool_patch_file(path: str, old: str, new: str) -> str:
     result = apply_patch(path, old, new)
     return result.message
@@ -244,6 +341,28 @@ def make_editing_tools() -> list[Tool]:
         "required": ["path", "old", "new"],
     }
     return [
+        Tool(
+            "file_edit",
+            "Line-based edit: insert/replace/delete/append lines in a file. "
+            "Lines are 1-based; 'insert' puts text AFTER the given line "
+            "(0 = top). Python files are syntax-checked; every edit is "
+            "undoable via undo_edit.",
+            _tool_file_edit,
+            {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string"},
+                    "action": {
+                        "type": "string",
+                        "enum": ["insert", "replace", "delete", "append"],
+                    },
+                    "line": {"type": "integer", "description": "1-based line"},
+                    "end_line": {"type": "integer", "description": "for ranges"},
+                    "text": {"type": "string", "description": "content to insert"},
+                },
+                "required": ["path", "action"],
+            },
+        ),
         Tool(
             "patch_file",
             "Replace old text with new text in a file (exact or fuzzy match). "
