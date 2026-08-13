@@ -9,6 +9,7 @@ from __future__ import annotations
 import platform
 import re
 import subprocess
+import threading
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
@@ -16,6 +17,10 @@ from datetime import datetime
 from pathlib import Path
 
 from eaccode.agent import Tool
+
+# Set by the agent loop while a run_command call is executing: the loop's
+# permission gate already decided, so run_command skips its own prompt.
+_loop_permission_checked = threading.local()
 
 READ_CHARS = 8000
 FETCH_CHARS = 8000
@@ -87,7 +92,9 @@ def search_files(pattern: str, path: str = ".") -> str:
 
 def run_command(command: str, cwd: str | None = None, timeout: int = 30) -> str:
     """Run a shell command; gated by the permission handler."""
-    if not permission_handler(command):
+    if not getattr(_loop_permission_checked, "value", False) and not permission_handler(
+        command
+    ):
         return f"Error: permission denied for command: {command}"
     try:
         result = subprocess.run(

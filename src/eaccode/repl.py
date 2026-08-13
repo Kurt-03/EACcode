@@ -18,6 +18,7 @@ from eaccode.commands import (
     run_config_command,
     run_memory_command,
     run_model_command,
+    run_permissions_command,
     run_provider_command,
     run_session_command,
     run_skill_command,
@@ -35,6 +36,7 @@ Commands:
   /memory <cmd>   manage memory (add, show, remove, user add)
   /skill <cmd>    manage skills (list, view, new, remove)
   /session <cmd>  search past sessions (browse, search, show)
+  /permissions    permission modes and rules (status, mode, allow, deny)
   /exit           leave eaccode (alias: /quit)
 
 Everything else is sent to the agent as a chat message.
@@ -79,6 +81,8 @@ def _handle_command(
         run_skill_command(command.split()[1:], stdout=stdout)
     elif name == "session":
         run_session_command(command.split()[1:], stdout=stdout)
+    elif name == "permissions":
+        run_permissions_command(command.split()[1:], stdout=stdout)
     else:
         stdout.write(f"Unknown command: /{name} - type /help for a list of commands.\n")
     return None
@@ -135,8 +139,10 @@ def _handle_chat(
             store.add_message(session_id, "assistant", answer)
 
 
-def _wire_permission_prompt(stdin: TextIO, stdout: TextIO) -> None:
-    """Ask y/N on stdout when the agent wants to run a shell command."""
+def _wire_permission_prompt(
+    stdin: TextIO, stdout: TextIO, manager: Any | None = None
+) -> None:
+    """Ask y/N on stdout when the agent wants to run a tool or command."""
 
     def ask(command: str) -> bool:
         stdout.write(f"Allow: {command} [y/N] ")
@@ -147,9 +153,14 @@ def _wire_permission_prompt(stdin: TextIO, stdout: TextIO) -> None:
             return False
         return answer.strip().lower() in ("y", "yes")
 
+    def ask_tool(name: str, arguments: dict[str, Any]) -> bool:
+        return ask(f"{name} {arguments}")
+
     from eaccode import tools
 
     tools.permission_handler = ask
+    if manager is not None:
+        manager.ask_handler = ask_tool
 
 
 def run_repl(
@@ -180,6 +191,10 @@ def run_repl(
             memory_block = injection_text()
             if memory_block:
                 active_agent.system_prompt = f"{active_agent.system_prompt}\n\n{memory_block}"
+            # C1: wire the interactive ask prompt into the permission manager
+            manager = getattr(active_agent, "permission_manager", None)
+            if manager is not None:
+                _wire_permission_prompt(stdin, stdout, manager)
         return active_agent
 
     _wire_permission_prompt(stdin, stdout)

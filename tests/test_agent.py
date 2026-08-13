@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 from eaccode import config as cfg
-from eaccode import router
+from eaccode import permissions, router
 from eaccode.agent import Agent, Tool, ToolCall, parse_response
 
 
@@ -326,6 +326,56 @@ class TestParallelTools:
         assert any("kaputt" in c for c in contents)  # failed tool reported
         assert any("ok" in c for c in contents)  # other tool still ran
         assert agent.last_text(history) == "fertig"  # loop survived
+
+
+class TestPermissionGate:
+    def test_denied_tool_returns_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import litellm
+
+        monkeypatch.setattr(
+            litellm,
+            "completion",
+            lambda **kw: _response(
+                None, [_tool_call_raw("c1", "write_file", '{"path": "x"}')]
+            ),
+        )
+        agent = Agent(
+            conf=_conf(),
+            tools=[Tool(name="write_file", description="w", func=lambda path: "ok")],
+            permission_manager=permissions.PermissionManager(
+                {"permissions": {"mode": "read_only", "allow": [], "deny": []}}
+            ),
+        )
+        history = agent.run([{"role": "user", "content": "schreib!"}])
+        tool_messages = [m for m in history if m["role"] == "tool"]
+        assert "permission denied" in tool_messages[0]["content"]
+
+    def test_allowed_tool_runs(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import litellm
+
+        seen: dict[str, Any] = {}
+
+        def fake_completion(**kwargs: Any) -> SimpleNamespace:
+            if kwargs["messages"][-1]["role"] == "tool":
+                return _response("fertig")
+            return _response(None, [_tool_call_raw("c1", "read_file", '{"path": "x"}')])
+
+        monkeypatch.setattr(litellm, "completion", fake_completion)
+        agent = Agent(
+            conf=_conf(),
+            tools=[
+                Tool(
+                    name="read_file",
+                    description="r",
+                    func=lambda path: seen.update(path=path) or "inhalt",
+                )
+            ],
+            permission_manager=permissions.PermissionManager(
+                {"permissions": {"mode": "read_only", "allow": [], "deny": []}}
+            ),
+        )
+        history = agent.run([{"role": "user", "content": "lies!"}])
+        assert "inhalt" in [m["content"] for m in history if m["role"] == "tool"][0]
 
 
 class TestCancelEvent:

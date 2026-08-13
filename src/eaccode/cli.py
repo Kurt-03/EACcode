@@ -12,6 +12,7 @@ from eaccode.commands import (
     run_config_command,
     run_memory_command,
     run_model_command,
+    run_permissions_command,
     run_provider_command,
     run_session_command,
     run_skill_command,
@@ -19,6 +20,7 @@ from eaccode.commands import (
 from eaccode.config import load_env
 from eaccode.learning import LEARNING_PROMPT, make_learning_tools
 from eaccode.memory import injection_text, make_memory_tools
+from eaccode.permissions import PermissionManager
 from eaccode.repl import run_repl
 from eaccode.store import make_session_tools
 from eaccode.subagents import SubagentPool, make_subagent_tool
@@ -45,7 +47,11 @@ def build_agent() -> Agent:
     registry = {tool.name: tool for tool in tools}
     pool = SubagentPool()
     tools.append(make_subagent_tool(pool, registry, cfg.load_config()))
-    return Agent(tools=tools, system_prompt=system_prompt)
+    return Agent(
+        tools=tools,
+        system_prompt=system_prompt,
+        permission_manager=PermissionManager(),
+    )
 
 
 def _run_once(prompt: str, stdout: TextIO) -> int:
@@ -102,5 +108,7 @@ def main(
         raise SystemExit(run_skill_command(argv[1:], stdout=stdout))
     if first == "session":
         raise SystemExit(run_session_command(argv[1:], stdout=stdout))
+    if first == "permissions":
+        raise SystemExit(run_permissions_command(argv[1:], stdout=stdout))
     stdout.write(f"Unknown command: {first} - try 'eaccode --help'\n")
     raise SystemExit(2)

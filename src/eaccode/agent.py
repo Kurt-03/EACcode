@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from eaccode import config as cfg
-from eaccode import router, skills
+from eaccode import permissions, router, skills
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are eaccode, a self-improving generalist agent running locally "
@@ -93,12 +93,14 @@ class Agent:
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         use_skills: bool = True,
         memory_nudge_interval: int = 10,
+        permission_manager: permissions.PermissionManager | None = None,
     ) -> None:
         self.conf = conf or cfg.load_config()
         self.system_prompt = system_prompt
         self.tools = {tool.name: tool for tool in (tools or [])}
         self.use_skills = use_skills
         self.memory_nudge_interval = memory_nudge_interval
+        self.permission_manager = permission_manager
         self._memory_runs = 0
 
     def _complete(
@@ -124,8 +126,24 @@ class Agent:
             return f"Error: unknown tool: {call.name}"
         if call.name.startswith("memory_"):
             self._memory_runs = 0  # agent curated memory -> nudge timer resets
+        # Permission gate (C1): every tool is checked before it runs.
+        if self.permission_manager is not None:
+            decision = self.permission_manager.check(call.name, call.arguments)
+            if not decision.allow:
+                return f"Error: permission denied ({decision.reason})"
         try:
-            result = tool.func(**call.arguments)
+            if call.name == "run_command":
+                # run_command has its own interactive gate; the loop already
+                # decided, so tell it to skip the second prompt.
+                from eaccode import tools as tools_mod  # lazy: avoids import cycle
+
+                tools_mod._loop_permission_checked = True
+                try:
+                    result = tool.func(**call.arguments)
+                finally:
+                    tools_mod._loop_permission_checked = False
+            else:
+                result = tool.func(**call.arguments)
         except Exception as exc:  # tool bugs must not kill the loop
             return f"Error: tool {call.name} failed: {exc}"
         return str(result)

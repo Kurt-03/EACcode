@@ -7,7 +7,7 @@ import sys
 from typing import Any, TextIO
 
 from eaccode import config as cfg
-from eaccode import memory, router, skills, store
+from eaccode import memory, permissions, router, skills, store
 
 USAGE = """\
 Usage: config <command> [args]
@@ -526,6 +526,74 @@ def run_session_command(args: list[str], stdout: TextIO | None = None) -> int:
             stdout.write(f"[{message['role']}] {message['content']}\n")
         return 0
     stdout.write(f"Unknown session command: {command}\n\n{SESSION_USAGE}")
+    return 1
+
+
+PERMISSIONS_USAGE = """\
+Usage: permissions <command> [args]
+
+Commands:
+  status                     show mode and rules
+  mode <m>                   ask | allow_all | read_only | deny_all
+  allow <regex>              add an allow rule (matches tool call text)
+  deny <regex>               add a deny rule (wins over allow)
+  unallow <regex>            remove an allow rule
+  undeny <regex>             remove a deny rule
+  reset                      back to ask / no rules
+"""
+
+
+def run_permissions_command(args: list[str], stdout: TextIO | None = None) -> int:
+    """Manage permission modes and rules (C1)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in ("help", "--help", "-h"):
+        stdout.write(PERMISSIONS_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+    try:
+        if command == "status":
+            perm = cfg.load_config().get("permissions", {}) or {}
+            stdout.write(f"mode: {perm.get('mode', 'ask')}\n")
+            stdout.write(f"allow: {perm.get('allow', [])}\n")
+            stdout.write(f"deny: {perm.get('deny', [])}\n")
+            return 0
+        if command == "mode":
+            if len(rest) != 1:
+                stdout.write("Usage: permissions mode <ask|allow_all|read_only|deny_all>\n")
+                return 1
+            permissions.write_permissions_config(mode=rest[0])
+            stdout.write(f"permission mode: {rest[0]}\n")
+            return 0
+        if command == "allow":
+            if len(rest) != 1:
+                stdout.write("Usage: permissions allow <regex>\n")
+                return 1
+            permissions.write_permissions_config(add_allow=rest[0])
+            stdout.write(f"allow rule added: {rest[0]}\n")
+            return 0
+        if command == "deny":
+            if len(rest) != 1:
+                stdout.write("Usage: permissions deny <regex>\n")
+                return 1
+            permissions.write_permissions_config(add_deny=rest[0])
+            stdout.write(f"deny rule added: {rest[0]}\n")
+            return 0
+        if command == "unallow":
+            permissions.write_permissions_config(remove_allow=rest[0] if rest else "")
+            stdout.write(f"allow rule removed: {rest[0] if rest else ''}\n")
+            return 0
+        if command == "undeny":
+            permissions.write_permissions_config(remove_deny=rest[0] if rest else "")
+            stdout.write(f"deny rule removed: {rest[0] if rest else ''}\n")
+            return 0
+        if command == "reset":
+            permissions.write_permissions_config(reset=True)
+            stdout.write("permissions reset to defaults\n")
+            return 0
+    except ValueError as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    stdout.write(f"Unknown permissions command: {command}\n\n{PERMISSIONS_USAGE}")
     return 1
 
 

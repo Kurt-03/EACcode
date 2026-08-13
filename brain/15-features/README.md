@@ -34,7 +34,10 @@ eintragen.
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
 | Subagents | agent | done | B5 | [[15-features/system/subagents.md\|subagents]] |
-| Parallel-Execution | system | done | B6 | [[15-features/system/parallel-execution.md\|parallel-execution]] |
+| Parallel-Execution | system | done | B6 | [[15-features/system/parallel-execution.md\|Parallel-Execution]] |
+| Permissions (C1) | system | active | C1 | [[15-features/system/permissions.md\|Permissions]] |
+| Cron & Daemon (C2) | system | active | C2 | [[15-features/system/cron-daemon.md\|Cron & Daemon]] |
+| MCP-Client (C3) | system | active | C3 | [[15-features/system/mcp-client.md\|MCP-Client]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
 | Session-Store (FTS5) | system | done | B3 | [[15-features/system/session-store.md\|session-store]] |
