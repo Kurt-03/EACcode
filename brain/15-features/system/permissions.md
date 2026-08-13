@@ -30,10 +30,14 @@ read_only/deny_all), allow-/deny-Regeln (Regex auf Tool-Call), Sandbox
 - allow-Regel `mcp__fake__echo` erlaubte gezielt ein MCP-Tool
 - Modus-Injection ✅: im read_only-Modus versucht der Agent Schreib-Tools
   gar nicht erst (System-Prompt-Hinweis)
+- **ask-Semantik (Nachbesserung 2026-08-13):** lesende Tools
+  (read_file/web/current_time/Sessions) laufen **frei** ohne Prompt —
+  nur mutierende Tools fragen (Regression aus C1 behoben, live bewiesen:
+  current_time antwortet ohne Prompt)
 
 ## Tests
-`tests/test_permissions.py` (18: Modes, Regeln, Persistenz, mode_hint)
-+ Agent-Gate-Tests (test_agent)
+`tests/test_permissions.py` (19: Modes, Regeln, Persistenz, mode_hint,
+ask-readonly-frei) + Agent-Gate-Tests (test_agent)
 
 ## Offene Punkte
 - Echte Sandbox (Docker/bwrap) — optional, später
