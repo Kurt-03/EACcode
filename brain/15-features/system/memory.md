@@ -2,7 +2,7 @@
 name: memory
 type: system
 status: done
-phase: A6
+phase: A6/B4
 date: 2026-08-13
 tags: [type/feature, feature/system]
 ---
@@ -10,30 +10,33 @@ tags: [type/feature, feature/system]
 # System: Memory (MEMORY.md / USER.md)
 
 ## Zweck
-Persistente, kuratierte Fakten über Sessions hinweg — der Unterschied zu
-„normalen" Agents.
+Persistente, kuratierte Fakten über Sessions hinweg — Hermes-Modell seit B4:
+Agent-Tools, Char-Budgets, Konsolidierungs-Zwang, atomic writes.
 
-## Implementierung
-- `src/eaccode/memory.py` — MEMORY.md/USER.md im Datenverzeichnis,
-  `add_entry` / `remove_entry` / `injection_text`
-- Injection in den System-Prompt beim Agent-Aufbau (REPL + TUI + `-p`)
-- Kommandos: `/memory show|add|remove|user add`
+## Implementierung (B4-Stand)
+- `src/eaccode/memory.py`:
+  - Einträge **§-delimitiert** (Hermes-Format), Legacy-Migration aus A6-Format
+  - **Char-Budgets:** MEMORY.md 2200, USER.md 1375 — `add` über Limit →
+    „Consolidate now"-Meldung mit Budget-Angabe
+  - `replace` (mehrdeutig → Fehler), `remove`, **`apply_batch`** (all-or-nothing,
+    gegen finales Budget — Konsolidieren + Hinzufügen in einem Call)
+  - **Atomic writes** (temp + os.replace), Thread-Locks, Duplikat-Schutz
+- **Agent-Tools** (B4): `memory_add` / `memory_replace` / `memory_remove` /
+  `memory_apply_batch` (target: agent|user) — der Agent kuratiert selbst
+- **Nudge:** alle 10 Agent-Runs erinnert der System-Prompt an Memory-Pflege;
+  Reset bei memory_*-Tool-Call
+- Kommandos: `/memory show|add|user add|remove` (CLI + REPL)
 
-## Kommandos
-```
-/memory add <fakt>        → MEMORY.md
-/memory user add <fakt>   → USER.md
-/memory remove <substring>
-```
+## Verifiziert (live, 2026-08-13)
+- Agent merkte sich „Python + Kaffee" selbst → korrekt in **USER.md** (target=user)
+- `/memory show` zeigt beide Sektionen im Injection-Format
 
 ## Tests
-`tests/test_memory.py` + `tests/test_commands.py` (TestMemoryCommands) +
-REPL-Chat-Tests
+`tests/test_memory.py` (21) + Memory-Tool-Tests + Nudge-Tests (test_agent)
 
 ## Offene Punkte
-- B4: Memory-Hierarchie (global vs. projektbezogen), Char-Budget,
-  Batch-Kuration, Konflikte
-- B3: Session-Store (FTS5) — dann kann der Agent alte Sessions durchsuchen
+- Konflikt-Auflösung bei parallelen Prozessen (Datei-Lock statt Thread-Lock)
+- Memory-Kuration als eigene Skill-Logik (B2-Verzahnung)
 
 ## Verknüpft
-[[15-features/README.md|Feature-Register]] · [[20-areas/architecture.md|Architektur]]
+[[15-features/README.md|Feature-Register]] · [[15-features/commands/memory.md|/memory]] · [[15-features/system/session-store.md|Session-Store]]

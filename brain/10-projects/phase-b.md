@@ -15,9 +15,9 @@ Ziel: Das Lern- und Gedächtnis-Herz — der Unterschied zu „normalen" Agents.
    Skill-Verzeichnisse, Laden per Trigger, Skill-View, Skill-Skripte/Templates
 2. **B2 Learning-Loop ✅** — Post-Task-Review (wann ein Skill entsteht),
    Skill-Erstellung als Tool-Aktion, Skill-Verbesserung (patch), Dedup/Pruning
-3. **B3 Session-Store** — SQLite + FTS5, `session_search`
+3. **B3 Session-Store ✅** — SQLite + FTS5, `session_search`
    (Discovery/Scroll/Browse), Session-Links
-4. **B4 Memory-Hierarchie** — global vs. projektbezogen, Char-Budget,
+4. **B4 Memory-Hierarchie ✅** — global vs. projektbezogen, Char-Budget,
    Batch-Kuration, Konflikte
 5. **B5 Subagents** — isolierte Kontexte, eigene Tool-Sets, Limits
 6. **B6 Parallel-Execution** — mehrere Tool-Calls gleichzeitig, Fehler-Isolation

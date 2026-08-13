@@ -28,7 +28,7 @@ eintragen.
 | Tool: web_search | tool | done | A5 | [[15-features/tools/web-search.md|Tool: web_search]] |
 | Tool: current_time | tool | done | A5 | [[15-features/tools/current-time.md|Tool: current_time]] |
 | Tool: system_info | tool | done | A5 | [[15-features/tools/system-info.md|Tool: system_info]] |
-| Memory (MEMORY.md/USER.md) | system | done | A6 | [[15-features/system/memory.md|Memory]] |
+| Memory (MEMORY.md/USER.md) | system | done | A6/B4 | [[15-features/system/memory.md\|Memory]] |
 | REPL (Chat + Slash) | system | done | A7 | [[15-features/system/repl.md|REPL]] |
 | One-Shot `-p` | system | done | A7 | [[15-features/system/one-shot.md|One-Shot]] |
 | TUI (Textual) | system | done | A8 | [[15-features/system/tui.md|TUI]] |
@@ -37,7 +37,7 @@ eintragen.
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |
 | Learning-Loop | system | done | B2 | [[15-features/system/learning-loop.md\|learning-loop]] |
 | Session-Store (FTS5) | system | done | B3 | [[15-features/system/session-store.md\|Session-Store]] |
-| Memory-Hierarchie | system | active | B4 | [[15-features/system/memory.md\|Memory]] |
+| Memory-Hierarchie | system | done | B4 | [[15-features/system/memory.md\|Memory]] |
 | Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|Commands-Index]] |
 
 *Stand: 2026-08-13 — Phase A komplett; Phase B: B1/B2 fertig, B3–B6 offen*
