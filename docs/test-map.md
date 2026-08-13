@@ -45,15 +45,15 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Tool-Restriktion | Chat: Subagent mit `ghost_tool` | `Error: unknown tool` | ✅ 08-13 |
 | Parallel (B6) | 2 Subagents | Gesamtzeit ≈ 1 Subagent (nicht doppelt) | ✅ 08-13 |
 
-## Phase C — Production-Reife (geplant)
+## Phase C — Production-Reife (in Arbeit: C1–C3 ✅, C4/C5 offen)
 
-| Feature | Wie testen (Plan) | Erwartung | Status |
+| Feature | Wie testen | Erwartung | Status |
 |---|---|---|---|
-| C1 Permissions | Regeln anlegen, Modus wechseln | Ask/Auto-Approve/Read-only wirken | ⏳ |
-| C2 Cron/Daemon | Job anlegen, `eaccode daemon` | Job feuert, Delivery-Ziel erreicht | ⏳ |
-| C3 MCP | Server anbinden, Tool-Discovery | MCP-Tool nutzbar, Permission greift | ⏳ |
-| C4 Gateway | Telegram-Bot, Chat senden | Antwort kommt im Chat | ⏳ |
-| C5 Packaging | Installer auf 3 OS | Installation + Smoke-Test | ⏳ |
+| C1 Permissions | `/permissions status`, `mode read_only` → Chat „Erstelle Datei" | write_file blockiert; ask → `Allow: … [y/N]`-Prompt | ✅ 08-13 |
+| C1 Regeln | `eaccode permissions allow "echo"` → Chat | gezielte Freigabe wirkt | ✅ 08-13 |
+| C2 Jobs | `eaccode job add x --schedule "0 9 * * *" --prompt "…"` + `job run x` | echter LLM-Call, Log `[ok]`, last_run | ✅ 08-13 |
+| C2 Daemon | `eaccode daemon` | startet, Ctrl+C beendet sauber | ⏳ (Unit-getestet) |
+| C3 MCP | `eaccode mcp add fake --command …` + Chat „nutze mcp__fake__echo" | Discovery + Permission + `echo:…` | ✅ 08-13 |
 
 ---
 

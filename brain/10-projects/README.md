@@ -3,9 +3,10 @@
 Aktive Arbeitsstränge und offene Entscheidungen. *(Pointer: aktueller Code-
 und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 
-## Aktive Phase: — (Phase B KOMPLETT ✅, 2026-08-13)
+## Aktive Phase: C — Production-Reife (2026-08-13)
 
-**Als Nächstes: Phase C (Production-Reife)** — Permissions/Sandbox, Cron/Daemon, MCP, Gateway, Packaging → [[50-archive/phase-b.md|phase-b]] (wird beim Abschluss angelegt)
+**Fortschritt:** C1 Permissions ✅ · C2 Cron/Daemon ✅ · C3 MCP ✅ · C4 Gateway ⏳ · C5 Packaging ⏳
+→ Ziel: sicher, autonom, verteilbar. DoD: installierbar auf 3 OS, Cron→Telegram, MCP-Tool genutzt, Permission-Regeln wirken.
 
 ## Abgeschlossen
 

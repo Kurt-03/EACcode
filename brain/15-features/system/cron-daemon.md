@@ -1,7 +1,7 @@
 ---
 name: cron-daemon
 type: system
-status: active
+status: done
 phase: C2
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -16,16 +16,17 @@ Telegram/Discord via C4).
 
 ## Implementierung
 - `src/eaccode/cron.py` — Job-Definitionen in `data/jobs.yaml`
-  (id, schedule, prompt, enabled), APScheduler-CronTrigger,
+  (id, schedule, prompt, enabled, last_run/status), APScheduler-CronTrigger,
   `run_job` via subprocess `eaccode -p`, Log in `data/jobs/<id>.log`
 - CLI: `eaccode job list|add|remove|pause|resume|run <id>`
 - Daemon: `eaccode daemon` (BlockingScheduler, beendbar per Ctrl+C)
 
 ## Verifiziert (live, 2026-08-13)
-- (wird beim Live-Test ergänzt)
+- `job add morgen` + `job run` → echter LLM-Call, Antwort „Job läuft",
+  Log `[ok]`, last_run gesetzt; remove funktioniert
 
 ## Tests
-`tests/test_cron.py`
+`tests/test_cron.py` (17: Store, Run, Scheduler, Commands)
 
 ## Offene Punkte
 - Delivery-Ziele außer Log (C4: Telegram)

@@ -1,7 +1,7 @@
 ---
 name: permissions
 type: system
-status: active
+status: done
 phase: C1
 date: 2026-08-13
 tags: [type/feature, feature/system]
@@ -15,17 +15,22 @@ read_only/deny_all), allow-/deny-Regeln (Regex auf Tool-Call), Sandbox
 (Docker optional; Windows-sicher = Modus-Schutz statt Kernel-Sandbox).
 
 ## Implementierung
-- `src/eaccode/permissions.py` — `PermissionManager` (Regeln > Modus > ask)
+- `src/eaccode/permissions.py` — `PermissionManager` (deny-Regeln >
+  allow-Regeln > Modus > ask-Handler)
 - Agent-Loop prüft **jedes Tool** vor der Ausführung (Nachbesserung zu A5,
-  wo nur `run_command` geprüft wurde)
-- config.yaml: `permissions: {mode, allow[], deny[]}` + `/permissions`-Kommando
-- Sandbox: dokumentiert, nicht implementiert (Docker optional, C-Phase)
+  wo nur `run_command` geprüft wurde); run_command überspringt seinen
+  eigenen zweiten Prompt via threading.local-Marker
+- config.yaml: `permissions: {mode, allow[], deny[]}` + `/permissions` +
+  `eaccode permissions` (status, mode, allow, deny, unallow, undeny, reset)
+- Sandbox: dokumentiert, nicht implementiert (Docker optional)
 
 ## Verifiziert (live, 2026-08-13)
-- (wird beim Live-Test ergänzt)
+- `mode read_only` → Agent-Deny mit Erklärung (write_file blockiert)
+- `mode ask` → interaktiver Prompt `Allow: write_file {…} [y/N]`
+- allow-Regel `mcp__fake__echo` erlaubte gezielt ein MCP-Tool
 
 ## Tests
-`tests/test_permissions.py` + Agent-Integrationstests
+`tests/test_permissions.py` (14) + Agent-Gate-Tests (test_agent)
 
 ## Offene Punkte
 - Echte Sandbox (Docker/bwrap) — optional, später
