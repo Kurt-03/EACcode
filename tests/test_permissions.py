@@ -14,6 +14,8 @@ from eaccode.permissions import PermissionManager
 
 @pytest.fixture
 def perm_conf(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    # commands read/write config.yaml via config_dir() — isolate BOTH
+    monkeypatch.setattr(cfg, "config_dir", lambda: tmp_path)
     monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
     cfg.ensure_config()
     return {"permissions": {"mode": "ask", "allow": [], "deny": []}}

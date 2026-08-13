@@ -89,6 +89,13 @@ class TestTools:
         assert [s.name for s in servers] == ["fake"]
 
 
+def _iso_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate config AND data dir (commands read/write config_dir()!)."""
+    monkeypatch.setattr(cfg, "config_dir", lambda: tmp_path)
+    monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+    cfg.ensure_config()
+
+
 class TestSseClient:
     """SSE transport against a minimal in-process SSE server."""
 
@@ -294,10 +301,78 @@ class TestHttpClient:
         assert servers[0].transport == "sse"
 
 
+class TestImportCommand:
+    @pytest.fixture
+    def mcp_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+        _iso_config(tmp_path, monkeypatch)
+        import io
+
+        from eaccode.commands import run_mcp_command
+
+        def run(*args: str) -> tuple[int, str]:
+            stdout = io.StringIO()
+            code = run_mcp_command(list(args), stdout=stdout)
+            return code, stdout.getvalue()
+
+        return run
+
+    def test_import_inline_json(self, mcp_runner: Any) -> None:
+        code, out = mcp_runner(
+            "import",
+            '{"mcpServers": {"inline_srv": {"command": "echo", '
+            '"args": ["hi"]}, "remote": {"url": "http://x:1/sse", '
+            '"transport": "sse"}}}',
+        )
+        assert code == 0
+        assert "added 2" in out
+        code, out = mcp_runner("list")
+        assert "inline_srv" in out
+        assert "remote" in out
+        assert "transport: sse" in out
+
+    def test_import_from_file(self, mcp_runner: Any, tmp_path: Path) -> None:
+        json_file = tmp_path / "servers.json"
+        json_file.write_text(
+            '{"mcpServers": {"Roblox_Studio": {"command": "cmd.exe", '
+            '"args": ["/c", "%LOCALAPPDATA%\\\\Roblox\\\\mcp.bat"]}}}',
+            encoding="utf-8",
+        )
+        code, out = mcp_runner("import", str(json_file))
+        assert code == 0
+        assert "added 1" in out
+        code, out = mcp_runner("list")
+        assert "Roblox_Studio" in out
+        assert "cmd.exe" in out
+
+    def test_import_overwrites_and_skips(self, mcp_runner: Any) -> None:
+        mcp_runner("add", "keep", "--command", "echo", "--args", "a")
+        code, out = mcp_runner(
+            "import",
+            '{"mcpServers": {"keep": {"command": "new"}, '
+            '"kaputt": {"args": ["x"]}}}',
+        )
+        assert code == 0
+        assert "updated 1" in out
+        assert "skipped 1" in out
+        code, out = mcp_runner("list")
+        assert "new" in out
+        assert "kaputt" not in out
+
+    def test_import_invalid_json(self, mcp_runner: Any) -> None:
+        code, out = mcp_runner("import", "{kaputt")
+        assert code == 1
+        assert "invalid JSON" in out
+
+    def test_import_missing_file(self, mcp_runner: Any) -> None:
+        code, out = mcp_runner("import", "C:/definitely/not/here.json")
+        assert code == 1
+        assert "invalid JSON" in out
+
+
 class TestMcpCommand:
     @pytest.fixture
     def mcp_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
-        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        _iso_config(tmp_path, monkeypatch)
         import io
 
         from eaccode.commands import run_mcp_command

@@ -25,6 +25,9 @@ HTTP (aktueller Standard), Tool-Discovery, Permission-Integration (C1).
 - Server in config.yaml: `mcp.servers: {name: {command|url, transport}}`
 - `eaccode mcp list|add|remove`; Tools heißen `mcp__<server>__<tool>`
   und laufen durch den PermissionManager (C1)
+- `eaccode mcp import <file.json | inline-json>` — mcpServers-JSON
+  (Claude/Cursor-Format) direkt übernehmen; existierende Namen werden
+  überschrieben; Beispiel: `docs/examples/mcp-servers.example.json`
 - `build_mcp_clients` + Registry + `atexit close_all` (keine Leaks)
 
 ## Verifiziert (live + Tests, 2026-08-13)

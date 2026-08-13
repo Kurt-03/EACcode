@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import getpass
+import json
 import sys
+from pathlib import Path
 from typing import Any, TextIO
 
 from eaccode import config as cfg
@@ -692,6 +694,12 @@ Commands:
   list                          show configured MCP servers
   add <name> --command <cmd> [--args ...]
                                 register a stdio MCP server
+  add <name> --url <url> [--transport http|sse]
+                                register a remote MCP server
+  import <file.json | inline-json>
+                                import servers from mcpServers JSON
+                                (Claude/Cursor format; existing names
+                                are overwritten)
   remove <name>                 unregister a server
 """
 
@@ -710,7 +718,63 @@ def run_mcp_command(args: list[str], stdout: TextIO | None = None) -> int:
             stdout.write("(no servers yet)\n")
             return 0
         for name, entry in servers.items():
-            stdout.write(f"{name}  command: {entry.get('command')} {entry.get('args', [])}\n")
+            if entry.get("url"):
+                transport = entry.get("transport", "http")
+                stdout.write(f"{name}  url: {entry['url']}  transport: {transport}\n")
+            else:
+                stdout.write(
+                    f"{name}  command: {entry.get('command')} {entry.get('args', [])}\n"
+                )
+        return 0
+    if command == "import":
+        if len(rest) != 1:
+            stdout.write("Usage: mcp import <file.json | inline-json>\n")
+            return 1
+        raw = rest[0]
+        if Path(raw).exists():
+            try:
+                raw = Path(raw).read_text(encoding="utf-8")
+            except OSError as exc:
+                stdout.write(f"Error: cannot read {rest[0]}: {exc}\n")
+                return 1
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            stdout.write(f"Error: invalid JSON: {exc}\n")
+            return 1
+        if not isinstance(data, dict):
+            stdout.write("Error: expected an object (mcpServers map)\n")
+            return 1
+        server_map = data.get("mcpServers", data)
+        if not isinstance(server_map, dict):
+            stdout.write("Error: 'mcpServers' must be an object\n")
+            return 1
+        added = updated = skipped = 0
+        for name, entry in server_map.items():
+            if not isinstance(entry, dict) or (
+                not entry.get("command") and not entry.get("url")
+            ):
+                skipped += 1
+                continue
+            if name in servers:
+                updated += 1
+            else:
+                added += 1
+            clean: dict[str, Any] = {}
+            if entry.get("command"):
+                clean["command"] = str(entry["command"])
+                clean["args"] = [str(a) for a in (entry.get("args") or [])]
+            if entry.get("url"):
+                clean["url"] = str(entry["url"])
+                if entry.get("transport"):
+                    clean["transport"] = str(entry["transport"])
+            servers[name] = clean
+        conf.setdefault("mcp", {})["servers"] = servers
+        cfg.save_config(conf)
+        stdout.write(
+            f"imported {added + updated} servers (added {added}, "
+            f"updated {updated}, skipped {skipped})\n"
+        )
         return 0
     if command == "add":
         if len(rest) < 3:
