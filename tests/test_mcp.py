@@ -89,6 +89,101 @@ class TestTools:
         assert [s.name for s in servers] == ["fake"]
 
 
+class TestSseClient:
+    """SSE transport against a minimal in-process SSE server."""
+
+    @pytest.fixture
+    def sse_server(self) -> Any:
+        import json as json_mod
+        import threading
+        import time
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                self.wfile.write(b"event: endpoint\ndata: /message?session_id=abc\n\n")
+                self.wfile.flush()
+                time.sleep(30)  # keep the stream open until the test ends
+
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", 0))
+                payload = json_mod.loads(self.rfile.read(length))
+                method = payload.get("method")
+                if method == "initialize":
+                    result = {
+                        "protocolVersion": "2025-06-18",
+                        "capabilities": {"tools": {}},
+                        "serverInfo": {"name": "sse-fake", "version": "1.0"},
+                    }
+                elif method == "tools/list":
+                    result = {
+                        "tools": [
+                            {
+                                "name": "sse_echo",
+                                "description": "sse echo",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {"text": {"type": "string"}},
+                                },
+                            }
+                        ]
+                    }
+                elif method == "tools/call":
+                    arguments = payload.get("params", {}).get("arguments", {})
+                    result = {
+                        "content": [
+                            {"type": "text", "text": f"sse:{arguments.get('text', '')}"}
+                        ]
+                    }
+                else:
+                    result = {}
+                message = {"jsonrpc": "2.0", "id": payload.get("id"), "result": result}
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.end_headers()
+                body = f"event: message\ndata: {json_mod.dumps(message)}\n\n"
+                self.wfile.write(body.encode("utf-8"))
+                self.wfile.flush()
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        yield f"http://127.0.0.1:{server.server_port}/sse"
+        server.shutdown()
+
+    def test_sse_initialize_and_call(self, sse_server: str) -> None:
+        sse = mcp.McpSseClient(McpServer("sse", url=sse_server))
+        try:
+            info = sse.initialize()
+            assert info["serverInfo"]["name"] == "sse-fake"
+            names = [t["name"] for t in sse.list_tools()]
+            assert names == ["sse_echo"]
+            assert sse.call_tool("sse_echo", {"text": "hi"}) == "sse:hi"
+        finally:
+            sse.close()
+
+    def test_sse_make_mcp_tools(self, sse_server: str) -> None:
+        client = mcp.McpSseClient(McpServer("sse", url=sse_server))
+        try:
+            tools = mcp.make_mcp_tools([client])
+            assert "mcp__sse__sse_echo" in {t.name for t in tools}
+        finally:
+            client.close()
+
+    def test_load_servers_url(self) -> None:
+        conf = {"mcp": {"servers": {"remote": {"url": "http://localhost:1/sse"}}}}
+        servers = mcp.load_servers(conf)
+        assert servers[0].name == "remote"
+        assert servers[0].url == "http://localhost:1/sse"
+        assert not servers[0].command
+
+
 class TestMcpCommand:
     @pytest.fixture
     def mcp_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:

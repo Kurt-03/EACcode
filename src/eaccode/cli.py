@@ -23,6 +23,7 @@ from eaccode.config import load_env
 from eaccode.learning import LEARNING_PROMPT, make_learning_tools
 from eaccode.memory import injection_text, make_memory_tools
 from eaccode.permissions import PermissionManager
+from eaccode.permissions import mode_hint as permissions_mode_hint
 from eaccode.repl import run_repl
 from eaccode.store import make_session_tools
 from eaccode.subagents import SubagentPool, make_subagent_tool
@@ -50,15 +51,18 @@ def build_agent() -> Agent:
     pool = SubagentPool()
     tools.append(make_subagent_tool(pool, registry, cfg.load_config()))
     # C3: MCP servers from config -> discovered tools (mcp__<server>__<tool>)
-    from eaccode.mcp import McpClient, load_servers, make_mcp_tools
+    from eaccode.mcp import build_mcp_clients, make_mcp_tools
 
-    mcp_clients = [McpClient(server) for server in load_servers()]
+    mcp_clients = build_mcp_clients()
     if mcp_clients:
         tools.extend(make_mcp_tools(mcp_clients))
+    # C1: tell the agent its permission mode up front
+    permission_manager = PermissionManager()
+    system_prompt = f"{system_prompt}{permissions_mode_hint(permission_manager.mode)}"
     return Agent(
         tools=tools,
         system_prompt=system_prompt,
-        permission_manager=PermissionManager(),
+        permission_manager=permission_manager,
     )
 
 

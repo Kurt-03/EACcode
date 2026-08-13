@@ -634,11 +634,15 @@ def run_job_command(args: list[str], stdout: TextIO | None = None) -> int:
             return 1
         job_id = rest[0]
         schedule = ""
+        deliver = "log"
         prompt_parts: list[str] = []
         index = 1
         while index < len(rest):
             if rest[index] == "--schedule" and index + 1 < len(rest):
                 schedule = rest[index + 1]
+                index += 2
+            elif rest[index] == "--deliver" and index + 1 < len(rest):
+                deliver = rest[index + 1]
                 index += 2
             elif rest[index] == "--prompt":
                 index += 1
@@ -648,7 +652,7 @@ def run_job_command(args: list[str], stdout: TextIO | None = None) -> int:
             else:
                 index += 1
         try:
-            message = cron.add_job(job_id, schedule, " ".join(prompt_parts))
+            message = cron.add_job(job_id, schedule, " ".join(prompt_parts), deliver)
         except ValueError as exc:
             stdout.write(f"Error: {exc}\n")
             return 1

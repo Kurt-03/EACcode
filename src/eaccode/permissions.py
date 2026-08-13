@@ -103,6 +103,36 @@ class PermissionManager:
         )
 
 
+def mode_hint(mode: str) -> str:
+    """System-prompt hint so the agent knows its permission mode upfront."""
+    if mode == "read_only":
+        return (
+            "\n\n## Permission mode: READ-ONLY\n"
+            "You are in read-only mode: do NOT attempt any tool that writes, "
+            "creates or deletes (write_file, run_command, create_skill, "
+            "memory_*, spawn_subagent, mcp tools that mutate). Read/search/web "
+            "tools are fine. If the user asks for changes, explain that "
+            "read-only mode blocks them."
+        )
+    if mode == "deny_all":
+        return (
+            "\n\n## Permission mode: DENY-ALL\n"
+            "No tools are available. Answer from knowledge only and tell the "
+            "user the permission mode blocks tool use."
+        )
+    if mode == "allow_all":
+        return (
+            "\n\n## Permission mode: AUTO-APPROVE\n"
+            "All tool calls are approved automatically. You may use any tool "
+            "freely."
+        )
+    return (
+        "\n\n## Permission mode: ASK\n"
+        "Tool calls that need approval show an interactive prompt to the user. "
+        "Proceed normally; the user decides per call."
+    )
+
+
 def write_permissions_config(
     mode: str | None = None,
     add_allow: str | None = None,

@@ -87,6 +87,22 @@ class TestRules:
         assert text == 'run_command {"command": "echo hi"}'
 
 
+class TestModeHint:
+    def test_read_only_hint(self) -> None:
+        hint = permissions.mode_hint("read_only")
+        assert "READ-ONLY" in hint
+        assert "write_file" in hint
+
+    def test_deny_all_hint(self) -> None:
+        assert "DENY-ALL" in permissions.mode_hint("deny_all")
+
+    def test_allow_all_hint(self) -> None:
+        assert "AUTO-APPROVE" in permissions.mode_hint("allow_all")
+
+    def test_ask_hint(self) -> None:
+        assert "ASK" in permissions.mode_hint("ask")
+
+
 class TestPersistence:
     def test_write_mode(self, perm_conf: dict) -> None:
         section = permissions.write_permissions_config(mode="read_only")

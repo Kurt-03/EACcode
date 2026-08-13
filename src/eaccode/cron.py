@@ -26,6 +26,7 @@ class Job:
     schedule: str  # cron expression, e.g. "0 9 * * *"
     prompt: str
     enabled: bool = True
+    deliver: str = "log"  # "log" (file) or "stdout"
     last_run: str | None = None
     last_status: str | None = None
 
@@ -36,6 +37,7 @@ class Job:
             schedule=str(data.get("schedule", "")),
             prompt=str(data.get("prompt", "")),
             enabled=bool(data.get("enabled", True)),
+            deliver=str(data.get("deliver", "log")),
             last_run=data.get("last_run"),
             last_status=data.get("last_status"),
         )
@@ -46,6 +48,7 @@ class Job:
             "schedule": self.schedule,
             "prompt": self.prompt,
             "enabled": self.enabled,
+            "deliver": self.deliver,
             "last_run": self.last_run,
             "last_status": self.last_status,
         }
@@ -80,16 +83,20 @@ def _save_jobs(jobs: list[Job]) -> None:
     )
 
 
-def add_job(job_id: str, schedule: str, prompt: str) -> str:
+def add_job(
+    job_id: str, schedule: str, prompt: str, deliver: str = "log"
+) -> str:
     """Add a job; errors on duplicate ids and invalid cron expressions."""
     job_id = job_id.strip()
     if not job_id or not schedule or not prompt:
         return "Error: id, schedule and prompt are required"
+    if deliver not in ("log", "stdout"):
+        return f"Error: unknown deliver target: {deliver} (use log or stdout)"
     _validate_schedule(schedule)
     jobs = load_jobs()
     if any(job.id == job_id for job in jobs):
         return f"Error: job already exists: {job_id}"
-    jobs.append(Job(id=job_id, schedule=schedule, prompt=prompt))
+    jobs.append(Job(id=job_id, schedule=schedule, prompt=prompt, deliver=deliver))
     _save_jobs(jobs)
     return f"job '{job_id}' added"
 
@@ -127,7 +134,10 @@ def job_log_path(job_id: str) -> Path:
     return cfg.data_dir() / "jobs" / f"{job_id}.log"
 
 
-def _deliver(job_id: str, output: str, status: str) -> None:
+def _deliver(job_id: str, output: str, status: str, deliver: str = "log") -> None:
+    if deliver == "stdout":
+        print(f"[cron:{job_id}] {status}\n{output}")
+        return
     path = job_log_path(job_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -148,7 +158,7 @@ def run_job(job: Job) -> str:
     )
     output = (result.stdout or "").strip() or (result.stderr or "").strip()
     status = "ok" if result.returncode == 0 else f"exit {result.returncode}"
-    _deliver(job.id, output, status)
+    _deliver(job.id, output, status, job.deliver)
     return output
 
 
