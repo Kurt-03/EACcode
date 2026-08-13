@@ -257,6 +257,39 @@ class TestSkillInjection:
         assert "Relevant skills" not in captured["messages"][0]["content"]
 
 
+class TestParallelTools:
+    def test_two_calls_run_concurrently(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import time
+
+        import litellm
+
+        def fake_completion(**kwargs: Any) -> SimpleNamespace:
+            if kwargs["messages"][-1]["role"] == "tool":
+                return _response("fertig")
+            return _response(
+                None,
+                [
+                    _tool_call_raw("c1", "slow", '{"tag": "a"}'),
+                    _tool_call_raw("c2", "slow", '{"tag": "b"}'),
+                ],
+            )
+
+        def slow(tag: str) -> str:
+            time.sleep(0.4)
+            return tag
+
+        monkeypatch.setattr(litellm, "completion", fake_completion)
+        agent = Agent(
+            conf=_conf(),
+            tools=[Tool(name="slow", description="s", func=slow)],
+        )
+        start = time.monotonic()
+        history = agent.run([{"role": "user", "content": "parallel!"}])
+        elapsed = time.monotonic() - start
+        assert elapsed < 0.7  # sequential would take ~0.8s
+        assert len([m for m in history if m["role"] == "tool"]) == 2
+
+
 class TestMemoryNudge:
     def test_nudge_appears_every_interval(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import litellm

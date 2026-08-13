@@ -6,6 +6,7 @@ import sys
 from typing import TextIO
 
 from eaccode import __version__
+from eaccode import config as cfg
 from eaccode.agent import DEFAULT_SYSTEM_PROMPT, Agent
 from eaccode.commands import (
     run_config_command,
@@ -20,6 +21,7 @@ from eaccode.learning import LEARNING_PROMPT, make_learning_tools
 from eaccode.memory import injection_text, make_memory_tools
 from eaccode.repl import run_repl
 from eaccode.store import make_session_tools
+from eaccode.subagents import SubagentPool, make_subagent_tool
 from eaccode.tools import BUILTIN_TOOLS
 
 DESCRIPTION = (
@@ -40,6 +42,9 @@ def build_agent() -> Agent:
         + make_session_tools()
         + make_memory_tools()
     )
+    registry = {tool.name: tool for tool in tools}
+    pool = SubagentPool()
+    tools.append(make_subagent_tool(pool, registry, cfg.load_config()))
     return Agent(tools=tools, system_prompt=system_prompt)
 
 

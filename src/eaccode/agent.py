@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -177,12 +178,19 @@ class Agent:
                 ],
             }
             history.append(assistant_message)
-            for call in calls:
+            # Parallel tool execution: independent calls of one turn run
+            # concurrently (subagents and long-running tools benefit).
+            if len(calls) > 1:
+                with ThreadPoolExecutor(max_workers=len(calls)) as pool:
+                    results = list(pool.map(self._execute_tool, calls))
+            else:
+                results = [self._execute_tool(calls[0])]
+            for call, content in zip(calls, results, strict=True):
                 history.append(
                     {
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "content": self._execute_tool(call),
+                        "content": content,
                     }
                 )
 
