@@ -3,10 +3,11 @@
 Aktive Arbeitsstränge und offene Entscheidungen. *(Pointer: aktueller Code-
 und Teststand liegt im Repo — `C:\Projekte\EACcode V3`.)*
 
-## Aktive Phase: C — Production-Reife (2026-08-13)
+## Aktive Phase: D — Coding-Stärke (2026-08-13)
 
-**Fortschritt:** C1 Permissions ✅ · C2 Cron/Daemon ✅ · C3 MCP ✅ · C4 Gateway ⏳ · C5 Packaging ⏳
-→ Ziel: sicher, autonom, verteilbar. DoD: installierbar auf 3 OS, Cron→Telegram, MCP-Tool genutzt, Permission-Regeln wirken.
+**Fortschritt:** D0–D6 geplant (→ [[10-projects/phase-d.md|phase-d]]) · C1–C3 ✅
+**C4 (Telegram) + C5 (Packaging): bewusst auf später verschoben (Nutzer).**
+→ Ziel: Claude-Code-Level beim Coden. DoD: fremdes Issue → Implementierung → Suite → PR.
 
 ## Abgeschlossen
 
