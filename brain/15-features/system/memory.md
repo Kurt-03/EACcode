@@ -35,8 +35,8 @@ Agent-Tools, Char-Budgets, Konsolidierungs-Zwang, atomic writes.
 `tests/test_memory.py` (21) + Memory-Tool-Tests + Nudge-Tests (test_agent)
 
 ## Offene Punkte (Hermes-Vergleich 2026-08-13)
-- 🚨 **Injection-Scan fehlt**: Hermes prüft Memory-Einträge auf Prompt-Injection/
-  Exfiltration vor dem Speichern (`_scan_memory_content`) — muss nachgerüstet werden
+- ✅ Injection-Scan nachgerüstet (Fences, Anweisungs-Override EN+DE, gefälschte
+  Sektionen; add/replace/apply_batch geschützt — one poisoned op rejects batch)
 - Drift-Erkennung explizit (Hermes: Fehler statt stillem Überschreiben bei externem Edit)
 - Nudge auf LLM-Turns statt Runs zählen
 - Externer Memory-Provider (Supermemory-Stil) — nur bei Bedarf
