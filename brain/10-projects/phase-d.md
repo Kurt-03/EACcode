@@ -18,13 +18,16 @@ bewusst **viel später** → D wird jetzt aktiv.
 
 ---
 
-## D0 — Basis-Aufräumen (Voraussetzung, ~1 h)
+## D0 — Basis-Aufräumen ✅ (2026-08-13)
 
-- **D0.1 Slash-Commands**: Quote-Parsing (mehrwortige Argumente, z. B.
-  `/skill new --description "mehrere Worte"`), `/job` + `/mcp` auch im REPL,
-  konsistenter Arg-Parser + Tests (behebt den Nutzer-Merkpunkt)
-- **D0.2 Memory-Härtung**: Cross-Process-File-Lock + Drift-Guard
-  (Hermes-Parität B4, schließt die letzte Memory-Lücke)
+- **D0.1 Slash-Commands ✅**: `parse_args` (Quote-Parsing für single/double
+  Quotes, Windows-Pfade bleiben intakt, unterminierte Quotes → sauberer
+  Fehler), `/job` + `/mcp` im REPL, HELP aktualisiert — Merkpunkt des
+  Nutzers behoben (live: `--description "Zeit anzeigen mit Uhr"` komplett)
+- **D0.2 Memory-Härtung ✅**: Cross-Process-File-Lock (`<datei>.lock`,
+  msvcrt/fcntl, 5s-Timeout → MemoryLockError) + Read-back-Verify nach jedem
+  Write (Drift-Guard) — Hermes-Parität B4 endgültig geschlossen. Live:
+  2 parallele Prozesse schrieben verlustfrei
 
 ## D1 — Repo-Verständnis (4 Tasks)
 

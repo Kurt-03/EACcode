@@ -45,7 +45,20 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Tool-Restriktion | Chat: Subagent mit `ghost_tool` | `Error: unknown tool` | ✅ 08-13 |
 | Parallel (B6) | 2 Subagents | Gesamtzeit ≈ 1 Subagent (nicht doppelt) | ✅ 08-13 |
 
-## Phase C — Production-Reife (in Arbeit: C1–C3 ✅, C4/C5 offen)
+| D0.1 Commands | `/skill new x --description "mehrere Worte"` im REPL | Beschreibung komplett übernommen; `/job list` + `/mcp list` im REPL verfügbar | ✅ 08-13 (live) |
+| D0.2 Memory-Lock | 2 eaccode-Prozesse parallel `/memory add` | beide Einträge da, kein Verlust (File-Lock + Verify) | ✅ 08-13 (live) |
+
+## Phase D — Coding-Stärke (D0 ✅, D1–D4/D6 geplant)
+
+| Feature | Wie testen | Erwartung | Status |
+|---|---|---|---|
+| D1 Repo-Verständnis | `repo_scan`/`repo_search`/Context-Packs | Struktur-Index, .gitignore-respekt | ⏳ |
+| D2 Diff-Editing | `patch_file` + Syntax-Check + Rollback | Patch anwendbar, kaputter Edit abgefangen | ⏳ |
+| D3 Test-Runner | `run_tests` + Fehler-Parsing + Loop | rot→fix→grün | ⏳ |
+| D4 Git/PR | status/diff/commit/PR-Tools | nie bei roten Tests committen | ⏳ |
+| D6 Browser | Playwright-Tools | Navigate/Click/Extract | ⏳ |
+
+## Phase C — Production-Reife (C1–C3 ✅; C4/C5 auf später verschoben)
 
 | Feature | Wie testen | Erwartung | Status |
 |---|---|---|---|
@@ -65,4 +78,4 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 
 ---
 
-*Stand: 2026-08-13 — Phasen A+B komplett durchgetestet (Live-Runde + Aufräumen); C1–C3 mit Härtungs-Runde; **307 Tests grün** (pytest) + ruff clean.*
+*Stand: 2026-08-13 — Phasen A+B komplett; C1–C3 inkl. Härtung; **D0 fertig**; **325 Tests grün** (pytest) + ruff clean.*
