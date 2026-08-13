@@ -14,7 +14,10 @@ Implementierung, Tests). **Neue Commands → eigene Notiz + Zeile hier.**
 | `/model` | Modelle verwalten (5 Sub-Commands) | done (A3) | [[15-features/commands/model.md\|model]] |
 | `/memory` | Memory verwalten (4 Sub-Commands) | done (A6) | [[15-features/commands/memory.md\|memory]] |
 | `/skill` | Skills verwalten (4 Sub-Commands) | done (B1) | [[15-features/commands/skill.md\|skill]] |
-| `/session` | Session-Suche (FTS5) | done (B3) | [[15-features/commands/session.md\|session]] |
+| `/session` | B3 | [[15-features/commands/session.md\|session]] |
+| `/job` | C2 | [[15-features/commands/job.md\|job]] |
+| `/mcp` | C3 | [[15-features/commands/mcp.md\|mcp]] |
+| `/permissions` | C1 | [[15-features/commands/permissions.md\|permissions]] |
 | `/tui`-Start | `eaccode tui` startet die TUI | done (A8) | [[15-features/commands/tui.md\|tui]] |
 
 *Stand: 2026-08-13 — 10 Commands aktiv, alle mit eigener Notiz*
