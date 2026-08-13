@@ -45,10 +45,7 @@ def add_entry(target: Path, text: str) -> str:
         return "Error: empty entry"
     lines = read_file(target)
     entry = f"- {text}"
-    if lines:
-        lines = f"{lines}\n{entry}"
-    else:
-        lines = entry
+    lines = f"{lines}\n{entry}" if lines else entry
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(lines + "\n", encoding="utf-8")
