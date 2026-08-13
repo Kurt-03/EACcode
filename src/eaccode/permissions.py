@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -58,6 +59,7 @@ class PermissionManager:
     allow_rules: list[str] = field(default_factory=list)
     deny_rules: list[str] = field(default_factory=list)
     ask_handler: Callable[[str, dict[str, Any]], bool] | None = None
+    _ask_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     def __post_init__(self) -> None:
         source = self.conf if self.conf is not None else cfg.load_config()
@@ -92,7 +94,9 @@ class PermissionManager:
         if self.mode == "allow_all":
             return Decision(True, "mode=allow_all", self.mode)
         if self.ask_handler is not None:
-            allowed = self.ask_handler(tool_name, arguments)
+            # serialized: parallel tool calls must not race the stdin prompt
+            with self._ask_lock:
+                allowed = self.ask_handler(tool_name, arguments)
             return Decision(
                 allowed,
                 "approved by user" if allowed else "denied by user",

@@ -24,7 +24,7 @@ from typing import Any
 from eaccode import config as cfg
 from eaccode.agent import Tool
 
-MCP_PROTOCOL_VERSION = "2025-06-18"
+MCP_PROTOCOL_VERSION = "2026-07-28"  # current spec (RC); servers reply with theirs
 MCP_TIMEOUT = 30
 
 _CLIENTS: list[McpClientBase] = []
@@ -51,6 +51,7 @@ class McpServer:
     command: str = ""
     args: list[str] = None  # type: ignore[assignment]
     url: str = ""
+    transport: str = "http"  # "http" (streamable, default) or "sse" (legacy)
 
     def __post_init__(self) -> None:
         if self.args is None:
@@ -63,6 +64,8 @@ class McpServer:
             entry["args"] = self.args
         if self.url:
             entry["url"] = self.url
+            if self.transport != "http":
+                entry["transport"] = self.transport
         return entry
 
 
@@ -74,7 +77,13 @@ def load_servers(conf: dict[str, Any] | None = None) -> list[McpServer]:
         if not isinstance(entry, dict):
             continue
         if entry.get("url"):
-            result.append(McpServer(name=name, url=str(entry["url"])))
+            result.append(
+                McpServer(
+                    name=name,
+                    url=str(entry["url"]),
+                    transport=str(entry.get("transport", "http")),
+                )
+            )
         elif entry.get("command"):
             result.append(
                 McpServer(
@@ -230,6 +239,85 @@ def _parse_sse(text: str) -> list[tuple[str, str]]:
     return events
 
 
+class McpHttpClient(McpClientBase):
+    """Streamable HTTP transport (2025-03-26+, current standard).
+
+    Single endpoint, POST JSON-RPC with ``Accept: application/json,
+    text/event-stream``. Responses are either direct JSON or an SSE stream.
+    ``Mcp-Session-Id`` from the server is echoed on follow-up requests.
+    """
+
+    def __init__(self, server: McpServer) -> None:
+        self.server = server
+        self._next_id = 1
+        self._session_id: str | None = None
+        _register(self)
+
+    def _post(self, payload: dict[str, Any]) -> tuple[str, str]:
+        """POST one payload; returns (content_type, body)."""
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self._session_id:
+            headers["Mcp-Session-Id"] = self._session_id
+        request = urllib.request.Request(
+            self.server.url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=MCP_TIMEOUT) as response:
+                self._session_id = self._session_id or response.headers.get(
+                    "Mcp-Session-Id"
+                )
+                content_type = response.headers.get("Content-Type", "")
+                body = response.read().decode("utf-8", "replace")
+        except OSError as exc:
+            raise McpError(
+                f"mcp server '{self.server.name}' request failed: {exc}"
+            ) from exc
+        return content_type, body
+
+    def _request(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
+        request_id = self._next_id
+        self._next_id += 1
+        payload = {"jsonrpc": "2.0", "id": request_id, "method": method}
+        if params is not None:
+            payload["params"] = params
+        content_type, body = self._post(payload)
+        if "text/event-stream" in content_type:
+            for event, data in _parse_sse(body):
+                if event != "message":
+                    continue
+                try:
+                    message = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                if message.get("id") == request_id:
+                    if "error" in message:
+                        raise McpError(str(message["error"]))
+                    return message.get("result", {})
+            raise McpError(f"mcp server '{self.server.name}': no matching response")
+        try:
+            message = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise McpError(f"mcp server '{self.server.name}': invalid JSON") from exc
+        if message.get("id") != request_id:
+            raise McpError(f"mcp server '{self.server.name}': response id mismatch")
+        if "error" in message:
+            raise McpError(str(message["error"]))
+        return message.get("result", {})
+
+    def _notify(self, method: str) -> None:
+        with contextlib.suppress(McpError):  # notifications are best-effort
+            self._post({"jsonrpc": "2.0", "method": method})
+
+    def close(self) -> None:
+        pass  # stateless HTTP: nothing to close
+
+
 class McpSseClient(McpClientBase):
     """SSE transport: GET /sse for the endpoint, POST JSON-RPC requests."""
 
@@ -308,13 +396,16 @@ class McpSseClient(McpClientBase):
 
 
 def build_mcp_clients(conf: dict[str, Any] | None = None) -> list[McpClientBase]:
-    """Start one client per configured server (stdio or SSE)."""
+    """Start one client per configured server (stdio / streamable http / sse)."""
     clients: list[McpClientBase] = []
     for server in load_servers(conf):
         try:
-            clients.append(
-                McpSseClient(server) if server.url else McpClient(server)
-            )
+            if server.command:
+                clients.append(McpClient(server))
+            elif server.transport == "sse":
+                clients.append(McpSseClient(server))
+            else:
+                clients.append(McpHttpClient(server))
         except McpError as exc:
             print(f"[mcp] skipping {server.name}: {exc}")
     return clients

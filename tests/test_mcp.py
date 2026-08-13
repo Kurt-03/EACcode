@@ -184,6 +184,116 @@ class TestSseClient:
         assert not servers[0].command
 
 
+class TestHttpClient:
+    """Streamable HTTP transport against an in-process JSON/SSE server."""
+
+    @pytest.fixture
+    def http_server(self) -> Any:
+        import json as json_mod
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        state: dict[str, Any] = {"mode": "json", "session_seen": []}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:
+                length = int(self.headers.get("Content-Length", 0))
+                payload = json_mod.loads(self.rfile.read(length))
+                method = payload.get("method")
+                if "Mcp-Session-Id" in self.headers:
+                    state["session_seen"].append(self.headers["Mcp-Session-Id"])
+                if method == "initialize":
+                    result = {
+                        "protocolVersion": "2026-07-28",
+                        "capabilities": {"tools": {}},
+                        "serverInfo": {"name": "http-fake", "version": "1.0"},
+                    }
+                elif method == "tools/list":
+                    result = {
+                        "tools": [
+                            {
+                                "name": "http_echo",
+                                "description": "http echo",
+                                "inputSchema": {
+                                    "type": "object",
+                                    "properties": {"text": {"type": "string"}},
+                                },
+                            }
+                        ]
+                    }
+                elif method == "tools/call":
+                    arguments = payload.get("params", {}).get("arguments", {})
+                    result = {
+                        "content": [
+                            {"type": "text", "text": f"http:{arguments.get('text', '')}"}
+                        ]
+                    }
+                else:
+                    result = {}
+                message = {"jsonrpc": "2.0", "id": payload.get("id"), "result": result}
+                self.send_response(200)
+                self.send_header("Mcp-Session-Id", "sess-1")
+                if state["mode"] == "sse":
+                    self.send_header("Content-Type", "text/event-stream")
+                    body = f"event: message\ndata: {json_mod.dumps(message)}\n\n"
+                else:
+                    self.send_header("Content-Type", "application/json")
+                    body = json_mod.dumps(message)
+                self.end_headers()
+                self.wfile.write(body.encode("utf-8"))
+                self.wfile.flush()
+
+            def log_message(self, *args: Any) -> None:
+                pass
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        yield (
+            f"http://127.0.0.1:{server.server_port}/mcp",
+            state,
+        )
+        server.shutdown()
+
+    def test_http_json_response(self, http_server: Any) -> None:
+        url, state = http_server
+        client = mcp.McpHttpClient(McpServer("remote", url=url))
+        try:
+            info = client.initialize()
+            assert info["serverInfo"]["name"] == "http-fake"
+            names = [t["name"] for t in client.list_tools()]
+            assert names == ["http_echo"]
+            assert client.call_tool("http_echo", {"text": "hi"}) == "http:hi"
+            assert state["session_seen"]  # session id echoed on follow-ups
+        finally:
+            client.close()
+
+    def test_http_sse_response(self, http_server: Any) -> None:
+        url, state = http_server
+        state["mode"] = "sse"
+        client = mcp.McpHttpClient(McpServer("remote", url=url))
+        try:
+            info = client.initialize()
+            assert info["serverInfo"]["name"] == "http-fake"
+            assert client.call_tool("http_echo", {"text": "x"}) == "http:x"
+        finally:
+            client.close()
+
+    def test_http_default_transport_selected(self, http_server: Any) -> None:
+        url, _ = http_server
+        conf = {"mcp": {"servers": {"remote": {"url": url}}}}
+        clients = mcp.build_mcp_clients(conf)
+        assert len(clients) == 1
+        assert isinstance(clients[0], mcp.McpHttpClient)
+        clients[0].close()
+
+    def test_sse_transport_legacy_selected(self, http_server: Any) -> None:
+        url, _ = http_server
+        conf = {"mcp": {"servers": {"legacy": {"url": url, "transport": "sse"}}}}
+        servers = mcp.load_servers(conf)
+        assert servers[0].transport == "sse"
+
+
 class TestMcpCommand:
     @pytest.fixture
     def mcp_runner(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
