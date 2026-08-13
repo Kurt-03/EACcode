@@ -53,7 +53,7 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Feature | Wie testen | Erwartung | Status |
 |---|---|---|---|
 | D1 Repo-Verständnis | Chat: „Scanne C:\Projekte\_ref\hermes", „Suche nach turns_since_memory", „Kontext zu memory_manager.py" | Scan (2000 Dateien/34 MB), 8 Suchtreffer, Context-Pack mit Tests | ✅ 08-13 (live, Hermes-Repo) |
-| D2 Diff-Editing | Übungs-Repo: Agent patcht `add`-Bug + fügt `multiply` hinzu | Syntax-Check, Rollback, Batch | ✅ 08-13 (live) |
+| D2 Diff-Editing | Übungs-Repo: Agent patcht `add`-Bug + fügt `multiply` hinzu; `file_edit append` live | Syntax-Check, Rollback, Batch, Zeilen-Edits | ✅ 08-13 (live) |
 | D3 Test-Runner | Übungs-Repo: `run_tests` vor/nach Fix | rot → Fehlerliste → grün | ✅ 08-13 (live) |
 | D4 Git/PR | Übungs-Repo: Agent committet nach grüner Suite | Commit mit Message; Policy: kein Commit bei rot | ✅ 08-13 (live) |
 | D6 Browser | Chat: „Öffne example.com, lies den Inhalt", Screenshot-Auftrag | Navigate + Extract + echte Antwort; PNG erzeugt | ✅ 08-13 (live) |

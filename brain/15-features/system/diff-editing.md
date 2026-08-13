@@ -19,11 +19,14 @@ Batch-Rollback, Undo-Stack, Syntax-Schutz.
   `apply_multiple` (atomar: ein Fehler → ganze Batch zurück),
   `EditSession` (Backup-Stack in `data/edits/`, max. 20)
 - Syntax-Check via `py_compile` VOR dem Schreiben (.py)
-- Tools: `patch_file`, `patch_multiple`, `undo_edit` — mutierend (ask)
+- Tools: `patch_file`, `patch_multiple`, `undo_edit`, **`file_edit`**
+  (zeilenbasiert: insert/replace/delete/append, 1-basiert, Ranges) —
+  mutierend (ask)
 
 ## Verifiziert (live, 2026-08-13 — Übungs-Repo `C:\Projekte\eaccode-praxis`)
 - Agent fixte `add`-Bug (a-b → a+b) per patch_file; run_tests grün
 - `multiply` + Test ergänzt (2 Dateien), 3 Tests grün, Commit gesetzt
+- `file_edit append` live: `# ende` angehängt (11 Zeilen)
 
 ## Tests
 `tests/test_editing.py` (15: exakt, fuzzy, mehrdeutig, Syntax, Rollback, Multi)
