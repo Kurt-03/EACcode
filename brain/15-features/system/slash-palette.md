@@ -37,3 +37,8 @@ Hermes / Claude Code.
 
 ## Verknüpft
 [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/repl.md|REPL]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/palette.py` → [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]]
+
