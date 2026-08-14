@@ -260,6 +260,29 @@ class TestChatApp:
         app._append("", "zweite zeile")
         assert app._log_lines == [("", "erste zeile\n"), ("", "zweite zeile\n")]
 
+    def test_run_writes_banner_into_log(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(palette, "banner_quiet", lambda: False)
+        app = palette.ChatApp(agent=FakeAgent())
+        # simulate the run() banner step (real terminals only; build_application
+        # would need a console, so the log-writing part is tested directly)
+        from eaccode import store as _store
+
+        app._session_id = _store.new_session()
+        app._append(
+            "class:chat.banner",
+            palette.render_banner(
+                {"model": {"default": "minimax/MiniMax-M3"}},
+                session_id=app._session_id,
+                cwd="C:\\x",
+            ),
+        )
+        text = "".join(t for _, t in app._log_lines)
+        assert "Welcome to eaccode!" in text
+        assert "eaccode 0.0.1" in text
+        assert "Session:" in text
+
     def test_pipe_roundtrip(self) -> None:
         pytest.importorskip("prompt_toolkit")
         from prompt_toolkit.input.defaults import create_pipe_input

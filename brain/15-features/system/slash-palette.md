@@ -71,5 +71,5 @@ Render-Sektionen, Pipe-Integration)
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/palette.py` → [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
+- `src/eaccode/palette.py` → [[15-features/system/start-banner.md|start-banner]] · [[15-features/commands/README.md|README]] · [[15-features/system/config.md|config.yaml]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
 

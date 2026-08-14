@@ -13,10 +13,15 @@ import contextlib
 import io
 import sys
 import threading
+import time
+from pathlib import Path
 from typing import Any
 
 from eaccode import __version__, commands, store
 from eaccode import skills as skills_mod
+from eaccode.banner import model_label, render_banner
+from eaccode.banner import quiet as banner_quiet
+from eaccode.banner import status_line as render_status_line
 
 try:
     from prompt_toolkit.application import Application
@@ -237,6 +242,8 @@ class ChatApp:
             "chat.agent": "bold #9dffb0",
             "chat.error": "bold #ff6b6b",
             "chat.permission": "bold #ffd166",
+            "chat.stat": "fg:#6e6e6e",
+            "chat.banner": "fg:#9a9a9a",
             "chat.prompt": "bold #4fc1ff",
             "palette.normal": "fg:#d4d4d4",
             "palette.name": "bold fg:#ffffff",
@@ -284,6 +291,7 @@ class ChatApp:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
     def _agent_worker(self, text: str) -> None:
+        start = time.monotonic()
         try:
             agent = self._get_agent()
             if agent is None:
@@ -308,6 +316,19 @@ class ChatApp:
         except Exception as exc:
             answer = f"Error: {exc}"
         self._append("class:chat.agent", f"⚡ {answer}")
+        try:
+            from eaccode import config as cfg
+
+            self._append(
+                "class:chat.stat",
+                render_status_line(
+                    model_label(cfg.load_config()),
+                    time.monotonic() - start,
+                    len(answer),
+                ),
+            )
+        except Exception:
+            pass
 
     # -- permission (inline) ------------------------------------------------
 
@@ -495,5 +516,19 @@ class ChatApp:
             from eaccode import store as _store
 
             self._session_id = _store.new_session()
+        if not banner_quiet() and not self._log_lines:
+            try:
+                from eaccode import config as cfg
+
+                self._append(
+                    "class:chat.banner",
+                    render_banner(
+                        cfg.load_config(),
+                        session_id=self._session_id,
+                        cwd=str(Path.cwd()),
+                    ),
+                )
+            except Exception:
+                pass
         self._wire_permission()
         return self.build_application().run()

@@ -36,6 +36,7 @@ MODULE_NOTES: dict[str, str] = {
     "editing.py": "15-features/system/diff-editing.md",
     "testrunner.py": "15-features/system/test-runner.md",
     "git.py": "15-features/system/git-pr.md",
+    "banner.py": "15-features/system/start-banner.md",
     "browser.py": "15-features/system/browser.md",
     "palette.py": "15-features/system/slash-palette.md",
     # entry points: version (0.0.1) and `python -m eaccode`

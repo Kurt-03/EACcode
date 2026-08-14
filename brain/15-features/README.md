@@ -42,6 +42,7 @@ eintragen.
 | Git & PR (D4) | system | done | D4 | [[15-features/system/git-pr.md\|git-pr]] |
 | Browser (D6) | system | done | D6 | [[15-features/system/browser.md\|browser]] |
 | Slash-Palette | system | done | D0.1+ | [[15-features/system/slash-palette.md\|slash-palette]] |
+| Start-Banner | system | done | D0.1 | [[15-features/system/start-banner.md\|start-banner]] |
 | Cron & Daemon (C2) | system | done | C2 | [[15-features/system/cron-daemon.md\|cron-daemon]] |
 | MCP-Client (C3) | system | done | C3 | [[15-features/system/mcp-client.md\|mcp-client]] |
 | Skill-System | system | done | B1 | [[15-features/system/skill-system.md\|skill-system]] |

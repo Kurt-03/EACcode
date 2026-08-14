@@ -15,6 +15,8 @@ from typing import Any, TextIO
 
 from eaccode import __version__, palette, store
 from eaccode.agent import Agent
+from eaccode.banner import quiet as banner_quiet
+from eaccode.banner import render_banner
 from eaccode.commands import (
     HELP_TEXT,
     parse_args,
@@ -32,6 +34,14 @@ from eaccode.memory import injection_text
 
 
 def _print_banner(stdout: TextIO) -> None:
+    if getattr(stdout, "isatty", lambda: False)() and not banner_quiet():
+        try:
+            from eaccode import config as cfg
+
+            stdout.write(render_banner(cfg.load_config()) + "\n")
+            return
+        except Exception:
+            pass  # fall back to the compact one-liner
     stdout.write(
         f"eaccode {__version__} - self-improving generalist agent. "
         "Type /help for commands.\n"
