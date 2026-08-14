@@ -7,33 +7,33 @@ date: 2026-08-13
 tags: [type/feature, feature/system]
 ---
 
-# System: Slash-Palette (Variante A)
+# System: Slash-Palette (Variante 3 — „Hermes-Flat")
 
 ## Zweck
-`/` öffnet ein Overlay mit allen Commands **und Skills** (fuzzy gefiltert),
-Pfeiltasten navigieren, Enter übernimmt/ausführt, Escape schließt — wie bei
+`/` öffnet ein **randloses Overlay** mit allen Commands und Skills (fuzzy
+gefiltert), Pfeiltasten navigieren, Enter wählt, Esc schließt — wie bei
 Hermes / Claude Code.
 
 ## Implementierung
-- `src/eaccode/palette.py` — prompt_toolkit-Completer (`_SlashCompleter`),
-  Subsequence-Fuzzy (`fuzzy_match`), `palette_entries()` (Commands aus
-  HELP_TEXT + Skills mit Trigger), `repl_prompt()`
+- `src/eaccode/palette.py` — eigene prompt_toolkit-Application:
+  `PalettePrompt` (Buffer + Float-Layer), **eigenes Rendering**:
+  ❯-Marker, aktive Zeile blau (statt Grau), Commands/Skills-Sektionen mit
+  Trennlinie, Subsequence-Fuzzy, `eager`-Key-Bindings (↑/↓/Enter/Esc)
 - `repl.py` — `_input_lines()`: TTY → Palette, sonst stdin (Tests/Pipes)
-- `HELP_TEXT` nach `commands.py` verschoben (Import-Zyklus vermieden)
-- Dependency: `prompt_toolkit>=3`
+- `HELP_TEXT` in `commands.py`; Dependency: `prompt_toolkit>=3`
 
 ## Verifiziert (live, 2026-08-13, PTY)
-- `/` → alle Commands erscheinen (Multi-Column)
-- Pfeil ↓ + Enter → `/help` übernommen und ausgeführt
-- Bug gefunden+gefixt: `len<2`-Gate verhinderte das Aufklappen bei nacktem `/`
+- `/` → Overlay erscheint; `/mem` → Filter zeigt nur `/memory`
+- Enter → `/memory` übernommen UND ausgeführt (Usage-Ausgabe)
+- Pipe-Test: `/mem`+Enter → `/memory` (Application-Loop mit DummyOutput)
 
 ## Tests
-`tests/test_palette.py` (9: Fuzzy, Entries, Completer, Slash-alone, Fallback)
+`tests/test_palette.py` (10: Fuzzy, Entries, Refresh/Filter/Move/Accept,
+Render-Sektionen, Pipe-Integration)
 
 ## Offene Punkte
-- Skills erscheinen als `/skillname` (Enter fügt Trigger ein — zweiter
-  Enter sendet). Escape-Verhalten standard (schließt Overlay)
-- Rückbau möglich (Nutzer-Vorbehalt): Palette-Code in palette.py isoliert
+- Kein Scrollbar bei sehr langen Listen (Float-Höhe folgt Inhalt)
+- Rückbau möglich (Nutzer-Vorbehalt): Palette in palette.py isoliert
 
 ## Verknüpft
 [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/repl.md|REPL]]
