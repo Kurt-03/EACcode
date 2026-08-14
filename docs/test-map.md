@@ -63,6 +63,8 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Tool-Manifest | Chat: „Welche Tools hast du?" | Agent listet Tools + Flow (System-Prompt) | ✅ 08-14 |
 | Streaming | Chat: Frage stellen | Antwort erscheint live, Zeile wächst | ✅ 08-14 (live: 7-34 Deltas) |
 | Stream→Tool-Reihenfolge | Chat: Tool-Aufgabe | kompletter Stream, DANN Tool-Call/Permission | ✅ 08-14 (live) |
+| Scrollback-Chat | Chat lang genug für Scroll | Verlauf im Terminal-Scrollback, native Scrollbar scrollt | ✅ 08-14 (Tests + Stream-REPL live) |
+| Chrome-Erhalt | ChatApp in CMD | Eingabe + Palette fixiert unten, Verlauf oben | ✅ 08-14 |
 
 ## Phase D — Coding-Stärke ✅ KOMPLETT (2026-08-13, DoD erfüllt)
 

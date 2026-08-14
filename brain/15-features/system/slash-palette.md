@@ -77,6 +77,17 @@ Render-Sektionen, Pipe-Integration)
   Router: `stream_completion` (stream=True) + `_completion_kwargs`;
   Agent: `run(on_token=...)` — siehe auch
   [[15-features/system/agent-core.md|Agent Core]]
+- **Scrollback-Umbau (2026-08-14, Hermes-Parität):** Die ChatApp ist
+  kein Vollbild mehr — `full_screen=False` (wie Hermes): Der gesamte
+  Verlauf (Banner, Nachrichten, Antworten, Stat-Zeilen) läuft in den
+  **nativen Terminal-Scrollback** (`_stream_out` → stdout + flush +
+  `app.invalidate()` für Chrome-Redraw). prompt_toolkit verwaltet nur
+  die untere Chrome (Eingabe + Palette). **Scrollen übernimmt das
+  Terminal selbst** (CMD/Windows-Terminal-Scrollbar, Maus-Selektion,
+  Terminal-Suche). `erase_when_done=True` räumt die Chrome beim Beenden
+  ab. Grund: Nutzer-Feedback — der Chat lief „unsichtbar unter der
+  Eingabe weiter", kein Scroll möglich; Hermes-Referenz: cli.py
+  `full_screen=False` + patch_stdout-Transcript
 - **Test-Härtung**: 2 flaky Pipe-Tests warten jetzt auf `app.is_running`
   statt fixem sleep; 2 _ask-Tests testen den echten Inline-Flow (ask im
   Thread, Antwort via _submit) statt Event-Race — die Suite hängte sonst

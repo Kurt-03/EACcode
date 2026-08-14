@@ -35,7 +35,6 @@ try:
         FloatContainer,
         HSplit,
         Layout,
-        ScrollOffsets,
         Window,
     )
     from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
@@ -266,11 +265,23 @@ class ChatApp:
         self._permission_answer = "n"
         self._stream_open = False
         self._streamed_any = False
+        # Hermes-style: the conversation lives in the terminal scrollback;
+        # prompt_toolkit only manages the input chrome at the bottom.
+        self._out = sys.stdout
 
     # -- log ---------------------------------------------------------------
 
     def _append(self, style: str, text: str) -> None:
         self._log_lines.append((style, text + "\n"))
+        self._stream_out(text)
+
+    def _stream_out(self, text: str, newline: bool = True) -> None:
+        """Write into the terminal scrollback and redraw the input chrome."""
+        try:
+            self._out.write(text + ("\n" if newline else ""))
+            self._out.flush()
+        except Exception:
+            pass
         if self._app is not None:
             self._app.invalidate()
 
@@ -286,19 +297,13 @@ class ChatApp:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
     def _on_token(self, delta: str) -> None:
-        """Stream callback (worker thread): extend the open log line."""
+        """Stream callback (worker thread): write directly to the scrollback."""
         if delta == "":
-            self._stream_open = False  # round marker: next text starts fresh
+            self._stream_open = False  # round marker
             return
         self._streamed_any = True
-        if not self._stream_open:
-            # open a fresh agent line (append ignores empty text)
-            self._log_lines.append(("class:chat.agent", ""))
-            self._stream_open = True
-        style, text = self._log_lines[-1]
-        self._log_lines[-1] = (style, text + delta)
-        if self._app is not None:
-            self._app.invalidate()
+        self._stream_open = True
+        self._stream_out(delta, newline=False)
 
     def _agent_worker(self, text: str) -> None:
         start = time.monotonic()
@@ -330,12 +335,8 @@ class ChatApp:
             answer = f"Error: {exc}"
         self._stream_open = False
         if self._streamed_any:
-            # streamed text is already in the log line by line; only drop a
-            # line that stayed empty (e.g. a tool-only round)
-            if self._log_lines and self._log_lines[-1] == ("class:chat.agent", ""):
-                self._log_lines.pop()
-            if self._app is not None:
-                self._app.invalidate()
+            # streamed text is already in the scrollback; finish the line
+            self._stream_out("")
         elif answer:
             self._append("class:chat.agent", answer)
         try:
@@ -512,11 +513,6 @@ class ChatApp:
         )
         root = HSplit(
             [
-                Window(
-                    self._log_control(),
-                    wrap_lines=True,
-                    scroll_offsets=ScrollOffsets(bottom=10**8),
-                ),
                 input_row,
                 palette_win,
             ]
@@ -527,6 +523,8 @@ class ChatApp:
             style=self.STYLE,
             input=input,
             output=output,
+            full_screen=False,  # conversation lives in the terminal scrollback
+            erase_when_done=True,  # clear the input chrome on exit
         )
         return self._app
 

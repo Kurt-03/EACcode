@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import threading
 import time
 from typing import Any
@@ -181,16 +182,17 @@ def test_streaming_emits_deltas_and_tool_calls(
     assert calls[0].arguments == {"tz": "UTC"}
 
 
-def test_streaming_round_marker_opens_fresh_lines() -> None:
+def test_streaming_writes_to_scrollback() -> None:
     app = palette.ChatApp(agent=FakeAgent())
+    app._out = io.StringIO()
     app._on_token("")  # round marker
     app._on_token("Hallo ")
     app._on_token("Welt")
-    assert app._log_lines[-1] == ("class:chat.agent", "Hallo Welt")
+    assert app._out.getvalue() == "Hallo Welt"
     assert app._streamed_any is True
-    app._on_token("")  # next round: fresh line
+    app._on_token("")  # next round: continues on the stream
     app._on_token("Zweite")
-    assert app._log_lines[-1] == ("class:chat.agent", "Zweite")
+    assert app._out.getvalue() == "Hallo WeltZweite"
 
 
 def test_stream_completion_sets_stream_flag(
@@ -274,8 +276,11 @@ def _wait_for(predicate: Any, timeout: float = 5.0) -> bool:
 class TestChatApp:
     def test_submit_chats_and_logs_answer(self) -> None:
         app = palette.ChatApp(agent=FakeAgent(reply="hallo aus dem chat"))
+        app._out = io.StringIO()
         app._submit("wie gehts")
-        assert _wait_for(lambda: any("hallo aus dem chat" in t for _, t in app._log_lines))
+        assert _wait_for(
+            lambda: "hallo aus dem chat" in app._out.getvalue()
+        )
         assert any("> wie gehts" in t for _, t in app._log_lines)
 
     def test_slash_opens_palette_then_runs(self) -> None:
@@ -397,6 +402,7 @@ class TestChatApp:
 
         with create_pipe_input() as pipe:
             app = palette.ChatApp(agent=FakeAgent(reply="pipe antwort"))
+            app._out = io.StringIO()
             application = app.build_application(input=pipe, output=DummyOutput())
 
             def run() -> None:
@@ -407,7 +413,7 @@ class TestChatApp:
             assert _wait_for(lambda: application.is_running), "app did not start"
             pipe.send_text("hallo\n")  # enter submits
             assert _wait_for(
-                lambda: any("pipe antwort" in t for _, t in app._log_lines)
+                lambda: "pipe antwort" in app._out.getvalue()
             )
             pipe.send_text("\x03")  # ctrl+c exits
             thread.join(timeout=5)
