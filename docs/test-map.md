@@ -47,6 +47,7 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 
 | D0.1 Commands | `/skill new x --description "mehrere Worte"` im REPL | Beschreibung komplett übernommen; `/job list` + `/mcp list` im REPL verfügbar | ✅ 08-13 (live) |
 | D0.1 Palette | `/` in eaccode → Overlay, `/mem`+Enter | randloses Overlay mit ❯-Marker, Filter, `/memory` ausgeführt | ✅ 08-13 (live, PTY) |
+| D0.1 Palette-TUI | `eaccode` im Terminal → TUI; `/` → Overlay über Eingabe, Enter wählt+ausführt | TUI startet automatisch (TTY), Chat oben/Eingabe unten fixiert | ✅ 08-13 (Tests; Live-Feedback offen) |
 | D0.2 Memory-Lock | 2 eaccode-Prozesse parallel `/memory add` | beide Einträge da, kein Verlust (File-Lock + Verify) | ✅ 08-13 (live) |
 
 ## Phase D — Coding-Stärke ✅ KOMPLETT (2026-08-13, DoD erfüllt)

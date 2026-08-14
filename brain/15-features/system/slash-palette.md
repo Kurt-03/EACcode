@@ -27,6 +27,15 @@ Hermes / Claude Code.
 - Enter → `/memory` übernommen UND ausgeführt (Usage-Ausgabe)
 - Pipe-Test: `/mem`+Enter → `/memory` (Application-Loop mit DummyOutput)
 
+## Variante 3 → Variante A (TUI, CC-Layout) — 2026-08-13
+- Nutzer-Feedback: Overlay soll nicht mittig schweben, Eingabe unten fixiert
+- **TUI als Standard bei TTY-Start** (`eaccode` im Terminal → Vollbild):
+  Chat oben (Scroll), **PaletteOverlay angepinnt ÜBER der Input-Zeile**
+  (kein Float!), Input `dock: bottom`
+- TUI beherrscht jetzt ALLE Slash-Commands (parse_args aus commands.py),
+  Markup-Escape für Agent-Text, Store-Persistenz wie REPL
+- Stream-REPL bleibt für Pipes/Skripte; `eaccode tui` explizit weiter möglich
+
 ## Tests
 `tests/test_palette.py` (10: Fuzzy, Entries, Refresh/Filter/Move/Accept,
 Render-Sektionen, Pipe-Integration)
