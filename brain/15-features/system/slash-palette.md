@@ -58,6 +58,10 @@ Render-Sektionen, Pipe-Integration)
   **keine Symbole** mehr (⚡/⚕ entfernt — nur noch Text)
 - **Keine Scrollbar-Margin** mehr (`right_margins=[]`); **Umbruch am
   Rand wieder AN** (`wrap_lines=True`, Nutzer-Entscheid 08-14)
+- **Slash-Palette umgestellt** (08-14): flache Liste ohne Sections,
+  Name links + Beschreibung rechts, sauber ausgerichtet (Hermes-Stil);
+  ❯-Marker vor dem ausgewählten Eintrag; dynamische Spaltenbreite nach
+  dem längsten Namen
 - **Start-Banner** als erste Log-Zeilen (Style `chat.banner`, grau) +
   **Stat-Zeile** nach Antworten (Style `chat.stat`, gedimmt) — Details in
   [[15-features/system/start-banner.md|start-banner]]

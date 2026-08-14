@@ -96,16 +96,20 @@ class TestPalettePrompt:
         prompt.refresh("kein slash")
         assert prompt.accept() is None
 
-    def test_render_has_sections_and_separator(self) -> None:
+    def test_render_flat_list_with_aligned_columns(self) -> None:
         entries = ENTRIES + [("/zeit-helfer", "skill (uhrzeit)", True)]
         prompt = palette.PalettePrompt(entries)
         prompt.refresh("/")
         lines = prompt._render_lines()
         text = "".join(part for _, part in lines)
-        assert "Commands" in text
-        assert "Skills" in text
-        assert "─" in text  # separator
-        assert "❯" in text  # marker
+        assert "❯" in text
+        assert "Commands" not in text  # no sections
+        assert "Skills" not in text
+        assert "─" not in text  # no separator
+        assert "/help" in text
+        assert "/zeit-helfer" in text
+        # names are aligned: /help and /memory have same column width
+        assert "/help" in text and "/memory" in text
 
     def test_render_no_matches(self) -> None:
         prompt = palette.PalettePrompt(ENTRIES)

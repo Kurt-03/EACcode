@@ -126,30 +126,23 @@ class PalettePrompt:
 
     # -- rendering --------------------------------------------------------
     def _render_lines(self) -> list[tuple[str, str]]:
-        """Styled (style, text) lines; separator between commands and skills."""
+        """Styled (style, text) lines; flat list with aligned columns."""
         if not self.visible:
             return []
         lines: list[tuple[str, str]] = []
-        commands = [e for e in self._filtered if not e[2]]
-        skills = [e for e in self._filtered if e[2]]
-        index = 0
-        for section, entries in (("Commands", commands), ("Skills", skills)):
-            if not entries:
-                continue
-            if lines:
-                lines.append(("class:palette.separator", "─" * 44))
-            lines.append(("class:palette.section", f"  {section}"))
-            for entry in entries:
-                name, description, _is_skill = entry
-                marker = "❯" if index == self.selected else " "
-                if index == self.selected:
-                    lines.append(("class:palette.selected", f"{marker} {name:<12} "))
-                    lines.append(("class:palette.selected.desc", description))
-                else:
-                    lines.append(("class:palette.normal", f"{marker} {name:<12} "))
-                    lines.append(("class:palette.desc", description))
-                lines.append(("", "\n"))
-                index += 1
+        # dynamic column width: align all names to the longest one
+        max_name = max((len(e[0]) for e in self._filtered), default=0)
+        for index, entry in enumerate(self._filtered):
+            name, description, _is_skill = entry
+            marker = "❯ " if index == self.selected else "  "
+            col = f"{marker}{name:<{max_name + 2}}"
+            if index == self.selected:
+                lines.append(("class:palette.selected", col))
+                lines.append(("class:palette.selected.desc", description))
+            else:
+                lines.append(("class:palette.normal", col))
+                lines.append(("class:palette.desc", description))
+            lines.append(("", "\n"))
         if not lines:
             lines.append(("class:palette.desc", "  (no matches)"))
         return lines
