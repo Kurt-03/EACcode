@@ -45,10 +45,20 @@ Render-Sektionen, Pipe-Integration)
   TUI bleibt Skeleton) — Nutzerwunsch: Link-UX (Session-Links) fehlt,
   Vollbild nicht gewünscht
 
+## REPL-Vollbild („Chat unten" — Nutzerwunsch, 2026-08-14)
+- **`ChatApp`** in palette.py: prompt_toolkit-Vollbild — Log oben
+  (Auto-Scroll, Scrollbar), Palette angepinnt über der Eingabe,
+  Eingabe FEST unten mit ❯-Marker — Hermes-Look (kein Textual!)
+- `run_repl`: TTY → ChatApp; Pipes/Tests → Stream-Loop (unverändert)
+- Inline-Permission: `Allow: ... [y/N]` im Log, Antwort im Input-Feld
+- Alle Slash-Commands, Store-Persistenz, Live-Filter beim Tippen,
+  Enter: 1× Palette öffnen (Text bleibt), 2× übernehmen+ausführen
+- Live verifiziert (PTY): `/version` → Palette → Enter → `eaccode 0.0.1`
+
 ## Verknüpft
 [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/repl.md|REPL]]
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/palette.py` → [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]]
+- `src/eaccode/palette.py` → [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
 
