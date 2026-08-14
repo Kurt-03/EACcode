@@ -267,7 +267,7 @@ class ChatApp:
     # -- log ---------------------------------------------------------------
 
     def _append(self, style: str, text: str) -> None:
-        self._log_lines.append((style, text))
+        self._log_lines.append((style, text + "\n"))
         if self._app is not None:
             self._app.invalidate()
 
@@ -449,7 +449,7 @@ class ChatApp:
         input_row = HSplit(
             [
                 Window(
-                    FormattedTextControl(lambda: [("bold #4fc1ff", "❯ ")]),
+                    FormattedTextControl(lambda: [("", "❯ ")]),
                     width=3,
                     height=1,
                 ),

@@ -206,6 +206,12 @@ class TestChatApp:
         app._submit("/nonsense")
         assert any("Unknown command" in t for _, t in app._log_lines)
 
+    def test_log_lines_are_newline_terminated(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._append("", "erste zeile")
+        app._append("", "zweite zeile")
+        assert app._log_lines == [("", "erste zeile\n"), ("", "zweite zeile\n")]
+
     def test_pipe_roundtrip(self) -> None:
         pytest.importorskip("prompt_toolkit")
         from prompt_toolkit.input.defaults import create_pipe_input
