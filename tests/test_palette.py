@@ -193,6 +193,28 @@ class TestChatApp:
         assert app._permission_answer == "y"
         assert app._permission_prompt is None
 
+    def test_ask_returns_bool(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._permission_prompt = "x"
+        app._submit("y")
+        assert app._ask("x") is True
+        app._permission_prompt = "x"
+        app._submit("n")
+        assert app._ask("x") is False
+
+    def test_agent_gate_wired(self) -> None:
+        from types import SimpleNamespace
+
+        manager = SimpleNamespace(ask_handler=None)
+        agent = FakeAgent()
+        agent.permission_manager = manager
+        app = palette.ChatApp(agent=agent)
+        app._wire_agent_gate(agent)
+        assert manager.ask_handler is not None
+        app._permission_prompt = "write_file x"
+        app._submit("yes")
+        assert manager.ask_handler("write_file", {"x": 1}) is True
+
     def test_clear_empties_log(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
         app._append("", "etwas")

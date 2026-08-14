@@ -223,6 +223,27 @@ Hinweis: Browser-Tools sind mutierend → Permission-Prompt `Allow: browser_navi
 | Navigieren | `uv run eaccode -p "Öffne example.com, sag mir die Überschrift"` | korrekte Antwort |
 | Screenshot | `uv run eaccode -p "Screenshot von example.com"` | Bilddatei gespeichert, öffnet |
 
+### D0–D4: Coding-Tools (fertig, 2026-08-13)
+
+| Check | Kommando (in eaccode-Chat) | Erwartung |
+|---|---|---|
+| Quote-Parsing | `/skill new probe --trigger probe --description "mit mehreren Worten"` | Beschreibung KOMPLETT gespeichert (vorher abgeschnitten) |
+| `/job` im REPL | `/job list` | „(no jobs yet)" oder Job-Liste |
+| `/mcp` im REPL | `/mcp list` | Roblox_Studio + weitere Server |
+| Memory-Lock | 2× parallel `/memory add Test-A` / `Test-B` starten | BEIDE Einträge landen in der Datei (keiner verloren) |
+| Repo-Scan | „Scanne C:\Projekte\_ref\hermes" | Struktur-Index, Größe, Dateizahl |
+| Repo-Suche | „Suche in C:\Projekte\_ref\hermes nach turns_since_memory (.py)" | Treffer mit Pfad + Zeile |
+| Context-Pack | „Lade den Kontext zu agent/memory_manager.py" | Modul + Tests + Imports |
+| Patch-Fuzzy | „Ändere in meiner Datei: 'print(hallo)' → 'print(hi)'" (leicht abweichend) | Fuzzy-Match, Syntax-Check, Backup |
+| Patch-Batch | „Ändere in X und Y ..." (2 Dateien, 2. Fehlerhaft) | Batch komplett zurückgerollt |
+| Undo | „Mach den letzten Edit rückgängig" | Datei wiederhergestellt |
+| Test-Runner | „Führe die Tests in C:\Projekte\eaccode-praxis aus" | Strukturierter Report (passed/failed + Fehlerliste) |
+| Test-Fix-Loop | „Test test_add schlägt fehl — fixe und führe erneut aus" | rot → grün (max. 3 Zyklen) |
+| Git-Status | „Git-Status in C:\Projekte\eaccode-praxis" | Saubere Zusammenfassung |
+| Git-Commit | „Committe mit Message 'test'" | Commit; bei roten Tests VERWEIGERT |
+| Git-Undo | „Mach den letzten Commit rückgängig" | `reset --soft HEAD~1`, Dateien bleiben |
+| Übungs-Repo | `C:\Projekte\eaccode-praxis` (Bug + Tests einbauen, Agent fixen lassen) | kompletter Zyklus: scan → test rot → patch → test grün → commit |
+
 ---
 
 ## Fehler melden (wichtig für die Zusammenarbeit)

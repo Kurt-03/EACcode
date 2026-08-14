@@ -276,6 +276,7 @@ class ChatApp:
     def _get_agent(self) -> Any:
         if self._agent is None:
             self._agent = self._agent_factory() if self._agent_factory else None
+            self._wire_agent_gate(self._agent)
         return self._agent
 
     def _run_agent(self, text: str) -> None:
@@ -309,18 +310,25 @@ class ChatApp:
 
     # -- permission (inline) ------------------------------------------------
 
-    def _ask(self, prompt: str) -> str:
+    def _ask(self, prompt: str) -> bool:
         self._permission_prompt = prompt
         self._permission_event.clear()
         self._append("class:chat.permission", f"Allow: {prompt} [y/N]")
         self._permission_event.wait(timeout=600)
-        return self._permission_answer
+        return self._permission_answer in ("y", "yes")
 
     def _wire_permission(self) -> None:
+        """Wire the inline ask into the tool wrapper (run_command gate)."""
         with contextlib.suppress(Exception):
             from eaccode import tools
 
-            tools.permission_handler = lambda name, arguments: self._ask(
+            tools.permission_handler = lambda command: self._ask(command)
+
+    def _wire_agent_gate(self, agent: Any) -> None:
+        """Wire the inline ask into the agent's permission manager."""
+        manager = getattr(agent, "permission_manager", None)
+        if manager is not None:
+            manager.ask_handler = lambda name, arguments: self._ask(
                 f"{name} {arguments}"
             )
 
