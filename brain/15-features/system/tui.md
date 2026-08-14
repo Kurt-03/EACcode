@@ -33,5 +33,5 @@ Commands, Agent-Calls im Worker-Thread (UI blockiert nie).
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/tui.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/commands/README.md|README]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/slash-palette.md|slash-palette]] · [[15-features/system/session-store.md|session-store]]
+- `src/eaccode/tui.py` → [[15-features/system/agent-core.md|Agent Core]] · [[15-features/commands/README.md|README]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/repl.md|REPL]]
 
