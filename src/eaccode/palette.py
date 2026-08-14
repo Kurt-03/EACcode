@@ -60,9 +60,9 @@ class _SlashCompleter(Completer):  # type: ignore[misc]
 
     def get_completions(self, document: Any, complete_event: Any) -> Iterable[Any]:
         word = document.get_word_before_cursor()
-        if not word.startswith("/") or len(word) < 2:
+        if not word.startswith("/"):
             return
-        query = word[1:]
+        query = word[1:]  # empty query shows every entry (palette opens at "/")
         for text, description, is_skill in self._entries:
             candidate = text[1:]  # compare without leading '/'
             if fuzzy_match(query, candidate):

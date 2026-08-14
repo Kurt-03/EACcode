@@ -71,6 +71,16 @@ class TestCompleter:
         texts = {completion.text for completion in completions}
         assert texts == {"/memory", "/model", "/mcp"}
 
+    def test_slash_alone_opens_all(self) -> None:
+        completer = palette._SlashCompleter([("/help", "x", False), ("/exit", "y", False)])
+
+        class Doc:
+            def get_word_before_cursor(self) -> str:
+                return "/"
+
+        completions = list(completer.get_completions(Doc(), None))
+        assert {c.text for c in completions} == {"/help", "/exit"}
+
     def test_no_completions_without_slash(self) -> None:
         completer = palette._SlashCompleter([("/help", "x", False)])
 
