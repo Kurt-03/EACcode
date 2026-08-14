@@ -305,14 +305,14 @@ class ChatApp:
                                 )
         except Exception as exc:
             answer = f"Error: {exc}"
-        self._append("chat.agent", f"⚡ {answer}")
+        self._append("class:chat.agent", f"⚡ {answer}")
 
     # -- permission (inline) ------------------------------------------------
 
     def _ask(self, prompt: str) -> str:
         self._permission_prompt = prompt
         self._permission_event.clear()
-        self._append("chat.permission", f"Allow: {prompt} [y/N]")
+        self._append("class:chat.permission", f"Allow: {prompt} [y/N]")
         self._permission_event.wait(timeout=600)
         return self._permission_answer
 
@@ -345,7 +345,7 @@ class ChatApp:
             if choice is not None:
                 text = choice
             # no match: run the typed text itself (e.g. unknown command)
-        self._append("chat.user", f"> {text}")
+        self._append("class:chat.user", f"> {text}")
         if text.startswith("/"):
             self._run_slash(text[1:])
         else:
@@ -380,7 +380,7 @@ class ChatApp:
         }
         handler = handlers.get(name)
         if handler is None:
-            self._append("chat.error", f"Unknown command: /{name} - type /help")
+            self._append("class:chat.error", f"Unknown command: /{name} - type /help")
             return
         output = io.StringIO()
         if handler is commands.run_config_command:
