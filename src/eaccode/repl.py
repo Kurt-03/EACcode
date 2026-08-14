@@ -10,11 +10,13 @@ from __future__ import annotations
 import contextlib
 import re
 import sys
+from collections.abc import Iterable
 from typing import Any, TextIO
 
-from eaccode import __version__, store
+from eaccode import __version__, palette, store
 from eaccode.agent import Agent
 from eaccode.commands import (
+    HELP_TEXT,
     run_config_command,
     run_job_command,
     run_mcp_command,
@@ -26,25 +28,6 @@ from eaccode.commands import (
     run_skill_command,
 )
 from eaccode.memory import injection_text
-
-HELP_TEXT = """\
-Commands:
-  /help           show this help
-  /version        show eaccode version
-  /clear          clear the screen and the chat history
-  /config <cmd>   manage configuration (init, show, set, ...)
-  /provider <cmd> manage providers (add, list, remove, set-key)
-  /model <cmd>    manage models (list, set-default, ping, ...)
-  /memory <cmd>   manage memory (add, show, remove, user add)
-  /skill <cmd>    manage skills (list, view, new, remove)
-  /session <cmd>  search past sessions (browse, search, show)
-  /permissions    permission modes and rules (status, mode, allow, deny)
-  /job <cmd>      scheduled jobs (list, add, remove, pause, resume, run)
-  /mcp <cmd>      MCP servers (list, add, import, remove)
-  /exit           leave eaccode (alias: /quit)
-
-Everything else is sent to the agent as a chat message.
-"""
 
 
 def _print_banner(stdout: TextIO) -> None:
@@ -249,8 +232,20 @@ def run_repl(
         return active_agent
 
     _wire_permission_prompt(stdin, stdout)
+
+    def _input_lines() -> Iterable[str]:
+        """Interactive TTY: slash palette; otherwise plain stdin lines."""
+        if sys.stdin.isatty():
+            while True:
+                try:
+                    yield palette.repl_prompt()
+                except (EOFError, KeyboardInterrupt):
+                    return
+        else:
+            yield from stdin
+
     try:
-        for raw_line in stdin:
+        for raw_line in _input_lines():
             line = raw_line.strip()
             if not line:
                 continue

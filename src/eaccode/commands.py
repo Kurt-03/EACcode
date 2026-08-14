@@ -160,6 +160,26 @@ def _cmd_unset(rest: list[str], stdout: TextIO) -> int:
     return 0
 
 
+HELP_TEXT = """\
+Commands:
+  /help           show this help
+  /version        show eaccode version
+  /clear          clear the screen and the chat history
+  /config <cmd>   manage configuration (init, show, set, ...)
+  /provider <cmd> manage providers (add, list, remove, set-key)
+  /model <cmd>    manage models (list, set-default, ping, ...)
+  /memory <cmd>   manage memory (add, show, remove, user add)
+  /skill <cmd>    manage skills (list, view, new, remove)
+  /session <cmd>  search past sessions (browse, search, show)
+  /permissions    permission modes and rules (status, mode, allow, deny)
+  /job <cmd>      scheduled jobs (list, add, remove, pause, resume, run)
+  /mcp <cmd>      MCP servers (list, add, import, remove)
+  /exit           leave eaccode (alias: /quit)
+
+Everything else is sent to the agent as a chat message.
+"""
+
+
 def run_config_command(
     args: list[str],
     stdout: TextIO | None = None,
