@@ -264,6 +264,8 @@ class ChatApp:
         self._permission_prompt: str | None = None
         self._permission_event = threading.Event()
         self._permission_answer = "n"
+        self._stream_open = False
+        self._streamed_any = False
 
     # -- log ---------------------------------------------------------------
 
@@ -283,8 +285,24 @@ class ChatApp:
     def _run_agent(self, text: str) -> None:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
+    def _on_token(self, delta: str) -> None:
+        """Stream callback (worker thread): extend the open log line."""
+        if delta == "":
+            self._stream_open = False  # round marker: next text starts fresh
+            return
+        self._streamed_any = True
+        if not self._stream_open:
+            # open a fresh agent line (append ignores empty text)
+            self._log_lines.append(("class:chat.agent", ""))
+            self._stream_open = True
+        style, text = self._log_lines[-1]
+        self._log_lines[-1] = (style, text + delta)
+        if self._app is not None:
+            self._app.invalidate()
+
     def _agent_worker(self, text: str) -> None:
         start = time.monotonic()
+        self._streamed_any = False
         try:
             agent = self._get_agent()
             if agent is None:
@@ -293,7 +311,9 @@ class ChatApp:
                 messages = list(self._chat_history) + [
                     {"role": "user", "content": text}
                 ]
-                history = agent.run(messages)
+                history = agent.run(
+                    messages, on_token=self._on_token
+                )
                 answer = agent.last_text(history)
                 new_messages = history[len(self._chat_history) + 1 :]
                 self._chat_history[:] = history[1:]
@@ -308,7 +328,16 @@ class ChatApp:
                                 )
         except Exception as exc:
             answer = f"Error: {exc}"
-        self._append("class:chat.agent", answer)
+        self._stream_open = False
+        if self._streamed_any:
+            # streamed text is already in the log line by line; only drop a
+            # line that stayed empty (e.g. a tool-only round)
+            if self._log_lines and self._log_lines[-1] == ("class:chat.agent", ""):
+                self._log_lines.pop()
+            if self._app is not None:
+                self._app.invalidate()
+        elif answer:
+            self._append("class:chat.agent", answer)
         try:
             from eaccode import config as cfg
 

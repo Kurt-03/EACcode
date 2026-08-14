@@ -40,8 +40,57 @@ READ_ONLY_TOOLS = frozenset(
         "repo_scan",
         "repo_search",
         "repo_context",
+        "git_status",
+        "git_log",
+        "git_diff",
+        "browser_status",
     }
 )
+
+# Read-only MCP tools are detected by their name (the MCP protocol marks
+# them readOnlyHint; we approximate via verbs). Anything else from an MCP
+# server counts as mutating -> always ask.
+_READONLY_MCP_HINTS = (
+    "get_",
+    "list_",
+    "read",
+    "search",
+    "inspect",
+    "grep",
+    "scan",
+    "show",
+    "find",
+    "state",
+    "status",
+    "console",
+)
+
+
+def _is_readonly_mcp(tool_name: str) -> bool:
+    """True when an mcp__<server>__<tool> name looks read-only."""
+    if not tool_name.startswith("mcp__"):
+        return False
+    tool = tool_name.split("__", 2)[-1].lower()
+    return any(hint in tool for hint in _READONLY_MCP_HINTS)
+
+
+# Truly dangerous tools: always prompt, approval is never remembered.
+ALWAYS_ASK_TOOLS = frozenset(
+    {
+        "run_command",
+        "browser_click",
+        "browser_type",
+        "browser_navigate",
+        "browser_screenshot",
+    }
+)
+
+
+def is_always_ask(tool_name: str) -> bool:
+    """Critical tools prompt on every call (no session memory)."""
+    return tool_name in ALWAYS_ASK_TOOLS or (
+        tool_name.startswith("mcp__") and not _is_readonly_mcp(tool_name)
+    )
 
 
 @dataclass
@@ -63,6 +112,7 @@ class PermissionManager:
     deny_rules: list[str] = field(default_factory=list)
     ask_handler: Callable[[str, dict[str, Any]], bool] | None = None
     _ask_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _session_allowed: set[str] = field(default_factory=set, repr=False)
 
     def __post_init__(self) -> None:
         source = self.conf if self.conf is not None else cfg.load_config()
@@ -76,6 +126,18 @@ class PermissionManager:
     def call_text(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """The string rules match against (tool + sorted json args)."""
         return f"{tool_name} {json.dumps(arguments, sort_keys=True, ensure_ascii=False)}"
+
+    def session_allow(self, tool_name: str) -> None:
+        """Remember an approval for the rest of this process session."""
+        self._session_allowed.add(tool_name)
+
+    def session_clear(self) -> None:
+        """Forget all session approvals."""
+        self._session_allowed.clear()
+
+    def session_allowed(self) -> list[str]:
+        """Currently session-approved tool names (sorted)."""
+        return sorted(self._session_allowed)
 
     def check(self, tool_name: str, arguments: dict[str, Any]) -> Decision:
         """Decide whether a tool call may run."""
@@ -101,10 +163,22 @@ class PermissionManager:
             return Decision(
                 True, "read-only tool (no approval needed)", self.mode
             )
+        if self.mode == "ask" and _is_readonly_mcp(tool_name):
+            # MCP tools whose name marks them read-only run freely too
+            return Decision(
+                True, "read-only mcp tool (no approval needed)", self.mode
+            )
+        if tool_name in self._session_allowed:
+            return Decision(True, "approved for this session", self.mode)
         if self.ask_handler is not None:
             # serialized: parallel tool calls must not race the stdin prompt
             with self._ask_lock:
                 allowed = self.ask_handler(tool_name, arguments)
+            if allowed and not is_always_ask(tool_name):
+                # routine tools: one approval covers the whole session;
+                # critical tools (shell, browser actions, mutating MCP)
+                # keep prompting on every call
+                self._session_allowed.add(tool_name)
             return Decision(
                 allowed,
                 "approved by user" if allowed else "denied by user",
@@ -140,9 +214,12 @@ def mode_hint(mode: str) -> str:
         )
     return (
         "\n\n## Permission mode: ASK\n"
-        "Read-only tools (read_file, search, web, time, sessions) run freely. "
-        "Mutating tools (write_file, run_command, memory, skills, subagents, "
-        "mcp calls) show an interactive prompt; the user decides per call.\n"
+        "Read-only tools (read_file, search, web, time, sessions, git read, "
+        "repo tools, read-only MCP tools) run freely. Mutating tools "
+        "(write_file, memory, skills, git_commit, tests, subagents) prompt "
+        "ONCE per session - after approval they run freely until eaccode "
+        "restarts. Critical tools (run_command, browser actions, mutating "
+        "MCP calls) prompt on EVERY call.\n"
         "Proceed normally."
     )
 

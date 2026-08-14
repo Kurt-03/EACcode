@@ -57,6 +57,12 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Stat-Zeile | ChatApp: Antwort abwarten | `MiniMax-M3 │ 3.2s │ 412 chars` (ohne Symbol) unter der Antwort | ✅ 08-14 |
 | Box-Wände | Banner in schmalem Fenster | alle Wand-Zeilen gleich breit, kein Loch rechts | ✅ 08-14 |
 | Agent weiß + keine Symbole | ChatApp: Antwort ansehen | weißer Text, kein ⚡/⚕ | ✅ 08-14 |
+| Session-Allow | ChatApp: `write_file` bestätigen, dann 2. Schreibversuch | 1 Prompt, dann frei für die Session | ✅ 08-14 (Tests) |
+| Kritische Tools | `run_command` 2× | Prompt bei JEDEM Call | ✅ 08-14 (Tests) |
+| MCP read-only frei | `mcp__Roblox_Studio__script_search` | kein Prompt (Namens-Heuristik) | ✅ 08-14 (Tests) |
+| Tool-Manifest | Chat: „Welche Tools hast du?" | Agent listet Tools + Flow (System-Prompt) | ✅ 08-14 |
+| Streaming | Chat: Frage stellen | Antwort erscheint live, Zeile wächst | ✅ 08-14 (live: 7-34 Deltas) |
+| Stream→Tool-Reihenfolge | Chat: Tool-Aufgabe | kompletter Stream, DANN Tool-Call/Permission | ✅ 08-14 (live) |
 
 ## Phase D — Coding-Stärke ✅ KOMPLETT (2026-08-13, DoD erfüllt)
 

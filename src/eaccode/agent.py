@@ -83,6 +83,29 @@ def parse_response(response: Any) -> tuple[str | None, list[ToolCall]]:
     return content, calls
 
 
+def tool_guide(tools: dict[str, Tool]) -> str:
+    """Human-readable tool manifest for the system prompt.
+
+    Lists every tool with its description plus usage guidance so the
+    model knows what exists and when to reach for it.
+    """
+    lines = [
+        "\n\n## Available tools",
+        "You have tools - use them instead of guessing. Tool calls run "
+        "through the permission gate (see mode above).",
+    ]
+    for name in sorted(tools):
+        tool = tools[name]
+        lines.append(f"- `{name}`: {tool.description}")
+    lines.append(
+        "\nTypical coding flow: repo_scan to understand the project, "
+        "read_file for details, patch_file/file_edit for changes, "
+        "run_tests to verify, git_status/git_diff to inspect, git_commit "
+        "only after tests pass. Memory tools store durable facts."
+    )
+    return "\n".join(lines)
+
+
 class Agent:
     """A minimal ReAct agent: model <-> tools until a final answer."""
 
@@ -98,13 +121,18 @@ class Agent:
         self.conf = conf or cfg.load_config()
         self.system_prompt = system_prompt
         self.tools = {tool.name: tool for tool in (tools or [])}
+        if self.tools and self.system_prompt:
+            self.system_prompt = f"{self.system_prompt}\n\n{tool_guide(self.tools)}"
         self.use_skills = use_skills
         self.memory_nudge_interval = memory_nudge_interval
         self.permission_manager = permission_manager
         self._memory_runs = 0
 
     def _complete(
-        self, messages: list[dict[str, Any]], max_output_tokens: int
+        self,
+        messages: list[dict[str, Any]],
+        max_output_tokens: int,
+        on_token: Any = None,
     ) -> tuple[str | None, list[ToolCall]]:
         chain = router.model_chain(self.conf)
         if not chain:
@@ -115,10 +143,54 @@ class Agent:
         if self.tools:
             kwargs["tools"] = [_tool_schema(tool) for tool in self.tools.values()]
             kwargs["tool_choice"] = "auto"
-        response = router.completion_response(
+        if on_token is None:
+            response = router.completion_response(
+                chain[0], messages, self.conf, timeout=90.0, extra_kwargs=kwargs
+            )
+            return parse_response(response)
+        # ---- streaming path: emit text deltas, assemble tool calls ----
+        content_parts: list[str] = []
+        fragments: dict[int, dict[str, str]] = {}
+        response = router.stream_completion(
             chain[0], messages, self.conf, timeout=90.0, extra_kwargs=kwargs
         )
-        return parse_response(response)
+        for chunk in response:
+            if not getattr(chunk, "choices", None):
+                continue
+            delta = chunk.choices[0].delta
+            text = getattr(delta, "content", None)
+            if text:
+                content_parts.append(text)
+                on_token(text)
+            for tc in getattr(delta, "tool_calls", None) or []:
+                index = getattr(tc, "index", 0)
+                frag = fragments.setdefault(index, {"id": "", "name": "", "args": ""})
+                if getattr(tc, "id", None):
+                    frag["id"] = tc.id
+                fn = getattr(tc, "function", None)
+                if fn is not None:
+                    if getattr(fn, "name", None):
+                        frag["name"] = fn.name
+                    if getattr(fn, "arguments", None):
+                        frag["args"] += fn.arguments
+        content = "".join(content_parts) or None
+        if fragments:
+            calls = []
+            for index in sorted(fragments):
+                frag = fragments[index]
+                try:
+                    args = json.loads(frag["args"] or "{}")
+                except json.JSONDecodeError:
+                    args = {}
+                calls.append(
+                    ToolCall(
+                        id=frag["id"] or f"call_{index}",
+                        name=frag["name"],
+                        arguments=args,
+                    )
+                )
+            return content, calls
+        return content, []
 
     def _execute_tool(self, call: ToolCall) -> str:
         tool = self.tools.get(call.name)
@@ -154,12 +226,17 @@ class Agent:
         max_turns: int = MAX_TURNS,
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
         cancel_event: Any | None = None,
+        on_token: Any = None,
     ) -> list[dict[str, Any]]:
         """Run the loop; returns the full conversation including tool results.
 
         ``cancel_event``: a threading.Event that is checked between turns —
         when set, the loop stops cleanly with a cancellation message (used
         by the subagent timeout guard).
+
+        ``on_token``: optional callback receiving text deltas while the
+        model streams. It also receives "" at the start of every round so
+        the UI can open a fresh line per round.
         """
         self._memory_runs += 1
         system_content = self.system_prompt
@@ -186,7 +263,11 @@ class Agent:
                     {"role": "assistant", "content": "(cancelled by timeout guard)"}
                 )
                 return history
-            content, calls = self._complete(history, max_output_tokens)
+            if on_token is not None:
+                on_token("")  # round marker: UI opens a fresh log line
+            content, calls = self._complete(
+                history, max_output_tokens, on_token=on_token
+            )
             if not calls:
                 history.append({"role": "assistant", "content": content or ""})
                 return history

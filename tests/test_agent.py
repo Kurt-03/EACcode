@@ -62,7 +62,47 @@ class TestParseResponse:
         assert calls[0].id == "call_0"
 
 
-class TestAgentLoop:
+def _tool(name: str, description: str) -> Tool:
+    return Tool(name, description, func=lambda **_: "")
+
+
+def test_tool_guide_lists_tools_and_flow() -> None:
+    from eaccode.agent import tool_guide
+
+    guide = tool_guide(
+        {
+            "read_file": _tool("read_file", "Read a file"),
+            "run_tests": _tool("run_tests", "Run the test suite"),
+            "repo_scan": _tool("repo_scan", "Index a repository"),
+        }
+    )
+    assert "read_file" in guide
+    assert "Read a file" in guide
+    assert "run_tests" in guide
+    assert "repo_scan" in guide
+    assert "Typical coding flow" in guide
+    assert "git_commit" in guide
+
+
+def test_agent_prompt_contains_tool_guide() -> None:
+    agent = Agent(
+        system_prompt="base prompt",
+        tools=[
+            _tool("read_file", "Read a file"),
+            _tool("run_tests", "Run the test suite"),
+        ],
+    )
+    assert "## Available tools" in agent.system_prompt
+    assert "read_file" in agent.system_prompt
+    assert "Typical coding flow" in agent.system_prompt
+
+
+def test_agent_without_tools_keeps_prompt() -> None:
+    agent = Agent(system_prompt="base prompt", tools=[])
+    assert agent.system_prompt == "base prompt"
+
+
+class TestAgentRun:
     def test_single_answer_no_tools(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import litellm
 

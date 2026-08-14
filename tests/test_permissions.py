@@ -98,6 +98,65 @@ class TestRules:
         assert text == 'run_command {"command": "echo hi"}'
 
 
+class TestSessionAllow:
+    def _manager(self) -> tuple[PermissionManager, list[str]]:
+        calls: list[str] = []
+
+        def handler(name: str, args: dict[str, Any]) -> bool:
+            calls.append(name)
+            return True
+
+        return PermissionManager(ask_handler=handler), calls
+
+    def test_approval_remembered_for_session(self) -> None:
+        manager, calls = self._manager()
+        assert manager.check("write_file", {}).allow
+        assert manager.check("write_file", {}).allow
+        assert manager.check("write_file", {}).allow
+        assert calls == ["write_file"]  # only ONE prompt for the session
+
+    def test_critical_tool_prompts_every_time(self) -> None:
+        manager, calls = self._manager()
+        assert manager.check("run_command", {"command": "ls"}).allow
+        assert manager.check("run_command", {"command": "ls"}).allow
+        assert calls == ["run_command", "run_command"]  # every call prompts
+
+    def test_mutating_mcp_always_asks(self) -> None:
+        manager, calls = self._manager()
+        manager.check("mcp__Roblox_Studio__execute_luau", {"code": "x"})
+        manager.check("mcp__Roblox_Studio__execute_luau", {"code": "x"})
+        assert len(calls) == 2
+
+    def test_readonly_mcp_runs_free(self) -> None:
+        manager = PermissionManager(ask_handler=lambda name, args: False)
+        assert manager.check("mcp__Roblox_Studio__script_search", {}).allow
+        assert manager.check("mcp__Roblox_Studio__get_console_output", {}).allow
+
+    def test_git_read_tools_run_free(self) -> None:
+        manager = PermissionManager(ask_handler=lambda name, args: False)
+        assert manager.check("git_status", {}).allow
+        assert manager.check("git_log", {}).allow
+        assert manager.check("git_diff", {}).allow
+        assert manager.check("browser_status", {}).allow
+
+    def test_session_clear_forgets_approvals(self) -> None:
+        manager, calls = self._manager()
+        manager.check("write_file", {})
+        manager.session_clear()
+        manager.check("write_file", {})
+        assert len(calls) == 2
+
+    def test_deny_rule_wins_over_session(self) -> None:
+        manager = PermissionManager(
+            conf={"permissions": {"mode": "ask", "deny": ["write_file"]}},
+            ask_handler=lambda name, args: True,
+        )
+        assert not manager.check("write_file", {}).allow
+        # the deny rule also blocks the remembered path
+        manager.session_allow("write_file")
+        assert not manager.check("write_file", {}).allow
+
+
 class TestModeHint:
     def test_read_only_hint(self) -> None:
         hint = permissions.mode_hint("read_only")

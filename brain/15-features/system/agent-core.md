@@ -24,6 +24,14 @@ kommt — ohne Framework, synchron, testbar.
 - REPL/TUI nutzen `Agent` mit `BUILTIN_TOOLS` (aus `tools.py`)
 - Memory-Injection in den System-Prompt (lazy beim ersten Chat)
 
+- **Tool-Manifest (2026-08-14):** `tool_guide()` hängt dem System-Prompt
+  die komplette Tool-Liste (Name + Beschreibung) plus Coding-Flow-Hinweis
+  an — das Modell kennt alle Tools und ihre Nutzung explizit
+- **Streaming (2026-08-14):** `run(on_token=...)` — Text-Deltas laufen
+  live (Runden-Marker `""` pro Runde); Tool-Calls werden aus den
+  Stream-Fragmenten assembliert (id/name/arguments über Chunks hinweg);
+  ohne on_token bleibt der bisherige nicht-streamende Pfad
+
 ## Tests
 `tests/test_agent.py` — Loop, Tool-Roundtrip, unbekannte Tools, Exceptions,
 Turn-Budget, JSON-Argumente

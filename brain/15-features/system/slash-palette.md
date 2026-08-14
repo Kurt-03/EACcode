@@ -62,9 +62,21 @@ Render-Sektionen, Pipe-Integration)
   Name links + Beschreibung rechts, sauber ausgerichtet (Hermes-Stil);
   ❯-Marker vor dem ausgewählten Eintrag; dynamische Spaltenbreite nach
   dem längsten Namen
+- **Palette-Position** (08-14, Nutzer): erscheint **UNTER der
+  Eingabezeile** (nicht darüber) — HSplit-Reihenfolge Log → Input →
+  Palette; Höhe dynamisch 0–12 Zeilen (`Dimension(max=12)`,
+  `dont_extend_height=True`); unsichtbar wenn zu (render leer)
 - **Start-Banner** als erste Log-Zeilen (Style `chat.banner`, grau) +
   **Stat-Zeile** nach Antworten (Style `chat.stat`, gedimmt) — Details in
   [[15-features/system/start-banner.md|start-banner]]
+- **Streaming (2026-08-14):** Agent-Antworten werden live in den Log
+  gestreamt (Zeile wächst mit jedem Chunk, `app.invalidate()` aus dem
+  Worker-Thread). Jede Agent-Runde bekommt einen Leer-Marker (neue
+  Zeile); Tool-Calls erscheinen erst NACH dem vollständigen Stream der
+  Runde (Loop-Reihenfolge: Stream zu Ende → Tool-Call → Permission).
+  Router: `stream_completion` (stream=True) + `_completion_kwargs`;
+  Agent: `run(on_token=...)` — siehe auch
+  [[15-features/system/agent-core.md|Agent Core]]
 - **Test-Härtung**: 2 flaky Pipe-Tests warten jetzt auf `app.is_running`
   statt fixem sleep; 2 _ask-Tests testen den echten Inline-Flow (ask im
   Thread, Antwort via _submit) statt Event-Race — die Suite hängte sonst

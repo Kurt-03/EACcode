@@ -88,6 +88,27 @@ def _extract_text(response: Any) -> str:
         return str(response)
 
 
+def _completion_kwargs(
+    model_id: str,
+    messages: list[dict[str, str]],
+    conf: dict[str, Any],
+    timeout: float,
+    extra_kwargs: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Build the LiteLLM kwargs shared by plain and streaming calls."""
+    provider_name = model_id.split("/", 1)[0]
+    provider = (conf.get("providers") or {}).get(provider_name)
+    api_key = resolve_api_key(provider)
+    kwargs: dict[str, Any] = {"model": model_id, "messages": messages, "timeout": timeout}
+    if extra_kwargs:
+        kwargs.update(extra_kwargs)
+    if api_key:
+        kwargs["api_key"] = api_key
+    if provider and provider.get("base_url"):
+        kwargs["api_base"] = provider["base_url"]
+    return kwargs
+
+
 def completion_response(
     model_id: str,
     messages: list[dict[str, str]],
@@ -99,22 +120,36 @@ def completion_response(
 
     ``extra_kwargs`` are forwarded to LiteLLM (e.g. tools, max_tokens).
     """
-    provider_name = model_id.split("/", 1)[0]
-    provider = (conf.get("providers") or {}).get(provider_name)
-    api_key = resolve_api_key(provider)
-    kwargs: dict[str, Any] = {"model": model_id, "messages": messages, "timeout": timeout}
-    if extra_kwargs:
-        kwargs.update(extra_kwargs)
-    if api_key:
-        kwargs["api_key"] = api_key
-    if provider and provider.get("base_url"):
-        kwargs["api_base"] = provider["base_url"]
+    kwargs = _completion_kwargs(model_id, messages, conf, timeout, extra_kwargs)
     try:
         import litellm
 
         litellm.suppress_debug_info = True  # keep errors clean for the user
         return litellm.completion(**kwargs)
     except Exception as exc:  # litellm raises a broad family of exceptions
+        raise ModelError(f"model call failed ({model_id}): {exc}") from exc
+
+
+def stream_completion(
+    model_id: str,
+    messages: list[dict[str, str]],
+    conf: dict[str, Any],
+    timeout: float = 90.0,
+    extra_kwargs: dict[str, Any] | None = None,
+) -> Any:
+    """One streaming completion; returns the LiteLLM chunk iterator.
+
+    Each chunk has ``choices[0].delta`` with ``content`` and/or
+    ``tool_calls`` fragments.
+    """
+    kwargs = _completion_kwargs(model_id, messages, conf, timeout, extra_kwargs)
+    kwargs["stream"] = True
+    try:
+        import litellm
+
+        litellm.suppress_debug_info = True
+        return litellm.completion(**kwargs)
+    except Exception as exc:
         raise ModelError(f"model call failed ({model_id}): {exc}") from exc
 
 

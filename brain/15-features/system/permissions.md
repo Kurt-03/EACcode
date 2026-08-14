@@ -34,14 +34,27 @@ read_only/deny_all), allow-/deny-Regeln (Regex auf Tool-Call), Sandbox
   (read_file/web/current_time/Sessions) laufen **frei** ohne Prompt —
   nur mutierende Tools fragen (Regression aus C1 behoben, live bewiesen:
   current_time antwortet ohne Prompt)
+- **Session-Allow + Gefahrenklassen (2026-08-14):** Routine-Tools
+  (write_file, memory, skills, git_commit, run_tests, subagents) fragen
+  **EINMAL pro Session** — nach Zustimmung laufen sie frei bis zum
+  Neustart. Kritische Tools (run_command, Browser-Aktionen, mutierende
+  MCP-Calls) fragen **bei JEDEM Call**. Lesende MCP-Tools laufen frei
+  (Namens-Heuristik: get_/list_/read/search/inspect/grep/scan/...).
+  git_status/log/diff + browser_status sind jetzt read-only.
+  `session_allow/session_clear/session_allowed()` im Manager;
+  Mode-Hint erklärt die Semantik (Agent antwortete live korrekt:
+  „nach deiner Zustimmung brauche ich keine erneute Freigabe")
 
 ## Tests
 `tests/test_permissions.py` (19: Modes, Regeln, Persistenz, mode_hint,
 ask-readonly-frei) + Agent-Gate-Tests (test_agent)
++ `TestSessionAllow` (7: Session-Merkung, kritische Tools immer, MCP
+read-only frei, deny gewinnt, session_clear)
 
 ## Offene Punkte
 - Echte Sandbox (Docker/bwrap) — optional, später
 - Regel-Syntax-Erweiterung (Glob statt Regex) — nach Nutzerfeedback
+- MCP readOnlyHint aus dem Protokoll statt Namens-Heuristik (ideal)
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] · [[15-features/system/permission-gate.md|Permission-Gate]] · [[15-features/system/agent-core.md|Agent Core]]

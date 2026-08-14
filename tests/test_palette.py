@@ -118,6 +118,102 @@ class TestPalettePrompt:
         assert "no matches" in text
 
 
+def _fake_chunk(content: str | None = None, tool_call: Any = None) -> Any:
+    from types import SimpleNamespace
+
+    delta: dict[str, Any] = {}
+    if content is not None:
+        delta["content"] = content
+    if tool_call is not None:
+        delta["tool_calls"] = [tool_call]
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(**delta))]
+    )
+
+
+def test_streaming_emits_deltas_and_tool_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    import eaccode.router as router_mod
+    from eaccode.agent import Agent
+
+    tc1 = SimpleNamespace(
+        index=0,
+        id="call_9",
+        function=SimpleNamespace(name="current_time", arguments='{"tz":'),
+    )
+    tc2 = SimpleNamespace(
+        index=0,
+        id="call_9",
+        function=SimpleNamespace(name="current_time", arguments='"UTC"}'),
+    )
+    chunks = [
+        _fake_chunk(content="Ich "),
+        _fake_chunk(content="antworte"),
+        _fake_chunk(content=None, tool_call=tc1),
+        _fake_chunk(content=None, tool_call=tc2),
+    ]
+
+    def fake_stream(
+        model_id: str,
+        messages: list[dict[str, Any]],
+        conf: dict[str, Any],
+        timeout: float = 90.0,
+        extra_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
+        assert extra_kwargs is not None and extra_kwargs.get("max_tokens") == 1024
+        return iter(chunks)
+
+    monkeypatch.setattr(router_mod, "stream_completion", fake_stream)
+    monkeypatch.setattr(router_mod, "model_chain", lambda conf: ["minimax/MiniMax-M3"])
+
+    agent = Agent(system_prompt="sys", tools=[])
+    received: list[str] = []
+    content, calls = agent._complete(
+        [{"role": "user", "content": "hallo"}], 1024, on_token=received.append
+    )
+    assert "".join(received) == "Ich antworte"
+    assert content == "Ich antworte"
+    assert len(calls) == 1
+    assert calls[0].name == "current_time"
+    assert calls[0].arguments == {"tz": "UTC"}
+
+
+def test_streaming_round_marker_opens_fresh_lines() -> None:
+    app = palette.ChatApp(agent=FakeAgent())
+    app._on_token("")  # round marker
+    app._on_token("Hallo ")
+    app._on_token("Welt")
+    assert app._log_lines[-1] == ("class:chat.agent", "Hallo Welt")
+    assert app._streamed_any is True
+    app._on_token("")  # next round: fresh line
+    app._on_token("Zweite")
+    assert app._log_lines[-1] == ("class:chat.agent", "Zweite")
+
+
+def test_stream_completion_sets_stream_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import eaccode.router as router_mod
+
+    seen: dict[str, Any] = {}
+
+    def fake_completion(**kwargs: Any) -> Any:
+        seen.update(kwargs)
+        return iter([])
+
+    monkeypatch.setattr("litellm.completion", fake_completion)
+    conf = {"providers": {"minimax": {"api_key": "x"}}}
+    result = router_mod.stream_completion(
+        "minimax/MiniMax-M3", [{"role": "user", "content": "hi"}], conf
+    )
+    assert list(result) == []  # returned the chunk iterator
+    assert seen.get("stream") is True
+    assert seen.get("model") == "minimax/MiniMax-M3"
+
+
 class TestPipeIntegration:
     def test_enter_picks_selection(self) -> None:
         pytest.importorskip("prompt_toolkit")
@@ -148,7 +244,14 @@ class FakeAgent:
         self.reply = reply
         self.system_prompt = "system"
 
-    def run(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def run(
+        self,
+        messages: list[dict[str, str]],
+        on_token: Any = None,
+    ) -> list[dict[str, Any]]:
+        if on_token is not None:
+            on_token("")
+            on_token(self.reply)
         return (
             [{"role": "system", "content": self.system_prompt}]
             + list(messages)
