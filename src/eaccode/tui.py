@@ -10,11 +10,12 @@ from __future__ import annotations
 import io
 from typing import Any
 
+from rich.markup import escape
 from textual import work
 from textual.app import App, ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Horizontal, VerticalScroll
 from textual.message import Message
-from textual.widgets import Footer, Input, Static
+from textual.widgets import Footer, Input, RichLog, Static
 
 from eaccode import __version__
 from eaccode.agent import Agent
@@ -29,6 +30,7 @@ from eaccode.repl import HELP_TEXT
 
 USER_GLYPH = ">"
 AGENT_GLYPH = "eaccode"
+PROMPT_GLYPH = "❯"
 
 APP_CSS = """
 #scroll {
@@ -39,9 +41,20 @@ APP_CSS = """
 #log {
     padding: 0 1;
 }
-#input {
+#inputrow {
     dock: bottom;
+    height: auto;
     margin: 0 1 1 1;
+}
+#prompt {
+    width: auto;
+    content-align: center middle;
+    color: $primary;
+    text-style: bold;
+    padding: 0 0 0 1;
+}
+#input {
+    width: 1fr;
 }
 """
 
@@ -73,8 +86,12 @@ class EaccodeApp(App[None]):
         self._log_text = ""
 
     def compose(self) -> ComposeResult:
-        yield VerticalScroll(Static("", id="log"), id="scroll")
-        yield Input(placeholder="Ask eaccode... (type /help)", id="input")
+        yield VerticalScroll(
+            RichLog(id="log", wrap=False, markup=True), id="scroll"
+        )
+        with Horizontal(id="inputrow"):
+            yield Static(PROMPT_GLYPH, id="prompt")
+            yield Input(placeholder="Ask eaccode... (type /help)", id="input")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -82,11 +99,17 @@ class EaccodeApp(App[None]):
 
     # -- helpers ------------------------------------------------------------
 
-    def _append(self, text: str) -> None:
+    def _append(self, text: str, marked: str | None = None) -> None:
         if not text:
             return
         self._log_text = f"{self._log_text}{text}\n" if self._log_text else text
-        self.query_one("#log", Static).update(self._log_text)
+        if marked is None:
+            marked = escape(text)
+        self.query_one("#log", RichLog).write(marked)
+
+    def _append_user(self, text: str) -> None:
+        marked = f"[bold #4aa3ff]{escape(USER_GLYPH)}[/] {escape(text)}"
+        self._append(f"{USER_GLYPH} {text}", marked=marked)
 
     def _get_agent(self) -> Agent:
         if self._agent is None:
@@ -106,7 +129,7 @@ class EaccodeApp(App[None]):
         if text.startswith("/"):
             self._run_slash(text[1:])
         else:
-            self._append(f"{USER_GLYPH} {text}")
+            self._append_user(text)
             self._run_agent(text)
 
     def _run_slash(self, command: str) -> None:
@@ -117,7 +140,7 @@ class EaccodeApp(App[None]):
         if name == "clear":
             self._log_text = ""
             self._chat_history.clear()
-            self.query_one("#log", Static).update("")
+            self.query_one("#log", RichLog).clear()
             return
         if name == "help":
             self._append(HELP_TEXT.rstrip())

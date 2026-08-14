@@ -49,6 +49,17 @@ Render-Sektionen, Pipe-Integration)
 - **`ChatApp`** in palette.py: prompt_toolkit-Vollbild — Log oben
   (Auto-Scroll, Scrollbar), Palette angepinnt über der Eingabe,
   Eingabe FEST unten mit ❯-Marker — Hermes-Look (kein Textual!)
+
+## Feinschliff (2026-08-13, Nutzer-Wunsch)
+- **Input-Prompt „❯ " jetzt blau** (`chat.prompt` = bold #4fc1ff, vorher
+  Standard-Grau); steht als eigenes Window LINKS vom Buffer → immer vor
+  dem Cursor
+- **Chat-Log bricht nicht mehr am Rand um** (`wrap_lines=False`) —
+  lange Zeilen laufen über den Rand statt zu wrappen
+- **Test-Härtung**: 2 flaky Pipe-Tests warten jetzt auf `app.is_running`
+  statt fixem sleep; 2 _ask-Tests testen den echten Inline-Flow (ask im
+  Thread, Antwort via _submit) statt Event-Race — die Suite hängte sonst
+  600s (Event wird in `_ask` ge-cleart)
 - `run_repl`: TTY → ChatApp; Pipes/Tests → Stream-Loop (unverändert)
 - Inline-Permission: `Allow: ... [y/N]` im Log, Antwort im Input-Feld
 - Alle Slash-Commands, Store-Persistenz, Live-Filter beim Tippen,

@@ -130,7 +130,7 @@ class TestPipeIntegration:
 
             thread = threading.Thread(target=run, daemon=True)
             thread.start()
-            time.sleep(0.3)
+            assert _wait_for(lambda: app.is_running), "app did not start"
             pipe.send_text("/mem")
             time.sleep(0.3)
             pipe.send_text("\r")  # enter -> picks /memory
@@ -195,12 +195,29 @@ class TestChatApp:
 
     def test_ask_returns_bool(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        app._permission_prompt = "x"
-        app._submit("y")
-        assert app._ask("x") is True
-        app._permission_prompt = "x"
-        app._submit("n")
-        assert app._ask("x") is False
+        result: dict[str, bool] = {}
+
+        def ask() -> None:
+            result["value"] = app._ask("x")
+
+        thread = threading.Thread(target=ask, daemon=True)
+        thread.start()
+        assert _wait_for(lambda: app._permission_prompt is not None)
+        app._submit("y")  # answer yes
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+        assert result.get("value") is True
+
+        def ask_no() -> None:
+            result["value"] = app._ask("x")
+
+        thread = threading.Thread(target=ask_no, daemon=True)
+        thread.start()
+        assert _wait_for(lambda: app._permission_prompt is not None)
+        app._submit("n")  # answer no
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+        assert result.get("value") is False
 
     def test_agent_gate_wired(self) -> None:
         from types import SimpleNamespace
@@ -211,9 +228,18 @@ class TestChatApp:
         app = palette.ChatApp(agent=agent)
         app._wire_agent_gate(agent)
         assert manager.ask_handler is not None
-        app._permission_prompt = "write_file x"
-        app._submit("yes")
-        assert manager.ask_handler("write_file", {"x": 1}) is True
+        result: dict[str, bool] = {}
+
+        def ask() -> None:
+            result["value"] = manager.ask_handler("write_file", {"x": 1})
+
+        thread = threading.Thread(target=ask, daemon=True)
+        thread.start()
+        assert _wait_for(lambda: app._permission_prompt is not None)
+        app._submit("yes")  # inline answer
+        thread.join(timeout=5)
+        assert not thread.is_alive()
+        assert result.get("value") is True
 
     def test_clear_empties_log(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
@@ -248,7 +274,7 @@ class TestChatApp:
 
             thread = threading.Thread(target=run, daemon=True)
             thread.start()
-            time.sleep(0.3)
+            assert _wait_for(lambda: application.is_running), "app did not start"
             pipe.send_text("hallo\n")  # enter submits
             assert _wait_for(
                 lambda: any("pipe antwort" in t for _, t in app._log_lines)

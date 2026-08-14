@@ -237,6 +237,7 @@ class ChatApp:
             "chat.agent": "bold #9dffb0",
             "chat.error": "bold #ff6b6b",
             "chat.permission": "bold #ffd166",
+            "chat.prompt": "bold #4fc1ff",
             "palette.normal": "fg:#d4d4d4",
             "palette.name": "bold fg:#ffffff",
             "palette.desc": "fg:#6e6e6e",
@@ -457,7 +458,7 @@ class ChatApp:
         input_row = HSplit(
             [
                 Window(
-                    FormattedTextControl(lambda: [("", "❯ ")]),
+                    FormattedTextControl(lambda: [("class:chat.prompt", "❯ ")]),
                     width=3,
                     height=1,
                 ),
@@ -468,6 +469,7 @@ class ChatApp:
             [
                 Window(
                     self._log_control(),
+                    wrap_lines=False,  # no wrap at the right edge
                     scroll_offsets=ScrollOffsets(bottom=10**8),
                     right_margins=[ScrollbarMargin()],
                 ),
