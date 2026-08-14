@@ -326,18 +326,19 @@ class ChatApp:
 
     # -- input -------------------------------------------------------------
 
-    def _submit(self, text: str) -> None:
+    def _submit(self, text: str) -> bool:
+        """Handle one submitted line; returns True when it was consumed."""
         text = text.strip()
         if not text:
-            return
+            return True
         if self._permission_prompt is not None:
             self._permission_answer = text.lower() or "n"
             self._permission_prompt = None
             self._permission_event.set()
-            return
+            return True
         if text.startswith("/") and not self.palette.visible:
             self.palette.refresh(text)  # first enter opens the palette
-            return
+            return False  # keep the text in the buffer
         if self.palette.visible:
             choice = self.palette.accept()
             self.palette.visible = False
@@ -349,6 +350,7 @@ class ChatApp:
             self._run_slash(text[1:])
         else:
             self._run_agent(text)
+        return True
 
     def _run_slash(self, command: str) -> None:
         name, args = self._parse(command)
@@ -408,10 +410,15 @@ class ChatApp:
     ) -> Application[str]:
         custom = KeyBindings()
 
+        def _on_text_changed(_buffer: Buffer) -> None:
+            self.palette.refresh(self._buffer.text)
+
+        self._buffer.on_text_changed += _on_text_changed
+
         @custom.add("enter", eager=True)
         def _enter(event: Any) -> None:
-            self._submit(event.current_buffer.text)
-            event.current_buffer.text = ""
+            if self._submit(event.current_buffer.text):
+                event.current_buffer.text = ""
 
         @custom.add("up", eager=True)
         def _up(event: Any) -> None:
