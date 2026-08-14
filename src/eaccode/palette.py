@@ -439,6 +439,16 @@ class ChatApp:
         kb = merge_key_bindings(
             [custom, load_basic_bindings(), load_emacs_bindings()]
         )
+        input_row = HSplit(
+            [
+                Window(
+                    FormattedTextControl(lambda: [("bold #4fc1ff", "❯ ")]),
+                    width=3,
+                    height=1,
+                ),
+                Window(BufferControl(buffer=self._buffer), height=1),
+            ]
+        )
         root = HSplit(
             [
                 Window(
@@ -451,7 +461,7 @@ class ChatApp:
                     height=Dimension(),
                     dont_extend_height=True,
                 ),
-                Window(BufferControl(buffer=self._buffer), height=1),
+                input_row,
             ]
         )
         self._app = Application(
