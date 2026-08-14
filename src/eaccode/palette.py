@@ -39,7 +39,7 @@ try:
         Window,
     )
     from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
-    from prompt_toolkit.layout.margins import ScrollbarMargin
+    from prompt_toolkit.layout.processors import BeforeInput
     from prompt_toolkit.styles import Style
 except ImportError:  # pragma: no cover - dependency always installed
     Application = None  # type: ignore[assignment,misc]
@@ -239,7 +239,7 @@ class ChatApp:
     STYLE = Style.from_dict(
         {
             "chat.user": "bold #4fc1ff",
-            "chat.agent": "bold #9dffb0",
+            "chat.agent": "bold white",
             "chat.error": "bold #ff6b6b",
             "chat.permission": "bold #ffd166",
             "chat.stat": "fg:#6e6e6e",
@@ -315,7 +315,7 @@ class ChatApp:
                                 )
         except Exception as exc:
             answer = f"Error: {exc}"
-        self._append("class:chat.agent", f"⚡ {answer}")
+        self._append("class:chat.agent", answer)
         try:
             from eaccode import config as cfg
 
@@ -476,23 +476,19 @@ class ChatApp:
         kb = merge_key_bindings(
             [custom, load_basic_bindings(), load_emacs_bindings()]
         )
-        input_row = HSplit(
-            [
-                Window(
-                    FormattedTextControl(lambda: [("class:chat.prompt", "❯ ")]),
-                    width=3,
-                    height=1,
-                ),
-                Window(BufferControl(buffer=self._buffer), height=1),
-            ]
+        input_row = Window(
+            BufferControl(
+                buffer=self._buffer,
+                input_processors=[BeforeInput([("class:chat.prompt", "❯ ")])],
+            ),
+            height=1,
         )
         root = HSplit(
             [
                 Window(
                     self._log_control(),
-                    wrap_lines=False,  # no wrap at the right edge
+                    wrap_lines=True,  # wrap at the right edge
                     scroll_offsets=ScrollOffsets(bottom=10**8),
-                    right_margins=[ScrollbarMargin()],
                 ),
                 Window(
                     self._palette_control(),

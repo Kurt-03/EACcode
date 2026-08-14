@@ -26,7 +26,11 @@ Welcome/Tip + Stat-Zeile nach Antworten.
   stabil)
 - **ChatApp** (Vollbild): Banner als erste Log-Zeilen (Style
   `chat.banner`, grau) mit Session-ID; nach jeder Agent-Antwort eine
-  Stat-Zeile (Style `chat.stat`, gedimmt) mit Modell, Dauer, Zeichen
+  Stat-Zeile (Style `chat.stat`, gedimmt) mit Modell, Dauer, Zeichen —
+  **ohne Symbole** (⚡/⚕ entfernt, Nutzer-Wunsch 08-14)
+- **Box passt sich dem Inhalt an** (kein Fixed-Width): alle Wand-Zeilen
+  exakt gleich breit — kein Clipping in schmalen Fenstern (Regressions-
+  Test `TestBoxWalls`)
 
 ## Verifiziert
 - Unit: 15 Banner-Tests (Logo, Box, Modell-Label, MCP, Skills, Quiet,

@@ -77,12 +77,26 @@ class TestCounts:
 
 class TestStatusLine:
     def test_ready(self) -> None:
-        assert banner.status_line("MiniMax-M3") == "⚕ MiniMax-M3 │ ready"
+        assert banner.status_line("MiniMax-M3") == "MiniMax-M3 │ ready"
 
     def test_with_stats(self) -> None:
         line = banner.status_line("MiniMax-M3", seconds=2.5, chars=100)
         assert "2.5s" in line
         assert "100 chars" in line
+
+    def test_no_symbols(self) -> None:
+        line = banner.status_line("MiniMax-M3", seconds=1.0, chars=10)
+        assert "⚕" not in line
+        assert "⚡" not in line
+
+
+class TestBoxWalls:
+    def test_all_wall_lines_same_width(self) -> None:
+        text = banner.render_banner(CONF, session_id="s1", cwd="C:\\x")
+        walls = [line for line in text.splitlines() if line and line[0] in "╭╰│"]
+        assert len(walls) >= 5
+        widths = {len(line) for line in walls}
+        assert len(widths) == 1, f"walls differ: {widths}"
 
 
 def test_quiet_flag(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -7,7 +7,6 @@ chat log. Suppress everywhere with ``EACCODE_QUIET=1`` (Hermes -Q parity).
 from __future__ import annotations
 
 import os
-import shutil
 from typing import Any
 
 from eaccode import __version__
@@ -80,52 +79,48 @@ def mcp_labels(conf: dict[str, Any]) -> list[str]:
     ]
 
 
-def _box_width() -> int:
-    try:
-        width = shutil.get_terminal_size().columns
-    except Exception:
-        width = 80
-    return max(60, min(width - 2, 88))
-
-
 def render_banner(
     conf: dict[str, Any],
     session_id: str | None = None,
     cwd: str | None = None,
 ) -> str:
-    """Full startup banner: logo, status box, welcome line, tip."""
-    width = _box_width()
-    line = "─" * (width - 2)
+    """Full startup banner: logo, status box, welcome line, tip.
+
+    The box sizes itself to its content so every wall line has the same
+    width - it never gets clipped by a narrower terminal window.
+    """
     model = model_label(conf)
     tools = count_tools()
     skills = count_skills()
     mcp = mcp_labels(conf)
     session = session_id or "--"
 
-    def row(text: str = "") -> str:
-        return f"│  {text:<{width - 6}} │"
-
-    header = f" eaccode {__version__} · {model} · {cwd or '--'} "
-    box = [
-        f"╭─{header}{'─' * max(0, width - 2 - len(header))}╮",
-        row(f"Session: {session}"),
-        row(f"Available Tools: {tools}"),
-    ]
+    rows = [f"Session: {session}", f"Available Tools: {tools}"]
     if mcp:
-        box.append(row(f"MCP Servers: {', '.join(mcp)}"))
+        rows.append(f"MCP Servers: {', '.join(mcp)}")
     if skills:
-        box.append(row(f"Available Skills: {skills}"))
-    box.append(row())
-    box.append(
-        f"│  {tools} tools · {skills} skills · /help for commands  ".ljust(width - 1)
-        + "│"
-    )
-    box.append(f"╰─{line}╯")
+        rows.append(f"Available Skills: {skills}")
+    footer = f"{tools} tools · {skills} skills · /help for commands"
+    header = f" eaccode {__version__} · {model} · {cwd or '--'} "
+    content_width = max(len(row_text) for row_text in rows + [footer])
+    # box width follows the longest content OR the header, whichever is wider
+    width = max(content_width + 6, len(header) + 3)
+
+    def row(text: str = "") -> str:
+        return f"│  {text:<{width - 6}}  │"
+
+    box = [
+        f"╭─{header}{'─' * (width - len(header) - 3)}╮",
+        *[row(text) for text in rows],
+        row(),
+        row(footer),
+        f"╰─{'─' * (width - 3)}╯",
+    ]
     return "\n".join([LOGO, "", *box, "", WELCOME, TIP])
 
 
 def status_line(model: str, seconds: float = 0.0, chars: int = 0) -> str:
     """Compact line after an answer: model, duration, output size."""
     if seconds:
-        return f"⚕ {model} │ {seconds:.1f}s │ {chars} chars"
-    return f"⚕ {model} │ ready"
+        return f"{model} │ {seconds:.1f}s │ {chars} chars"
+    return f"{model} │ ready"

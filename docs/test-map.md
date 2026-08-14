@@ -49,12 +49,14 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | D0.1 Palette | `/` in eaccode → Overlay, `/mem`+Enter | randloses Overlay mit ❯-Marker, Filter, `/memory` ausgeführt | ✅ 08-13 (live, PTY) |
 | D0.1 Vollbild-REPL | `eaccode` im Terminal; `/version` → Enter Enter | Chat oben, Eingabe unten fixiert (❯), Palette darüber, `eaccode 0.0.1` im Log | ✅ 08-14 (live, PTY) |
 | D0.2 Memory-Lock | 2 eaccode-Prozesse parallel `/memory add` | beide Einträge da, kein Verlust (File-Lock + Verify) | ✅ 08-13 (live) |
-| Chat-Prompt blau | `eaccode` in CMD → „❯ " vor Eingabe | Pfeil blau (chat.prompt), links vom Cursor | ✅ 08-14 |
-| Chat kein Wrap | lange Zeile im Chat-Log | läuft über den Rand, kein Umbruch | ✅ 08-14 |
+| Chat-Prompt blau | `eaccode` in CMD → „❯ " vor Eingabe | Pfeil blau (chat.prompt), **eine Zeile**, links vom Cursor | ✅ 08-14 |
+| Chat kein Wrap → Wrap | lange Zeile im Chat-Log | bricht am Rand um (wrap_lines=True) | ✅ 08-14 |
 | ChatApp-Tests robust | `pytest tests/test_palette.py` | 22 passed in ~1s (vorher 600s-Hänger) | ✅ 08-14 |
 | Start-Banner | `eaccode` in CMD (TTY) | EACCODE-Logo + Status-Box (Modell/Tools/MCP/Session) + Welcome/Tip | ✅ 08-14 (Render live) |
 | Banner-Stille | `EACCODE_QUIET=1 eaccode` | kompakter Einzeiler statt Banner | ✅ 08-14 |
-| Stat-Zeile | ChatApp: Antwort abwarten | `⚕ Modell │ 3.2s │ 412 chars` unter der Antwort | ✅ 08-14 |
+| Stat-Zeile | ChatApp: Antwort abwarten | `MiniMax-M3 │ 3.2s │ 412 chars` (ohne Symbol) unter der Antwort | ✅ 08-14 |
+| Box-Wände | Banner in schmalem Fenster | alle Wand-Zeilen gleich breit, kein Loch rechts | ✅ 08-14 |
+| Agent weiß + keine Symbole | ChatApp: Antwort ansehen | weißer Text, kein ⚡/⚕ | ✅ 08-14 |
 
 ## Phase D — Coding-Stärke ✅ KOMPLETT (2026-08-13, DoD erfüllt)
 

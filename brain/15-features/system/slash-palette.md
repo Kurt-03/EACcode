@@ -50,12 +50,17 @@ Render-Sektionen, Pipe-Integration)
   (Auto-Scroll, Scrollbar), Palette angepinnt über der Eingabe,
   Eingabe FEST unten mit ❯-Marker — Hermes-Look (kein Textual!)
 
-## Feinschliff (2026-08-13, Nutzer-Wunsch)
-- **Input-Prompt „❯ " jetzt blau** (`chat.prompt` = bold #4fc1ff, vorher
-  Standard-Grau); steht als eigenes Window LINKS vom Buffer → immer vor
-  dem Cursor
-- **Chat-Log bricht nicht mehr am Rand um** (`wrap_lines=False`) —
-  lange Zeilen laufen über den Rand statt zu wrappen
+## Feinschliff (2026-08-13/14, Nutzer-Wünsche)
+- **Input-Prompt „❯ " jetzt blau** (`chat.prompt` = bold #4fc1ff); als
+  `BeforeInput`-Processor im SELBEN Window wie der Buffer → **eine Zeile,
+  links vom Cursor** (vorher separates Window darüber)
+- **Agent-Antworten weiß** (`chat.agent` = bold white, vorher grün);
+  **keine Symbole** mehr (⚡/⚕ entfernt — nur noch Text)
+- **Keine Scrollbar-Margin** mehr (`right_margins=[]`); **Umbruch am
+  Rand wieder AN** (`wrap_lines=True`, Nutzer-Entscheid 08-14)
+- **Start-Banner** als erste Log-Zeilen (Style `chat.banner`, grau) +
+  **Stat-Zeile** nach Antworten (Style `chat.stat`, gedimmt) — Details in
+  [[15-features/system/start-banner.md|start-banner]]
 - **Test-Härtung**: 2 flaky Pipe-Tests warten jetzt auf `app.is_running`
   statt fixem sleep; 2 _ask-Tests testen den echten Inline-Flow (ask im
   Thread, Antwort via _submit) statt Event-Race — die Suite hängte sonst
