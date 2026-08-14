@@ -1,12 +1,21 @@
-"""Tests for the slash palette (variante A)."""
+"""Tests for the flat slash palette (variante 3)."""
 
 from __future__ import annotations
 
+import threading
+import time
 from typing import Any
 
 import pytest
 
 from eaccode import palette
+
+ENTRIES = [
+    ("/help", "show this help", False),
+    ("/memory", "memory verwalten", False),
+    ("/model", "modelle verwalten", False),
+    ("/zeit-helfer", "skill (uhrzeit)", True),
+]
 
 
 class TestFuzzy:
@@ -17,9 +26,6 @@ class TestFuzzy:
         assert palette.fuzzy_match("", "anything")
         assert not palette.fuzzy_match("xyz", "memory")
         assert palette.fuzzy_match("MEM", "memory")  # case-insensitive
-
-    def test_skill_matches_trigger(self) -> None:
-        assert palette.fuzzy_match("uhr", "uhrzeit")
 
 
 class TestEntries:
@@ -40,7 +46,7 @@ class TestEntries:
         assert "/exit" in texts
         assert "/zeit-helfer" in texts
         skills_entry = next(entry for entry in entries if entry[0] == "/zeit-helfer")
-        assert skills_entry[2] is True  # flagged as skill
+        assert skills_entry[2] is True
 
     def test_skills_failure_is_silent(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from eaccode import skills
@@ -53,49 +59,81 @@ class TestEntries:
         assert any(entry[0] == "/help" for entry in entries)
 
 
-class TestCompleter:
-    def test_completes_for_slash_word(self) -> None:
-        entries = [
-            ("/memory", "memory verwalten", False),
-            ("/model", "modelle", False),
-            ("/mcp", "mcp server", False),
-            ("/zeit-helfer", "skill (uhrzeit)", True),
-        ]
-        completer = palette._SlashCompleter(entries)
+class TestPalettePrompt:
+    def test_refresh_opens_on_slash(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/")
+        assert prompt.visible
+        assert len(prompt._filtered) == 4
 
-        class Doc:
-            def get_word_before_cursor(self) -> str:
-                return "/m"
+    def test_refresh_filters_fuzzy(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/mem")
+        assert [e[0] for e in prompt._filtered] == ["/memory"]
 
-        completions = list(completer.get_completions(Doc(), None))
-        texts = {completion.text for completion in completions}
-        assert texts == {"/memory", "/model", "/mcp"}
+    def test_refresh_closes_without_slash(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/mem")
+        prompt.refresh("hallo")
+        assert not prompt.visible
+        assert prompt._filtered == []
 
-    def test_slash_alone_opens_all(self) -> None:
-        completer = palette._SlashCompleter([("/help", "x", False), ("/exit", "y", False)])
+    def test_move_wraps(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/")
+        prompt.move(1)
+        assert prompt.selected == 1
+        prompt.move(-2)  # wraps to last
+        assert prompt.selected == 3
 
-        class Doc:
-            def get_word_before_cursor(self) -> str:
-                return "/"
+    def test_accept_returns_selection(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/mem")
+        assert prompt.accept() == "/memory"
 
-        completions = list(completer.get_completions(Doc(), None))
-        assert {c.text for c in completions} == {"/help", "/exit"}
+    def test_accept_none_when_hidden(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("kein slash")
+        assert prompt.accept() is None
 
-    def test_no_completions_without_slash(self) -> None:
-        completer = palette._SlashCompleter([("/help", "x", False)])
+    def test_render_has_sections_and_separator(self) -> None:
+        entries = ENTRIES + [("/zeit-helfer", "skill (uhrzeit)", True)]
+        prompt = palette.PalettePrompt(entries)
+        prompt.refresh("/")
+        lines = prompt._render_lines()
+        text = "".join(part for _, part in lines)
+        assert "Commands" in text
+        assert "Skills" in text
+        assert "─" in text  # separator
+        assert "❯" in text  # marker
 
-        class Doc:
-            def get_word_before_cursor(self) -> str:
-                return "hello"
+    def test_render_no_matches(self) -> None:
+        prompt = palette.PalettePrompt(ENTRIES)
+        prompt.refresh("/xyz")
+        text = "".join(part for _, part in prompt._render_lines())
+        assert "no matches" in text
 
-        assert list(completer.get_completions(Doc(), None)) == []
 
-    def test_skill_has_meta(self) -> None:
-        completer = palette._SlashCompleter([("/zeit-helfer", "skill (uhrzeit)", True)])
+class TestPipeIntegration:
+    def test_enter_picks_selection(self) -> None:
+        pytest.importorskip("prompt_toolkit")
+        from prompt_toolkit.input.defaults import create_pipe_input
+        from prompt_toolkit.output import DummyOutput
 
-        class Doc:
-            def get_word_before_cursor(self) -> str:
-                return "/z"
+        with create_pipe_input() as pipe:
+            prompt = palette.PalettePrompt(ENTRIES)
+            app = prompt.build_application(input=pipe, output=DummyOutput())
+            result: dict[str, str] = {}
 
-        completions = list(completer.get_completions(Doc(), None))
-        assert "skill" in str(completions[0].display_meta)
+            def run() -> None:
+                result["text"] = app.run()
+
+            thread = threading.Thread(target=run, daemon=True)
+            thread.start()
+            time.sleep(0.3)
+            pipe.send_text("/mem")
+            time.sleep(0.3)
+            pipe.send_text("\r")  # enter -> picks /memory
+            thread.join(timeout=5)
+            assert not thread.is_alive()
+            assert result.get("text") == "/memory"
