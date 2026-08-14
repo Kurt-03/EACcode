@@ -35,6 +35,16 @@ Render-Sektionen, Pipe-Integration)
 - Kein Scrollbar bei sehr langen Listen (Float-Höhe folgt Inhalt)
 - Rückbau möglich (Nutzer-Vorbehalt): Palette in palette.py isoliert
 
+## Varianten-Historie (Entscheidungs-Log)
+- **V1 „CC-Lean"** — prompt_toolkit-Styling (nicht gebaut, Option)
+- **V2 „CC-Box"** — eigenes Overlay mit Rahmen (nicht gebaut, Option)
+- **V3 „Hermes-Flat"** ✅ — randloses Overlay, ❯, Sektionen, blaues
+  Highlight (gebaut, live, im REPL)
+- **VA „TUI-CC-Layout"** — Vollbild-TUI als Auto-Start (getestet, 420 Tests,
+  dann auf Nutzerwunsch REVERTIERT 08-14: REPL+Palette wieder Standard;
+  TUI bleibt Skeleton) — Nutzerwunsch: Link-UX (Session-Links) fehlt,
+  Vollbild nicht gewünscht
+
 ## Verknüpft
 [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/repl.md|REPL]]
 
