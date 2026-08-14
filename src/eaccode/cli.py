@@ -98,15 +98,6 @@ def main(
     stdout = stdout or sys.stdout
     load_env()
     if not argv:
-        # interactive: fullscreen TUI on a real terminal, stream REPL otherwise
-        if sys.stdin.isatty():
-            try:
-                from eaccode.tui import EaccodeApp
-
-                EaccodeApp(agent_factory=build_agent).run()
-                raise SystemExit(0)
-            except Exception:
-                pass  # fall back to the stream REPL
         raise SystemExit(
             run_repl(stdin=stdin, stdout=stdout, agent_factory=build_agent)
         )

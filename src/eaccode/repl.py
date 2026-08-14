@@ -17,7 +17,6 @@ from eaccode import __version__, palette, store
 from eaccode.agent import Agent
 from eaccode.commands import (
     HELP_TEXT,
-    parse_args,
     run_config_command,
     run_job_command,
     run_mcp_command,
@@ -41,6 +40,36 @@ def _print_banner(stdout: TextIO) -> None:
 def _clear_screen(stdout: TextIO) -> None:
     if getattr(stdout, "isatty", lambda: False)():
         stdout.write("\x1b[2J\x1b[H")
+
+
+def parse_args(text: str) -> list[str]:
+    """Split command text into arguments, honoring single/double quotes.
+
+    Backslashes are NOT escapes (Windows paths stay intact). Unterminated
+    quotes raise ValueError.
+    """
+    args: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    for char in text.strip():
+        if quote is not None:
+            if char == quote:
+                quote = None
+            else:
+                current.append(char)
+        elif char in ("'", '"'):
+            quote = char
+        elif char.isspace():
+            if current:
+                args.append("".join(current))
+                current = []
+        else:
+            current.append(char)
+    if quote is not None:
+        raise ValueError("unterminated quote in command")
+    if current:
+        args.append("".join(current))
+    return args
 
 
 def _handle_command(

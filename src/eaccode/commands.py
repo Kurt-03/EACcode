@@ -48,36 +48,6 @@ Commands:
 """
 
 
-def parse_args(text: str) -> list[str]:
-    """Split command text into arguments, honoring single/double quotes.
-
-    Backslashes are NOT escapes (Windows paths stay intact). Unterminated
-    quotes raise ValueError.
-    """
-    args: list[str] = []
-    current: list[str] = []
-    quote: str | None = None
-    for char in text.strip():
-        if quote is not None:
-            if char == quote:
-                quote = None
-            else:
-                current.append(char)
-        elif char in ("'", '"'):
-            quote = char
-        elif char.isspace():
-            if current:
-                args.append("".join(current))
-                current = []
-        else:
-            current.append(char)
-    if quote is not None:
-        raise ValueError("unterminated quote in command")
-    if current:
-        args.append("".join(current))
-    return args
-
-
 def _fmt(value: Any) -> str:
     """Format a config value for display."""
     if value is None or value == "":
