@@ -17,6 +17,7 @@ from eaccode import __version__, palette, store
 from eaccode.agent import Agent
 from eaccode.commands import (
     HELP_TEXT,
+    parse_args,
     run_config_command,
     run_job_command,
     run_mcp_command,
@@ -40,36 +41,6 @@ def _print_banner(stdout: TextIO) -> None:
 def _clear_screen(stdout: TextIO) -> None:
     if getattr(stdout, "isatty", lambda: False)():
         stdout.write("\x1b[2J\x1b[H")
-
-
-def parse_args(text: str) -> list[str]:
-    """Split command text into arguments, honoring single/double quotes.
-
-    Backslashes are NOT escapes (Windows paths stay intact). Unterminated
-    quotes raise ValueError.
-    """
-    args: list[str] = []
-    current: list[str] = []
-    quote: str | None = None
-    for char in text.strip():
-        if quote is not None:
-            if char == quote:
-                quote = None
-            else:
-                current.append(char)
-        elif char in ("'", '"'):
-            quote = char
-        elif char.isspace():
-            if current:
-                args.append("".join(current))
-                current = []
-        else:
-            current.append(char)
-    if quote is not None:
-        raise ValueError("unterminated quote in command")
-    if current:
-        args.append("".join(current))
-    return args
 
 
 def _handle_command(
@@ -205,11 +176,32 @@ def run_repl(
 ) -> int:
     """Run the interactive shell until /exit, Ctrl+C or EOF. Returns exit code.
 
+    On a real terminal this is the fullscreen chat REPL (Hermes style,
+    input docked at the bottom); on pipes/tests the stream loop is used.
+
     The agent is created lazily on the first chat message, so management
     commands (/config init, ...) work even without a configured setup.
     """
     stdin = stdin or sys.stdin
     stdout = stdout or sys.stdout
+    if sys.stdin.isatty():
+        try:
+            from eaccode.palette import ChatApp
+
+            ChatApp(agent=agent, agent_factory=agent_factory).run()
+            stdout.write("bye\n")
+            return 0
+        except Exception:
+            pass  # fall back to the stream loop
+    return _run_stream_repl(stdin, stdout, agent, agent_factory)
+
+
+def _run_stream_repl(
+    stdin: TextIO,
+    stdout: TextIO,
+    agent: Agent | None,
+    agent_factory: Any | None,
+) -> int:
     active_agent = agent
     chat_history: list[dict[str, Any]] = []
     session_id: str | None = None

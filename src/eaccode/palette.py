@@ -9,10 +9,13 @@ Falls back to a plain input() when stdin is not a real terminal
 
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
+import threading
 from typing import Any
 
-from eaccode import commands
+from eaccode import __version__, commands, store
 from eaccode import skills as skills_mod
 
 try:
@@ -27,9 +30,11 @@ try:
         FloatContainer,
         HSplit,
         Layout,
+        ScrollOffsets,
         Window,
     )
     from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+    from prompt_toolkit.layout.margins import ScrollbarMargin
     from prompt_toolkit.styles import Style
 except ImportError:  # pragma: no cover - dependency always installed
     Application = None  # type: ignore[assignment,misc]
@@ -215,3 +220,253 @@ def repl_prompt() -> str:
         return PalettePrompt().run()
     except Exception:
         return input("eaccode> ")
+
+
+class ChatApp:
+    """Fullscreen chat REPL (Hermes style, variant A-REPL).
+
+    Log at the top (auto-scroll), slash palette pinned ABOVE the input,
+    input docked at the bottom. Same prompt_toolkit stack as the palette;
+    the stream REPL stays for pipes/scripts. Agent calls run in a worker
+    thread; permission prompts are answered inline (y/N in the input).
+    """
+
+    STYLE = Style.from_dict(
+        {
+            "chat.user": "bold #4fc1ff",
+            "chat.agent": "bold #9dffb0",
+            "chat.error": "bold #ff6b6b",
+            "chat.permission": "bold #ffd166",
+            "palette.normal": "fg:#d4d4d4",
+            "palette.name": "bold fg:#ffffff",
+            "palette.desc": "fg:#6e6e6e",
+            "palette.selected": "bg:#005fb8 fg:#ffffff bold",
+            "palette.selected.desc": "bg:#005fb8 fg:#a8c8f0",
+            "palette.separator": "fg:#3f3f46",
+            "palette.section": "fg:#8b8b8b",
+        }
+    )
+
+    def __init__(
+        self,
+        agent: Any | None = None,
+        agent_factory: Any | None = None,
+    ) -> None:
+        self._agent = agent
+        self._agent_factory = agent_factory
+        self._chat_history: list[dict[str, Any]] = []
+        self._log_lines: list[tuple[str, str]] = []
+        self._buffer = Buffer()
+        self._app: Application[str] | None = None
+        self.palette = PalettePrompt()
+        self._session_id: str | None = None
+        self._permission_prompt: str | None = None
+        self._permission_event = threading.Event()
+        self._permission_answer = "n"
+
+    # -- log ---------------------------------------------------------------
+
+    def _append(self, style: str, text: str) -> None:
+        self._log_lines.append((style, text))
+        if self._app is not None:
+            self._app.invalidate()
+
+    # -- agent -------------------------------------------------------------
+
+    def _get_agent(self) -> Any:
+        if self._agent is None:
+            self._agent = self._agent_factory() if self._agent_factory else None
+        return self._agent
+
+    def _run_agent(self, text: str) -> None:
+        threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
+
+    def _agent_worker(self, text: str) -> None:
+        try:
+            agent = self._get_agent()
+            if agent is None:
+                answer = "Error: no agent available"
+            else:
+                messages = list(self._chat_history) + [
+                    {"role": "user", "content": text}
+                ]
+                history = agent.run(messages)
+                answer = agent.last_text(history)
+                new_messages = history[len(self._chat_history) + 1 :]
+                self._chat_history[:] = history[1:]
+                if self._session_id is not None:
+                    with contextlib.suppress(Exception):
+                        for message in new_messages:
+                            if message.get("role") in ("user", "assistant", "tool"):
+                                store.add_message(
+                                    self._session_id,
+                                    str(message.get("role", "")),
+                                    str(message.get("content", "")),
+                                )
+        except Exception as exc:
+            answer = f"Error: {exc}"
+        self._append("chat.agent", f"⚡ {answer}")
+
+    # -- permission (inline) ------------------------------------------------
+
+    def _ask(self, prompt: str) -> str:
+        self._permission_prompt = prompt
+        self._permission_event.clear()
+        self._append("chat.permission", f"Allow: {prompt} [y/N]")
+        self._permission_event.wait(timeout=600)
+        return self._permission_answer
+
+    def _wire_permission(self) -> None:
+        with contextlib.suppress(Exception):
+            from eaccode import tools
+
+            tools.permission_handler = lambda name, arguments: self._ask(
+                f"{name} {arguments}"
+            )
+
+    # -- input -------------------------------------------------------------
+
+    def _submit(self, text: str) -> None:
+        text = text.strip()
+        if not text:
+            return
+        if self._permission_prompt is not None:
+            self._permission_answer = text.lower() or "n"
+            self._permission_prompt = None
+            self._permission_event.set()
+            return
+        if text.startswith("/") and not self.palette.visible:
+            self.palette.refresh(text)  # first enter opens the palette
+            return
+        if self.palette.visible:
+            choice = self.palette.accept()
+            self.palette.visible = False
+            if choice is not None:
+                text = choice
+            # no match: run the typed text itself (e.g. unknown command)
+        self._append("chat.user", f"> {text}")
+        if text.startswith("/"):
+            self._run_slash(text[1:])
+        else:
+            self._run_agent(text)
+
+    def _run_slash(self, command: str) -> None:
+        name, args = self._parse(command)
+        if name in ("exit", "quit"):
+            if self._app is not None:
+                self._app.exit(result="")
+            return
+        if name == "clear":
+            self._log_lines.clear()
+            return
+        if name == "help":
+            self._append("", commands.HELP_TEXT.rstrip())
+            return
+        if name == "version":
+            self._append("", f"eaccode {__version__}")
+            return
+        handlers = {
+            "config": commands.run_config_command,
+            "provider": commands.run_provider_command,
+            "model": commands.run_model_command,
+            "memory": commands.run_memory_command,
+            "skill": commands.run_skill_command,
+            "session": commands.run_session_command,
+            "permissions": commands.run_permissions_command,
+            "job": commands.run_job_command,
+            "mcp": commands.run_mcp_command,
+        }
+        handler = handlers.get(name)
+        if handler is None:
+            self._append("chat.error", f"Unknown command: /{name} - type /help")
+            return
+        output = io.StringIO()
+        if handler is commands.run_config_command:
+            handler(args, stdout=output, stdin=io.StringIO(""))
+        else:
+            handler(args, stdout=output)
+        self._append("", output.getvalue().rstrip())
+
+    @staticmethod
+    def _parse(command: str) -> tuple[str, list[str]]:
+        try:
+            parts = commands.parse_args(command)
+        except ValueError as exc:
+            return "", [f"Error: {exc}"]
+        return (parts[0] if parts else ""), parts[1:]
+
+    # -- application --------------------------------------------------------
+
+    def _log_control(self) -> FormattedTextControl:
+        return FormattedTextControl(lambda: list(self._log_lines))
+
+    def _palette_control(self) -> FormattedTextControl:
+        return FormattedTextControl(lambda: self.palette._render_lines())
+
+    def build_application(
+        self, input: Any = None, output: Any = None
+    ) -> Application[str]:
+        custom = KeyBindings()
+
+        @custom.add("enter", eager=True)
+        def _enter(event: Any) -> None:
+            self._submit(event.current_buffer.text)
+            event.current_buffer.text = ""
+
+        @custom.add("up", eager=True)
+        def _up(event: Any) -> None:
+            if self.palette.visible:
+                self.palette.move(-1)
+            else:
+                event.current_buffer.cursor_up()
+
+        @custom.add("down", eager=True)
+        def _down(event: Any) -> None:
+            if self.palette.visible:
+                self.palette.move(1)
+            else:
+                event.current_buffer.cursor_down()
+
+        @custom.add("escape", eager=True)
+        def _escape(event: Any) -> None:
+            if self.palette.visible:
+                self.palette.visible = False
+
+        @custom.add("c-c", eager=True)
+        def _ctrl_c(event: Any) -> None:
+            event.app.exit(result="")
+
+        kb = merge_key_bindings(
+            [custom, load_basic_bindings(), load_emacs_bindings()]
+        )
+        root = HSplit(
+            [
+                Window(
+                    self._log_control(),
+                    scroll_offsets=ScrollOffsets(bottom=10**8),
+                    right_margins=[ScrollbarMargin()],
+                ),
+                Window(
+                    self._palette_control(),
+                    height=Dimension(),
+                    dont_extend_height=True,
+                ),
+                Window(BufferControl(buffer=self._buffer), height=1),
+            ]
+        )
+        self._app = Application(
+            layout=Layout(root, focused_element=self._buffer),
+            key_bindings=kb,
+            style=self.STYLE,
+            input=input,
+            output=output,
+        )
+        return self._app
+
+    def run(self) -> str:
+        with contextlib.suppress(Exception):
+            from eaccode import store as _store
+
+            self._session_id = _store.new_session()
+        self._wire_permission()
+        return self.build_application().run()

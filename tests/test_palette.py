@@ -137,3 +137,94 @@ class TestPipeIntegration:
             thread.join(timeout=5)
             assert not thread.is_alive()
             assert result.get("text") == "/memory"
+
+
+class FakeAgent:
+    def __init__(self, reply: str = "chat antwort") -> None:
+        self.reply = reply
+        self.system_prompt = "system"
+
+    def run(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return (
+            [{"role": "system", "content": self.system_prompt}]
+            + list(messages)
+            + [{"role": "assistant", "content": self.reply}]
+        )
+
+    def last_text(self, history: list[dict[str, Any]]) -> str:
+        return self.reply
+
+
+def _wait_for(predicate: Any, timeout: float = 5.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+class TestChatApp:
+    def test_submit_chats_and_logs_answer(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent(reply="hallo aus dem chat"))
+        app._submit("wie gehts")
+        assert _wait_for(lambda: any("hallo aus dem chat" in t for _, t in app._log_lines))
+        assert any("> wie gehts" in t for _, t in app._log_lines)
+
+    def test_slash_opens_palette_then_runs(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._submit("/mem")  # first enter: opens palette
+        assert app.palette.visible
+        app._submit("/mem")  # second enter: picks /memory and runs it
+        assert not app.palette.visible
+        assert any("Usage: memory" in t for _, t in app._log_lines)
+
+    def test_escape_closes_palette(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._submit("/")
+        assert app.palette.visible
+        app.palette.visible = False  # escape binding path
+        assert not app.palette.visible
+
+    def test_permission_flow(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._permission_prompt = "write_file x"
+        app._submit("y")
+        assert app._permission_answer == "y"
+        assert app._permission_prompt is None
+
+    def test_clear_empties_log(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._append("", "etwas")
+        app._submit("/clear")
+        app._submit("/clear")  # palette -> pick -> run
+        assert app._log_lines == []
+
+    def test_unknown_slash_reports_error(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        app._submit("/nonsense")
+        app._submit("/nonsense")
+        assert any("Unknown command" in t for _, t in app._log_lines)
+
+    def test_pipe_roundtrip(self) -> None:
+        pytest.importorskip("prompt_toolkit")
+        from prompt_toolkit.input.defaults import create_pipe_input
+        from prompt_toolkit.output import DummyOutput
+
+        with create_pipe_input() as pipe:
+            app = palette.ChatApp(agent=FakeAgent(reply="pipe antwort"))
+            application = app.build_application(input=pipe, output=DummyOutput())
+
+            def run() -> None:
+                application.run()
+
+            thread = threading.Thread(target=run, daemon=True)
+            thread.start()
+            time.sleep(0.3)
+            pipe.send_text("hallo\n")  # enter submits
+            assert _wait_for(
+                lambda: any("pipe antwort" in t for _, t in app._log_lines)
+            )
+            pipe.send_text("\x03")  # ctrl+c exits
+            thread.join(timeout=5)
+            assert not thread.is_alive()
