@@ -39,7 +39,6 @@ try:
         Window,
     )
     from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
-    from prompt_toolkit.layout.margins import ScrollbarMargin
     from prompt_toolkit.layout.processors import BeforeInput
     from prompt_toolkit.styles import Style
 except ImportError:  # pragma: no cover - dependency always installed
