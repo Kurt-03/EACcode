@@ -88,7 +88,8 @@ def repl_prompt() -> str:
             "eaccode> ",
             completer=_SlashCompleter(palette_entries()),
             complete_while_typing=True,
-            complete_style=CompleteStyle.MULTI_COLUMN,
+            # single-column dropdown (claude code / hermes style), not a grid
+            complete_style=CompleteStyle.COLUMN,
         )
     except Exception:
         return input("eaccode> ")
