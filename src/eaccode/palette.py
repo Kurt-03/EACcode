@@ -39,6 +39,7 @@ try:
         Window,
     )
     from prompt_toolkit.layout.controls import BufferControl, FormattedTextControl
+    from prompt_toolkit.layout.margins import ScrollbarMargin
     from prompt_toolkit.layout.processors import BeforeInput
     from prompt_toolkit.styles import Style
 except ImportError:  # pragma: no cover - dependency always installed
@@ -476,19 +477,20 @@ class ChatApp:
             ),
             height=1,
         )
+        palette_win = Window(
+            self._palette_control(),
+            height=Dimension(max=12),
+            dont_extend_height=True,
+        )
         root = HSplit(
             [
                 Window(
                     self._log_control(),
-                    wrap_lines=True,  # wrap at the right edge
+                    wrap_lines=True,
                     scroll_offsets=ScrollOffsets(bottom=10**8),
                 ),
-                Window(
-                    self._palette_control(),
-                    height=Dimension(),
-                    dont_extend_height=True,
-                ),
                 input_row,
+                palette_win,
             ]
         )
         self._app = Application(
