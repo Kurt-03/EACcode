@@ -548,4 +548,8 @@ class ChatApp:
             except Exception:
                 pass
         self._wire_permission()
-        return self.build_application().run()
+        app = self.build_application()
+        # Ensure the chrome (input + ❯ prompt) renders on the very first
+        # frame — without this, the ❯ only appears after the first keypress.
+        app.invalidate()
+        return app.run()
