@@ -492,6 +492,21 @@ class ChatApp:
             if self.palette.visible:
                 self.palette.visible = False
 
+        @custom.add("backspace", eager=True)
+        def _backspace(event: Any) -> None:
+            buf = event.current_buffer
+            if self.palette.visible:
+                # Close palette and delete the typed prefix
+                self.palette.visible = False
+            if buf.text:
+                buf.delete_before_cursor()
+
+        @custom.add("delete", eager=True)
+        def _delete(event: Any) -> None:
+            buf = event.current_buffer
+            if buf.cursor_position < len(buf.text):
+                buf.delete(1)
+
         @custom.add("c-c", eager=True)
         def _ctrl_c(event: Any) -> None:
             event.app.exit(result="")
