@@ -276,10 +276,24 @@ class ChatApp:
         self._stream_out(text)
 
     def _stream_out(self, text: str, newline: bool = True) -> None:
-        """Write into the terminal scrollback and redraw the input chrome."""
+        """Write into the terminal scrollback and redraw the input chrome.
+
+        On a real terminal the write goes through patch_stdout so the
+        prompt chrome is erased before and redrawn after the output -
+        otherwise the text lands INSIDE the input line ("> hi" glued to
+        the prompt) and the chrome never comes back.
+        """
+        payload = text + ("\n" if newline else "")
         try:
-            self._out.write(text + ("\n" if newline else ""))
-            self._out.flush()
+            if self._out is sys.stdout:
+                from prompt_toolkit.patch_stdout import patch_stdout
+
+                with patch_stdout():
+                    sys.stdout.write(payload)
+                    sys.stdout.flush()
+            else:
+                self._out.write(payload)
+                self._out.flush()
         except Exception:
             pass
         if self._app is not None:
