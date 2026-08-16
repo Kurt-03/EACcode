@@ -66,6 +66,12 @@ Render-Sektionen, Pipe-Integration)
   Eingabezeile** (nicht darüber) — HSplit-Reihenfolge Log → Input →
   Palette; Höhe dynamisch 0–12 Zeilen (`Dimension(max=12)`,
   `dont_extend_height=True`); unsichtbar wenn zu (render leer)
+- **Stream-Bereinigung** (08-14): Think-Blöcke (`<think>...</think>`)
+  werden chunk-übergreifend gefiltert (MiniMax sendet Reasoning),
+  `
+` + ANSI-Escapes aus dem Stream entfernt — Antwort immer sichtbar
+  (live: „Hallo Welt" statt `</think>`); Backspace/Delete löschen auch
+  bei offener Palette, kein Bell bei leerem Buffer
 - **Start-Banner** als erste Log-Zeilen (Style `chat.banner`, grau) +
   **Stat-Zeile** nach Antworten (Style `chat.stat`, gedimmt) — Details in
   [[15-features/system/start-banner.md|start-banner]]
