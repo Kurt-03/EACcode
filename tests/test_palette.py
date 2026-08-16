@@ -195,6 +195,37 @@ def test_streaming_writes_to_scrollback() -> None:
     assert app._out.getvalue() == "Hallo WeltZweite"
 
 
+def test_think_blocks_are_filtered() -> None:
+    app = palette.ChatApp(agent=FakeAgent())
+    app._out = io.StringIO()
+    app._on_token("")  # round marker
+    app._on_token("<think>Der User sagt hallo.")
+    assert app._out.getvalue() == ""
+    app._on_token("Hier denke ich nach</think>Das ist die Antwort")
+    assert "Das ist die Antwort" in app._out.getvalue()
+    assert "think" not in app._out.getvalue()
+
+
+def test_think_block_in_single_chunk() -> None:
+    app = palette.ChatApp(agent=FakeAgent())
+    app._out = io.StringIO()
+    app._on_token("")
+    app._on_token("<think>kurz</think>Fertig")
+    assert "Fertig" in app._out.getvalue()
+    assert "think" not in app._out.getvalue()
+
+
+def test_carriage_returns_and_ansi_removed() -> None:
+    app = palette.ChatApp(agent=FakeAgent())
+    app._out = io.StringIO()
+    app._on_token("")
+    app._on_token("Zeile eins" + chr(13) + chr(27) + "[31mZeile zwei")
+    assert chr(13) not in app._out.getvalue()
+    assert chr(27) not in app._out.getvalue()
+    assert "Zeile eins" in app._out.getvalue()
+    assert "Zeile zwei" in app._out.getvalue()
+
+
 def test_stream_completion_sets_stream_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

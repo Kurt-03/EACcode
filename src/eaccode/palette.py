@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import re
 import sys
 import threading
 import time
@@ -42,6 +43,9 @@ try:
     from prompt_toolkit.styles import Style
 except ImportError:  # pragma: no cover - dependency always installed
     Application = None  # type: ignore[assignment,misc]
+
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def palette_entries() -> list[tuple[str, str, bool]]:
@@ -265,6 +269,7 @@ class ChatApp:
         self._permission_answer = "n"
         self._stream_open = False
         self._streamed_any = False
+        self._think_buffer = ""
         # Hermes-style: the conversation lives in the terminal scrollback;
         # prompt_toolkit only manages the input chrome at the bottom.
         self._out = sys.stdout
@@ -310,10 +315,43 @@ class ChatApp:
     def _run_agent(self, text: str) -> None:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
+    def _strip_think(self, text: str) -> str:
+        """Remove <think>...</think> reasoning blocks across chunks.
+
+        Reasoning stays invisible; only the actual answer is shown. A
+        partial block is buffered until it closes so split deltas (
+        "<think>" as one chunk, "...</think>" as another) are handled.
+        """
+        if self._think_buffer:
+            self._think_buffer += text
+            if "</think>" in self._think_buffer:
+                rest = self._think_buffer.split("</think>", 1)[1]
+                self._think_buffer = ""
+                return rest
+            return ""
+        if "<think" in text:
+            before, _, after = text.partition("<think")
+            if "</think>" in after:
+                # whole block in one chunk
+                return before + after.split("</think>", 1)[1]
+            self._think_buffer = text[text.index("<think"):]
+            return before
+        return text
+
+    def _clean_delta(self, text: str) -> str:
+        """Sanitize streamed text: no CR or ANSI escape sequences."""
+        text = text.replace("\r", "")
+        text = _ANSI_RE.sub("", text)
+        return text
+
     def _on_token(self, delta: str) -> None:
         """Stream callback (worker thread): write directly to the scrollback."""
         if delta == "":
             self._stream_open = False  # round marker
+            return
+        delta = self._clean_delta(delta)
+        delta = self._strip_think(delta)
+        if not delta:
             return
         self._streamed_any = True
         self._stream_open = True
