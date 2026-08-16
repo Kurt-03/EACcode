@@ -283,22 +283,14 @@ class ChatApp:
     def _stream_out(self, text: str, newline: bool = True) -> None:
         """Write into the terminal scrollback and redraw the input chrome.
 
-        On a real terminal the write goes through patch_stdout so the
-        prompt chrome is erased before and redrawn after the output -
-        otherwise the text lands INSIDE the input line ("> hi" glued to
-        the prompt) and the chrome never comes back.
+        In the live chat the whole ``run()`` is wrapped in patch_stdout,
+        so writes land above the prompt chrome (Hermes approach); here we
+        only write and let the outer proxy handle the redraw.
         """
         payload = text + ("\n" if newline else "")
         try:
-            if self._out is sys.stdout:
-                from prompt_toolkit.patch_stdout import patch_stdout
-
-                with patch_stdout():
-                    sys.stdout.write(payload)
-                    sys.stdout.flush()
-            else:
-                self._out.write(payload)
-                self._out.flush()
+            self._out.write(payload)
+            self._out.flush()
         except Exception:
             pass
         if self._app is not None:
@@ -619,4 +611,10 @@ class ChatApp:
         # Ensure the chrome (input + ❯ prompt) renders on the very first
         # frame — without this, the ❯ only appears after the first keypress.
         app.invalidate()
-        return app.run()
+        # Hermes approach: the whole run is wrapped in patch_stdout so all
+        # transcript writes (from any thread) land above the prompt chrome
+        # in the terminal scrollback and the chrome is redrawn after each.
+        from prompt_toolkit.patch_stdout import patch_stdout
+
+        with patch_stdout():
+            return app.run()
