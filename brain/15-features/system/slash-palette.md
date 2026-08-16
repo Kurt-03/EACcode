@@ -72,6 +72,12 @@ Render-Sektionen, Pipe-Integration)
 ` + ANSI-Escapes aus dem Stream entfernt — Antwort immer sichtbar
   (live: „Hallo Welt" statt `</think>`); Backspace/Delete löschen auch
   bei offener Palette, kein Bell bei leerem Buffer
+- **patch_stdout um `app.run()`** (08-16, WURZELFIX live gefunden):
+  Der komplette Lauf ist in `with patch_stdout():` gewrappt (Hermes-
+  Ansatz, cli.py:18085) — NICHT pro Write! Vorher renderten sich die
+  ❯-Chrome-Zeichen MITTEN in den gestreamten Text (`Hi! How can❯ I
+  help...`). Jetzt: Transcript läuft sauber über der Chrome in den
+  Scrollback, Chrome bleibt unten (live verifiziert via winpty-PTY)
 - **Start-Banner** als erste Log-Zeilen (Style `chat.banner`, grau) +
   **Stat-Zeile** nach Antworten (Style `chat.stat`, gedimmt) — Details in
   [[15-features/system/start-banner.md|start-banner]]
