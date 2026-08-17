@@ -8,7 +8,8 @@ license = { text = "MIT" }
 authors = [{ name = "eaccode contributors" }]
 keywords = ["agent", "ai", "byok", "cli", "autonomous"]
 dependencies = [
-    "litellm>=1.60",
+    "anthropic==0.87.0",
+    "requests==2.33.0",
     "python-dotenv>=1.0",
     "pyyaml>=6.0",
     "textual>=0.80",
