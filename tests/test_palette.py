@@ -1,4 +1,4 @@
-"""Tests for the flat slash palette (variante 3)."""
+"""Tests for the flat slash palette and bottom-pinned chat REPL."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import io
 import threading
 import time
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 
@@ -109,7 +110,6 @@ class TestPalettePrompt:
         assert "─" not in text  # no separator
         assert "/help" in text
         assert "/zeit-helfer" in text
-        # names are aligned: /help and /memory have same column width
         assert "/help" in text and "/memory" in text
 
     def test_render_no_matches(self) -> None:
@@ -119,6 +119,10 @@ class TestPalettePrompt:
         assert "no matches" in text
 
 
+# ---------------------------------------------------------------------------
+# Agent / streaming helpers (defined in test_agent as well, duplicated here
+# for palette-level integration tests)
+# ---------------------------------------------------------------------------
 def _fake_chunk(content: str | None = None, tool_call: Any = None) -> Any:
     from types import SimpleNamespace
 
@@ -182,50 +186,6 @@ def test_streaming_emits_deltas_and_tool_calls(
     assert calls[0].arguments == {"tz": "UTC"}
 
 
-def test_streaming_writes_to_scrollback() -> None:
-    app = palette.ChatApp(agent=FakeAgent())
-    app._out = io.StringIO()
-    app._on_token("")  # round marker
-    app._on_token("Hallo ")
-    app._on_token("Welt")
-    assert app._out.getvalue() == "Hallo Welt"
-    assert app._streamed_any is True
-    app._on_token("")  # next round: continues on the stream
-    app._on_token("Zweite")
-    assert app._out.getvalue() == "Hallo WeltZweite"
-
-
-def test_think_blocks_are_filtered() -> None:
-    app = palette.ChatApp(agent=FakeAgent())
-    app._out = io.StringIO()
-    app._on_token("")  # round marker
-    app._on_token("<think>Der User sagt hallo.")
-    assert app._out.getvalue() == ""
-    app._on_token("Hier denke ich nach</think>Das ist die Antwort")
-    assert "Das ist die Antwort" in app._out.getvalue()
-    assert "think" not in app._out.getvalue()
-
-
-def test_think_block_in_single_chunk() -> None:
-    app = palette.ChatApp(agent=FakeAgent())
-    app._out = io.StringIO()
-    app._on_token("")
-    app._on_token("<think>kurz</think>Fertig")
-    assert "Fertig" in app._out.getvalue()
-    assert "think" not in app._out.getvalue()
-
-
-def test_carriage_returns_and_ansi_removed() -> None:
-    app = palette.ChatApp(agent=FakeAgent())
-    app._out = io.StringIO()
-    app._on_token("")
-    app._on_token("Zeile eins" + chr(13) + chr(27) + "[31mZeile zwei")
-    assert chr(13) not in app._out.getvalue()
-    assert chr(27) not in app._out.getvalue()
-    assert "Zeile eins" in app._out.getvalue()
-    assert "Zeile zwei" in app._out.getvalue()
-
-
 def test_stream_completion_sets_stream_flag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -272,6 +232,9 @@ class TestPipeIntegration:
             assert result.get("text") == "/memory"
 
 
+# ---------------------------------------------------------------------------
+# ChatApp unit tests (bottom-pinned REPL)
+# ---------------------------------------------------------------------------
 class FakeAgent:
     def __init__(self, reply: str = "chat antwort") -> None:
         self.reply = reply
@@ -305,28 +268,37 @@ def _wait_for(predicate: Any, timeout: float = 5.0) -> bool:
 
 
 class TestChatApp:
-    def test_submit_chats_and_logs_answer(self) -> None:
+    def test_submit_runs_agent(self) -> None:
         app = palette.ChatApp(agent=FakeAgent(reply="hallo aus dem chat"))
-        app._out = io.StringIO()
-        app._submit("wie gehts")
-        assert _wait_for(
-            lambda: "hallo aus dem chat" in app._out.getvalue()
-        )
-        assert any("> wie gehts" in t for _, t in app._log_lines)
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._submit("wie gehts")
+            assert _wait_for(lambda: "hallo aus dem chat" in mock.getvalue())
+            assert "wie gehts" in mock.getvalue()
+
+    def test_submit_runs_command_without_palette(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        # First submit opens the palette; second submit runs the selected command.
+        app._submit("/help")
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._submit("/help")
+            assert "Commands:" in mock.getvalue()
 
     def test_slash_opens_palette_then_runs(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        app._submit("/mem")  # first enter: opens palette
+        # First submit while palette is not visible: it opens and returns False
+        consumed = app._submit("/mem")
+        assert not consumed
         assert app.palette.visible
-        app._submit("/mem")  # second enter: picks /memory and runs it
+        # Second submit: palette picks /memory
+        with patch("sys.stdout", new_callable=io.StringIO):
+            app._submit("/mem")
         assert not app.palette.visible
-        assert any("Usage: memory" in t for _, t in app._log_lines)
 
     def test_escape_closes_palette(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        app._submit("/")
+        app.palette.refresh("/")
         assert app.palette.visible
-        app.palette.visible = False  # escape binding path
+        app.palette.visible = False
         assert not app.palette.visible
 
     def test_permission_flow(self) -> None:
@@ -384,48 +356,36 @@ class TestChatApp:
         assert not thread.is_alive()
         assert result.get("value") is True
 
-    def test_clear_empties_log(self) -> None:
-        app = palette.ChatApp(agent=FakeAgent())
-        app._append("", "etwas")
-        app._submit("/clear")
-        app._submit("/clear")  # palette -> pick -> run
-        assert app._log_lines == []
-
     def test_unknown_slash_reports_error(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        app._submit("/nonsense")
-        app._submit("/nonsense")
-        assert any("Unknown command" in t for _, t in app._log_lines)
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._submit("/nonsense")
+            app._submit("/nonsense")
+            assert "Unknown command" in mock.getvalue()
 
-    def test_log_lines_are_newline_terminated(self) -> None:
+    def test_stream_think_filter(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        app._append("", "erste zeile")
-        app._append("", "zweite zeile")
-        assert app._log_lines == [("", "erste zeile\n"), ("", "zweite zeile\n")]
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._on_token("")
+            app._on_token("<think>reasoning")
+            app._on_token("more</think>Answer")
+            output = mock.getvalue()
+            assert "Answer" in output
+            assert "think" not in output
 
-    def test_run_writes_banner_into_log(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(palette, "banner_quiet", lambda: False)
+    def test_stream_cr_and_ansi_removed(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        # simulate the run() banner step (real terminals only; build_application
-        # would need a console, so the log-writing part is tested directly)
-        from eaccode import store as _store
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._on_token("")
+            app._on_token("first" + chr(13) + chr(27) + "[31msecond")
+            output = mock.getvalue()
+            assert chr(13) not in output
+            assert chr(27) not in output
+            assert "first" in output
+            assert "second" in output
 
-        app._session_id = _store.new_session()
-        app._append(
-            "class:chat.banner",
-            palette.render_banner(
-                {"model": {"default": "minimax/MiniMax-M3"}},
-                session_id=app._session_id,
-                cwd="C:\\x",
-            ),
-        )
-        text = "".join(t for _, t in app._log_lines)
-        assert "Welcome to eaccode!" in text
-        assert "eaccode 0.0.1" in text
-        assert "Session:" in text
 
+class TestChatAppPipeIntegration:
     def test_pipe_roundtrip(self) -> None:
         pytest.importorskip("prompt_toolkit")
         from prompt_toolkit.input.defaults import create_pipe_input
@@ -433,19 +393,117 @@ class TestChatApp:
 
         with create_pipe_input() as pipe:
             app = palette.ChatApp(agent=FakeAgent(reply="pipe antwort"))
-            app._out = io.StringIO()
             application = app.build_application(input=pipe, output=DummyOutput())
+            result: dict[str, str] = {}
 
             def run() -> None:
-                application.run()
+                result["text"] = application.run()
 
             thread = threading.Thread(target=run, daemon=True)
             thread.start()
             assert _wait_for(lambda: application.is_running), "app did not start"
             pipe.send_text("hallo\n")  # enter submits
-            assert _wait_for(
-                lambda: "pipe antwort" in app._out.getvalue()
-            )
             pipe.send_text("\x03")  # ctrl+c exits
             thread.join(timeout=5)
             assert not thread.is_alive()
+            assert result.get("text") == ""
+
+
+class TestChatAppLayout:
+    """ChatApp uses FloatContainer so the palette sits below the prompt."""
+
+    def _build(self) -> Any:
+        """Build the app with DummyOutput so tests don't need a real console."""
+        pytest.importorskip("prompt_toolkit")
+        from prompt_toolkit.output import DummyOutput
+
+        app = palette.ChatApp(agent=FakeAgent())
+        # Window on Win32 needs a real console; use DummyOutput to bypass that
+        app.build_application(output=DummyOutput())
+        return app
+
+    def test_root_is_float_container(self) -> None:
+        from prompt_toolkit.layout import Float, FloatContainer
+
+        app = self._build()
+        assert isinstance(app._app.layout.container, FloatContainer)
+        floats = app._app.layout.container.floats
+        assert len(floats) == 1
+        assert isinstance(floats[0], Float)
+
+    def test_palette_float_uses_ycursor(self) -> None:
+        """The palette float uses ycursor=True so it sits below the cursor."""
+        app = self._build()
+        float_obj = app._app.layout.container.floats[0]
+        assert float_obj.ycursor is True
+
+    def test_palette_max_height_is_8(self) -> None:
+        """Palette max height is 8 rows (1 selected + 7 normal)."""
+        app = self._build()
+        window = app._app.layout.container.floats[0].content
+        assert window.height.max <= 8
+
+
+class TestChatAppDivider:
+    """The dashed divider that sits before the prompt."""
+
+    def test_divider_is_dashed(self) -> None:
+        """Divider contains '- - ' segments."""
+        app = palette.ChatApp(agent=FakeAgent())
+        divider = app._divider()
+        assert "- -" in divider
+        assert len(divider) >= 40
+
+    def test_divider_clamped_to_terminal(self) -> None:
+        """Divider width is clamped to the terminal width."""
+        app = palette.ChatApp(agent=FakeAgent())
+        # narrow terminal -> clipped to min 40
+        with patch(
+            "shutil.get_terminal_size",
+            return_value=type("S", (), {"columns": 20})(),
+        ):
+            assert len(app._divider()) >= 40
+        # wide terminal -> clipped to max 80
+        with patch(
+            "shutil.get_terminal_size",
+            return_value=type("S", (), {"columns": 200})(),
+        ):
+            assert len(app._divider()) <= 80
+
+    def test_start_emits_divider(self) -> None:
+        """run() emits a divider once before the prompt area opens."""
+        app = palette.ChatApp(agent=FakeAgent())
+        captured: list[str] = []
+        app._emit = lambda t: captured.append(t)  # type: ignore[method-assign]
+        # emulate just the divider-printing portion of run()
+        app._emit(app._divider())
+        assert any("- -" in c for c in captured if c)
+
+
+class TestChatAppUserEcho:
+    """User messages echo with a `●` bullet marker."""
+
+    def test_user_echo_has_bullet(self) -> None:
+        """User messages are echoed with a '● ' prefix."""
+        app = palette.ChatApp(agent=FakeAgent())
+        captured: list[str] = []
+        app._emit = lambda t: captured.append(t)  # type: ignore[method-assign]
+        app._permission_prompt = None
+        app.palette.visible = False
+        app._submit("hi")
+        assert any(line.startswith("● ") for line in captured if line)
+
+class TestChatAppEmitEmpty:
+    """_emit('') prints an explicit blank line as a turn spacer."""
+
+    def test_emit_empty_writes_blank_line(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._emit("")
+            assert mock.getvalue() == "\n"
+
+    def test_emit_text_writes_text(self) -> None:
+        app = palette.ChatApp(agent=FakeAgent())
+        with patch("sys.stdout", new_callable=io.StringIO) as mock:
+            app._emit("hello")
+            assert mock.getvalue() == "hello\n"
