@@ -410,7 +410,7 @@ class TestChatAppPipeIntegration:
 
 
 class TestChatAppLayout:
-    """ChatApp uses FloatContainer so the palette sits below the prompt."""
+    """ChatApp layout puts the palette directly below the input in an HSplit."""
 
     def _build(self) -> Any:
         """Build the app with DummyOutput so tests don't need a real console."""
@@ -418,30 +418,45 @@ class TestChatAppLayout:
         from prompt_toolkit.output import DummyOutput
 
         app = palette.ChatApp(agent=FakeAgent())
-        # Window on Win32 needs a real console; use DummyOutput to bypass that
+        # Win32 needs a real console; use DummyOutput to bypass that
         app.build_application(output=DummyOutput())
         return app
 
-    def test_root_is_float_container(self) -> None:
-        from prompt_toolkit.layout import Float, FloatContainer
+    def test_root_is_hsplit_with_input_and_palette(self) -> None:
+        from prompt_toolkit.layout import HSplit, Window
 
         app = self._build()
-        assert isinstance(app._app.layout.container, FloatContainer)
-        floats = app._app.layout.container.floats
-        assert len(floats) == 1
-        assert isinstance(floats[0], Float)
+        container = app._app.layout.container
+        assert isinstance(container, HSplit), (
+            f"expected HSplit, got {type(container).__name__}"
+        )
+        # Two children: input (height 1) and palette (0-8 rows)
+        children = list(container.children)
+        assert len(children) == 2
+        assert all(isinstance(c, Window) for c in children)
 
-    def test_palette_float_uses_ycursor(self) -> None:
-        """The palette float uses ycursor=True so it sits below the cursor."""
+    def test_palette_window_is_after_input(self) -> None:
+        """The palette Window is the second child (renders below input)."""
         app = self._build()
-        float_obj = app._app.layout.container.floats[0]
-        assert float_obj.ycursor is True
+        children = list(app._app.layout.container.children)
+        palette_win = children[1]
+        # The palette window must contain a BufferControl with the prompt
+        # — distinguishable from the input window by its content
+        assert palette_win.content is not children[0].content
 
     def test_palette_max_height_is_8(self) -> None:
-        """Palette max height is 8 rows (1 selected + 7 normal)."""
+        """Palette Window max height is 8 rows (1 selected + 7 normal)."""
         app = self._build()
-        window = app._app.layout.container.floats[0].content
-        assert window.height.max <= 8
+        palette_win = list(app._app.layout.container.children)[1]
+        assert palette_win.height.max <= 8
+
+    def test_palette_collapse_to_zero(self) -> None:
+        """The palette Window has min=0 so it can collapse when invisible."""
+        app = self._build()
+        palette_win = list(app._app.layout.container.children)[1]
+        assert palette_win.height.min == 0
+        # dont_extend_height is a Filter; call it to get the bool
+        assert palette_win.dont_extend_height() is True
 
 
 class TestChatAppDivider:

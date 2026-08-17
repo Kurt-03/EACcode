@@ -32,7 +32,6 @@ try:
     from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
     from prompt_toolkit.layout import (
         Dimension,
-        Float,
         FloatContainer,
         HSplit,
         Layout,
@@ -536,13 +535,6 @@ class ChatApp:
 
         def _on_text_changed(_buffer: Buffer) -> None:
             self.palette.refresh(self._buffer.text)
-            # Force the layout to redraw so the float actually appears
-            # (full_screen=False does not auto-redraw on text changes).
-            if self._app is not None:
-                try:
-                    self._app.invalidate()
-                except Exception:
-                    pass
 
         self._buffer.on_text_changed += _on_text_changed
 
@@ -595,19 +587,18 @@ class ChatApp:
             ),
             height=1,
         )
-        palette_float = Float(
-            content=Window(
-                self._palette_control(),
-                height=Dimension(max=8),
-                dont_extend_height=True,
-            ),
-            ycursor=True,
-            allow_cover_cursor=False,
+        # Palette is part of the HSplit, not a Float. With full_screen=False,
+        # Float overlays don't work reliably (the container is only 1+ line
+        # tall, the Float has nowhere to grow). HSplit makes the palette a
+        # native layout child that grows the container when needed.
+        # dont_extend_height=True + min=0 means: 0 height when invisible,
+        # up to 8 rows when visible.
+        palette_win = Window(
+            self._palette_control(),
+            height=Dimension(min=0, max=8),
+            dont_extend_height=True,
         )
-        root = FloatContainer(
-            content=HSplit([input_row]),
-            floats=[palette_float],
-        )
+        root = HSplit([input_row, palette_win])
         self._app = Application(
             layout=Layout(root, focused_element=self._buffer),
             key_bindings=kb,
