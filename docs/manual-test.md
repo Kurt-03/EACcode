@@ -292,6 +292,55 @@ Voraussetzung: Anthropic-kompatibler MiniMax-Account (api.minimax.io).
 | Token-Stats | Status-Zeile | `MiniMax-M3 │ X.Ys │ NNN chars` (nicht "0 chars") |
 | Fallback | `minimax` API-Key ungültig setzen, dann chatten | Fallback zu `ollama/llama3.2` greift |
 
+
+
+---
+
+## Provider-Switch zu Anthropic-SDK (08-17)
+
+Die eaccode-Architektur ist jetzt LiteLLM-frei. Anthropic-Messages-kompatible Provider (MiniMax, Anthropic) gehen direkt über das `anthropic` SDK, andere sind out of scope.
+
+### Verifikation
+
+1. **Test, dass LiteLLM wirklich weg ist:**
+   ```bash
+   grep -rn "litellm" src/eaccode/ 2>&1 | head -3
+   # Erwartung: KEINE Treffer
+   ```
+
+2. **Test, dass models.dev funktioniert:**
+   ```bash
+   export PYTHONPATH= && uv run python -c "
+   import sys; sys.path.insert(0, 'src')
+   from eaccode import models_dev
+   info = models_dev.get_model_info('minimax', 'MiniMax-M3')
+   print(f'context={info.context_window}, max_out={info.max_output}, reasoning={info.reasoning}')
+   print(f'cost=\${info.cost_input}/M in, \${info.cost_output}/M out')
+   "
+   # Erwartung: context=1000000, max_out=128000, reasoning=True
+   #           cost=$0.30/M in, $1.20/M out
+   ```
+
+3. **Test, dass Provider-Registry funktional ist:**
+   ```bash
+   export PYTHONPATH= && uv run pytest tests/test_providers_anthropic.py tests/test_providers_registry.py -q
+   # Erwartung: 43 passed (27 + 16)
+   ```
+
+4. **Test, dass Disk-Cache funktioniert:**
+   ```bash
+   cat C:/Users/kurtj/AppData/Local/eaccode/models_dev_cache.json | head -10
+   # Erwartung: JSON mit 7 MiniMax-Modelle
+   ```
+
+5. **Live-Test MiniMax via eaccode:**
+   ```bash
+   eaccode
+   # Dann im REPL:
+   # > hi
+   # Erwartung: Vollständige Antwort, NICHT mitten im Satz abgeschnitten
+   ```
+
 ## Fehler melden (wichtig für die Zusammenarbeit)
 
 Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:

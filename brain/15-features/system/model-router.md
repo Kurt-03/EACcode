@@ -1,3 +1,13 @@
+# Model Router
+
+**Status:** DEPRECATED as of 2026-08-17. Kept as back-compat shim. Use `eaccode.providers` instead.
+
+Warum? LiteLLM normalisiert MiniMax-Streams zu OpenAI-Format und verliert dabei `reasoning_content`-Reihenfolge. Plus falsche Auth-Header und Beta-Headers. Siehe `brain/15-features/system/providers.md` für die neue Architektur.
+
+Commit-Log: `cd25ce3` (deprecation shim), `9d45ce9` (agent refactor).
+
+---
+
 ---
 name: model-router
 type: system
