@@ -522,3 +522,62 @@ class TestChatAppEmitEmpty:
         with patch("sys.stdout", new_callable=io.StringIO) as mock:
             app._emit("hello")
             assert mock.getvalue() == "hello\n"
+
+
+class TestStreamStripThink:
+    """The stream must drop reasoning blocks without losing the answer."""
+
+    def test_chunks_after_close_tag_are_kept(self) -> None:
+        """When a chunk contains the closing tag, everything after
+        the tag is the answer and must be returned."""
+        # Build a real ChatApp and exercise _strip_think directly
+        app = palette.ChatApp(agent=type("F", (), {
+            "run": lambda *a, **k: [{"role": "system", "content": "s"}],
+            "last_text": lambda h: "",
+        })())
+        # Feed a buffer that already contains the closing tag
+        app._think_buffer = "reasoning stuff"
+        result = app._strip_think("</" + "think" + ">Hi! I'm your eaccode.")
+        assert result == "Hi! I'm your eaccode.", (
+            f"expected the answer preserved, got {result!r}"
+        )
+        assert app._think_buffer == ""
+
+    def test_no_think_returns_text(self) -> None:
+        app = palette.ChatApp(agent=type("F", (), {
+            "run": lambda *a, **k: [{"role": "system", "content": "s"}],
+            "last_text": lambda h: "",
+        })())
+        result = app._strip_think("plain text answer")
+        assert result == "plain text answer"
+
+    def test_open_tag_buffers_until_close(self) -> None:
+        """Chunks with the opening tag but no closing tag keep accumulating."""
+        app = palette.ChatApp(agent=type("F", (), {
+            "run": lambda *a, **k: [{"role": "system", "content": "s"}],
+            "last_text": lambda h: "",
+        })())
+        # Opening tag split across chunks
+        r1 = app._strip_think("thinking...")
+        assert r1 == "thinking..."  # no tag yet
+        # Simulate "<think" arriving in a chunk
+        r2 = app._strip_think("now <think>reasoning")
+        assert r2 == "now "  # before tag
+        assert app._think_buffer == "<think>reasoning"
+        # Closing tag in the same chunk
+        r3 = app._strip_think("</" + "think" + ">My answer")
+        assert r3 == "My answer", f"got {r3!r}"
+        assert app._think_buffer == ""
+
+    def test_split_close_tag_across_chunks(self) -> None:
+        """When the closing tag itself is split across chunks, the
+        final answer is preserved."""
+        app = palette.ChatApp(agent=type("F", (), {
+            "run": lambda *a, **k: [{"role": "system", "content": "s"}],
+            "last_text": lambda h: "",
+        })())
+        # Build up to the closing tag
+        app._think_buffer = "<think>reasoning more"
+        # Now sends "</t" + "hink>" + "More text"
+        result = app._strip_think("</" + "think" + ">More text")
+        assert result == "More text", f"got {result!r}"

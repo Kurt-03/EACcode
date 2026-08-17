@@ -46,6 +46,11 @@ except ImportError:  # pragma: no cover - dependency always installed
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
+THINK_OPEN = "<think>"
+THINK_CLOSE = "</think>"
+
+
+
 
 def palette_entries() -> list[tuple[str, str, bool]]:
     """(text, description, is_skill) for the palette: commands + skills."""
@@ -336,19 +341,31 @@ class ChatApp:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
     def _strip_think(self, text: str) -> str:
-        """Remove <think>...</think> reasoning blocks across chunks."""
+        """Remove  reasoning blocks across chunks.
+
+        The model may emit reasoning BEFORE the actual answer. We accumulate
+        the buffer until we see ``, then return everything after it.
+        If the stream ends inside a  block, we discard the whole buffer
+        (better to show nothing than partial reasoning).
+        """
         if self._think_buffer:
+            # We are already inside a reasoning block; keep accumulating
             self._think_buffer += text
-            if "</think>" in self._think_buffer:
-                rest = self._think_buffer.split("</think>", 1)[1]
+            if THINK_CLOSE in self._think_buffer:
+                # Split cleanly: keep everything AFTER the closing tag
+                _, _, rest = self._think_buffer.partition(THINK_CLOSE)
                 self._think_buffer = ""
                 return rest
             return ""
-        if "<think" in text:
-            before, _, after = text.partition("<think")
-            if "</think>" in after:
-                return before + after.split("</think>", 1)[1]
-            self._think_buffer = text[text.index("<think"):]
+        if THINK_OPEN in text:
+            before, _, after = text.partition(THINK_OPEN)
+            if THINK_CLOSE in after:
+                # Single chunk contains both the opening and closing tag
+                _, _, rest = after.partition(THINK_CLOSE)
+                return before + rest
+            # The opening tag was seen but no closing tag yet — buffer
+            # everything from the opening tag onwards
+            self._think_buffer = text[text.index(THINK_OPEN):]
             return before
         return text
 
