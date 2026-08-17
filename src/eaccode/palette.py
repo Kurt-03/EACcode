@@ -253,6 +253,7 @@ class ChatApp:
             "chat.stat": "fg:#6e6e6e",
             "chat.banner": "fg:#9a9a9a",
             "chat.prompt": "bold #4fc1ff",
+            "chat.divider": "fg:#5a5a5a",
             "palette.normal": "fg:#d4d4d4",
             "palette.name": "bold fg:#ffffff",
             "palette.desc": "fg:#6e6e6e",
@@ -298,14 +299,31 @@ class ChatApp:
         except Exception:
             pass
 
+    def _divider(self) -> str:
+        """Return a dimmed dashed line for above the prompt.
+
+        Width is clamped to the terminal (40-80 chars) so the line stays
+        readable in narrow windows but doesn't spam wide terminals.
+        """
+        try:
+            width = shutil.get_terminal_size().columns
+        except Exception:
+            width = 60
+        width = max(40, min(width - 4, 80))
+        return "- - " * (width // 4)
+
     def _emit(self, text: str) -> None:
         """Print one line into the terminal scrollback.
 
         Called from the main or worker thread; when patch_stdout is active
         the write lands above the input chrome.
+        Empty text means an explicit blank line (used as turn spacer).
         """
         with contextlib.suppress(Exception):
-            print(text)
+            if text:
+                print(text)
+            else:
+                print()  # explicit blank line for turn spacer
 
     # -- agent -------------------------------------------------------------
 
@@ -399,6 +417,9 @@ class ChatApp:
                     len(answer),
                 )
             )
+            # 1 blank line + dashed divider before the next prompt
+            self._emit("")
+            self._emit(self._divider())
         except Exception:
             pass
 
@@ -447,8 +468,9 @@ class ChatApp:
             if choice is not None:
                 text = choice
         # Echo the user's message into the scrollback (the prompt itself is
-        # only chrome and will be cleared on submit).
-        self._emit(text)
+        # only chrome and will be cleared on submit). The ● marker
+        # visually distinguishes user messages from agent answers.
+        self._emit(f"● {text}")
         if text.startswith("/"):
             self._run_slash(text[1:])
         else:
@@ -490,6 +512,9 @@ class ChatApp:
         else:
             handler(args, stdout=output)
         self._emit(output.getvalue().rstrip())
+        # 1 blank line + dashed divider before the next prompt
+        self._emit("")
+        self._emit(self._divider())
 
     @staticmethod
     def _parse(command: str) -> tuple[str, list[str]]:
@@ -615,6 +640,9 @@ class ChatApp:
         # Ensure the cursor is at the bottom of the terminal before we hand
         # control to prompt_toolkit so the chrome starts pinned at the bottom.
         self._push_input_to_bottom()
+        # Print the divider (dashed line) before the prompt so the input
+        # area is visually separated from the scrollback above.
+        self._emit(self._divider())
         self._wire_permission()
         app = self.build_application()
         from prompt_toolkit.patch_stdout import patch_stdout
