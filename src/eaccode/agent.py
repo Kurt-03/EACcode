@@ -1,8 +1,12 @@
-"""Agent core: ReAct-style loop with tool calling (Phase A4).
+"""Agent core: ReAct-style loop with tool calling.
 
 The agent alternates between model turns (which may request tool calls) and
 tool execution turns, until the model answers without tool calls or the turn
 budget is exhausted. Synchronous and testable — the REPL/TUI drive it.
+
+Streaming is delegated to the provider registry (`eaccode.providers`). Each
+provider adapter normalizes its wire format into `StreamChunk` so the agent
+loop never sees Anthropic-specific events.
 """
 
 from __future__ import annotations
@@ -14,7 +18,8 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from eaccode import config as cfg
-from eaccode import permissions, router, skills
+from eaccode import models_dev, permissions, providers, skills
+from eaccode.providers.base import StreamChunk, ToolCall
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are eaccode, a self-improving generalist agent running locally "
@@ -40,15 +45,6 @@ class Tool:
     parameters: dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass
-class ToolCall:
-    """One tool invocation requested by the model."""
-
-    id: str
-    name: str
-    arguments: dict[str, Any]
-
-
 def _tool_schema(tool: Tool) -> dict[str, Any]:
     return {
         "type": "function",
@@ -59,28 +55,6 @@ def _tool_schema(tool: Tool) -> dict[str, Any]:
             or {"type": "object", "properties": {}},
         },
     }
-
-
-def parse_response(response: Any) -> tuple[str | None, list[ToolCall]]:
-    """Extract (content, tool_calls) from a LiteLLM completion response."""
-    message = response.choices[0].message
-    content = message.content
-    calls: list[ToolCall] = []
-    for index, raw in enumerate(message.tool_calls or []):
-        try:
-            arguments = json.loads(raw.function.arguments or "{}")
-        except json.JSONDecodeError:
-            arguments = {}
-        if not isinstance(arguments, dict):
-            arguments = {}
-        calls.append(
-            ToolCall(
-                id=raw.id or f"call_{index}",
-                name=raw.function.name,
-                arguments=arguments,
-            )
-        )
-    return content, calls
 
 
 def tool_guide(tools: dict[str, Tool]) -> str:
@@ -106,6 +80,41 @@ def tool_guide(tools: dict[str, Tool]) -> str:
     return "\n".join(lines)
 
 
+def _state_to_provider(
+    conf: dict[str, Any], model_id: str = ""
+) -> tuple[providers.base.Provider, providers.base.Provider, str]:
+    """Resolve the configured provider/model to a Provider instance.
+
+    Returns (provider, tools_view, model_id). The provider is fetched via
+    the registry, which caches per (provider_name, base_url, api_key).
+
+    Raises AgentError when no model is configured or the provider cannot
+    be resolved.
+    """
+    chain = _model_chain(conf)
+    if not chain:
+        raise AgentError(
+            "no default model configured - run 'model set-default <model>'"
+        )
+    chosen = model_id or chain[0]
+    provider_name, _, model_short = chosen.partition("/")
+    provider_config = (conf.get("providers") or {}).get(provider_name, {})
+    provider = providers.registry.get(
+        provider_name, provider_config, model=chosen
+    )
+    return provider, provider, chosen
+
+
+def _model_chain(conf: dict[str, Any]) -> list[str]:
+    """Default model followed by the fallback chain."""
+    model = conf.get("model") or {}
+    chain: list[str] = []
+    if model.get("default"):
+        chain.append(model["default"])
+    chain.extend(model.get("fallback") or [])
+    return chain
+
+
 class Agent:
     """A minimal ReAct agent: model <-> tools until a final answer."""
 
@@ -128,101 +137,64 @@ class Agent:
         self.permission_manager = permission_manager
         self._memory_runs = 0
 
+    def _max_tokens_for(self, model_id: str) -> int:
+        """Pick max_tokens from models.dev, fall back to MAX_OUTPUT_TOKENS."""
+        provider_name, _, model_short = model_id.partition("/")
+        try:
+            md = models_dev.get_max_output_tokens(provider_name, model_short)
+        except Exception:
+            md = 0
+        return md or MAX_OUTPUT_TOKENS
+
     def _complete(
         self,
         messages: list[dict[str, Any]],
         max_output_tokens: int,
         on_token: Any = None,
     ) -> tuple[str | None, list[ToolCall]]:
-        chain = router.model_chain(self.conf)
-        if not chain:
-            raise router.ModelError(
-                "no default model configured - run 'model set-default <model>'"
-            )
-        kwargs: dict[str, Any] = {"max_tokens": max_output_tokens}
-        if self.tools:
-            kwargs["tools"] = [_tool_schema(tool) for tool in self.tools.values()]
-            kwargs["tool_choice"] = "auto"
-        if on_token is None:
-            response = router.completion_response(
-                chain[0], messages, self.conf, timeout=90.0, extra_kwargs=kwargs
-            )
-            return parse_response(response)
-        # ---- streaming path: emit text deltas, assemble tool calls ----
+        """One model turn: stream or one-shot, return (content, tool_calls)."""
+        _, _, model_id = _state_to_provider(self.conf)
+        provider_name, _, model_short = model_id.partition("/")
+        provider_config = (self.conf.get("providers") or {}).get(provider_name, {})
+        provider = providers.registry.get(
+            provider_name, provider_config, model=model_id
+        )
+
+        tool_schemas = (
+            [_tool_schema(tool) for tool in self.tools.values()] if self.tools else None
+        )
+        max_tokens = max_output_tokens or self._max_tokens_for(model_id)
+
         content_parts: list[str] = []
         reasoning_parts: list[str] = []
-        fragments: dict[int, dict[str, str]] = {}
-        response = router.stream_completion(
-            chain[0], messages, self.conf, timeout=90.0, extra_kwargs=kwargs
-        )
-        reasoning_signalled = False
-        for chunk in response:
-            if not getattr(chunk, "choices", None):
-                continue
-            delta = chunk.choices[0].delta
-            # Some providers (Anthropic, Moonshot, Novita, MiniMax via
-            # Anthropic-compat) send reasoning in a separate field.
-            # We forward it to the on_token callback separately so the
-            # UI can render it visually distinct from the answer.
-            reasoning_text = getattr(delta, "reasoning_content", None)
-            if reasoning_text:
-                reasoning_parts.append(reasoning_text)
-                on_token(reasoning_text, kind="reasoning")
-                reasoning_signalled = True
-            text = getattr(delta, "content", None)
-            if text:
-                content_parts.append(text)
-                # If we also see reasoning in the same stream, the
-                # caller already routed the prefix with kind="reasoning",
-                # so emit the answer part with kind="answer".
-                kind = "answer" if reasoning_signalled else "text"
-                try:
-                    on_token(text, kind=kind)
-                except TypeError:
-                    # Back-compat: older callers expect on_token(text) only
-                    on_token(text)
-            for tc in getattr(delta, "tool_calls", None) or []:
-                index = getattr(tc, "index", 0)
-                frag = fragments.setdefault(index, {"id": "", "name": "", "args": ""})
-                if getattr(tc, "id", None):
-                    frag["id"] = tc.id
-                fn = getattr(tc, "function", None)
-                if fn is not None:
-                    if getattr(fn, "name", None):
-                        frag["name"] = fn.name
-                    if getattr(fn, "arguments", None):
-                        frag["args"] += fn.arguments
+        tool_calls: dict[int, ToolCall] = {}
+
+        for chunk in provider.stream(
+            messages,
+            max_tokens=max_tokens,
+            tools=tool_schemas,
+        ):
+            if chunk.kind == "text" and chunk.content:
+                content_parts.append(chunk.content)
+                if on_token is not None:
+                    _safe_on_token(on_token, chunk)
+            elif chunk.kind == "reasoning" and chunk.content:
+                reasoning_parts.append(chunk.content)
+                if on_token is not None:
+                    _safe_on_token(on_token, chunk)
+            elif chunk.kind == "tool_call" and chunk.tool_call is not None:
+                # The provider adapter should deliver at most one tool_call
+                # per tool_use block; we use the id as the dedup key.
+                tool_calls[chunk.tool_call.id or id(chunk.tool_call)] = chunk.tool_call
+            elif chunk.kind == "done":
+                break
+
         content = "".join(content_parts) or None
-        reasoning = "".join(reasoning_parts) or None
-        if reasoning and not content:
-            # No answer content, only reasoning — store reasoning so
-            # the agent can still produce *something* useful. last_text()
-            # picks the most recent text content; if reasoning is all we
-            # have, we surface it.
-            content = reasoning
-        # Remember reasoning on the history so the next round sees it
-        # (matches Anthropic's API contract where reasoning_content is
-        # a separate keyed field in the message).
-        if reasoning:
-            # Stash on the next assistant message we will build below
-            pass  # handled via the tool-call path / final append
-        if fragments:
-            calls = []
-            for index in sorted(fragments):
-                frag = fragments[index]
-                try:
-                    args = json.loads(frag["args"] or "{}")
-                except json.JSONDecodeError:
-                    args = {}
-                calls.append(
-                    ToolCall(
-                        id=frag["id"] or f"call_{index}",
-                        name=frag["name"],
-                        arguments=args,
-                    )
-                )
-            return content, calls
-        return content, []
+        if reasoning_parts and not content:
+            # No answer content but the model only produced reasoning. Surface
+            # the reasoning as the answer so the user still sees something.
+            content = "".join(reasoning_parts)
+        return content, list(tool_calls.values())
 
     def _execute_tool(self, call: ToolCall) -> str:
         tool = self.tools.get(call.name)
@@ -259,6 +231,7 @@ class Agent:
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
         cancel_event: Any | None = None,
         on_token: Any = None,
+        on_chunk: Any = None,
     ) -> list[dict[str, Any]]:
         """Run the loop; returns the full conversation including tool results.
 
@@ -266,9 +239,13 @@ class Agent:
         when set, the loop stops cleanly with a cancellation message (used
         by the subagent timeout guard).
 
-        ``on_token``: optional callback receiving text deltas while the
-        model streams. It also receives "" at the start of every round so
-        the UI can open a fresh line per round.
+        ``on_token``: legacy callback interface: accepts a single string
+        (text delta) or a (text, kind) tuple. Deprecated — prefer
+        ``on_chunk`` which receives StreamChunk objects.
+
+        ``on_chunk``: optional callback receiving StreamChunk objects as
+        they stream from the provider. The agent does not depend on either
+        callback being present.
         """
         self._memory_runs += 1
         system_content = self.system_prompt
@@ -352,3 +329,20 @@ class Agent:
             if message["role"] == "assistant" and message.get("content"):
                 return message["content"]
         return ""
+
+
+def _safe_on_token(on_token: Any, chunk: StreamChunk) -> None:
+    """Forward a StreamChunk to the legacy on_token callback.
+
+    Supports:
+      - on_token(str)              (legacy single-arg)
+      - on_token(str, kind=...)      (palette's reasoning-style)
+      - on_token(StreamChunk)        (newest, full-delivery)
+    """
+    try:
+        on_token(chunk.content, kind=chunk.kind)
+    except TypeError:
+        try:
+            on_token(chunk.content)
+        except TypeError:
+            on_token(chunk)

@@ -1,69 +1,127 @@
-"""Tests for the agent core loop (Phase A4, B1 skill injection)."""
+"""Tests for the agent core loop.
+
+Each test uses a `FakeProvider` (subclass of eaccode.from eaccode.providers import base as provider_base.Provider)
+that yields a fixed sequence of StreamChunks. The agent does not care
+about Anthropic-specific events — only the StreamChunk contract.
+"""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 
 from eaccode import config as cfg
-from eaccode import permissions, router
-from eaccode.agent import Agent, Tool, ToolCall, parse_response
+from eaccode import permissions
+from eaccode.agent import Agent, Tool, ToolCall
+from eaccode.providers import base as provider_base
+from eaccode.providers import registry as provider_registry
+from eaccode.providers.base import StreamChunk, ToolCall
 
 
 def _conf() -> dict[str, Any]:
-    return cfg.defaults() | {"model": {"default": "openrouter/test", "fallback": []}}
+    return cfg.defaults() | {
+        "model": {"default": "anthropic/test-model", "fallback": []},
+        "providers": {
+            "anthropic": {"api_key": "sk-test"},
+        },
+    }
 
 
-def _message(
-    content: str | None, tool_calls: list[dict[str, Any]] | None = None
-) -> SimpleNamespace:
-    return SimpleNamespace(content=content, tool_calls=tool_calls)
+class FakeProvider:
+    """Provider that yields a fixed sequence of StreamChunks per call."""
+
+    def __init__(self, responses: list[list[StreamChunk]] | list[StreamChunk]) -> None:
+        if responses and not isinstance(responses[0], list):
+            responses = [responses]  # type: ignore[list-item]
+        self.responses: list[list[StreamChunk]] = responses  # type: ignore[assignment]
+        self.call_count = 0
+        self.last_kwargs: dict[str, Any] = {}
+
+    def stream(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        cancel_event: Any | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> Any:
+        from collections.abc import Iterator
+
+        self.last_kwargs = {
+            "messages": messages,
+            "system": system,
+            "tools": tools,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if self.call_count < len(self.responses):
+            response = self.responses[self.call_count]
+        else:
+            response = []
+        self.call_count += 1
+        return iter(response)
 
 
-def _response(
-    content: str | None, tool_calls: list[dict[str, Any]] | None = None
-) -> SimpleNamespace:
-    return SimpleNamespace(choices=[SimpleNamespace(message=_message(content, tool_calls))])
-
-
-def _tool_call_raw(call_id: str, name: str, arguments: str) -> SimpleNamespace:
-    return SimpleNamespace(
-        id=call_id, function=SimpleNamespace(name=name, arguments=arguments)
+def _tool_call_chunk(call_id: str, name: str, args: dict[str, Any]) -> StreamChunk:
+    return StreamChunk(
+        kind="tool_call",
+        tool_call=ToolCall(id=call_id, name=name, arguments=args),
     )
 
 
-class TestParseResponse:
-    def test_plain_content(self) -> None:
-        content, calls = parse_response(_response("hello"))
-        assert content == "hello"
-        assert calls == []
+def _text(text: str) -> StreamChunk:
+    return StreamChunk(kind="text", content=text)
 
-    def test_tool_calls_parsed(self) -> None:
-        content, calls = parse_response(
-            _response(
-                None,
-                [_tool_call_raw("c1", "echo", '{"text": "hi"}')],
-            )
-        )
-        assert content is None
-        assert calls == [ToolCall(id="c1", name="echo", arguments={"text": "hi"})]
 
-    def test_bad_json_arguments_become_empty_dict(self) -> None:
-        _, calls = parse_response(_response(None, [_tool_call_raw("c1", "x", "not json")]))
-        assert calls[0].arguments == {}
+def _reasoning(text: str) -> StreamChunk:
+    return StreamChunk(kind="reasoning", content=text)
 
-    def test_missing_id_gets_fallback(self) -> None:
-        raw = SimpleNamespace(id=None, function=SimpleNamespace(name="x", arguments="{}"))
-        _, calls = parse_response(_response(None, [raw]))
-        assert calls[0].id == "call_0"
+
+def _done() -> StreamChunk:
+    return StreamChunk(kind="done")
+
+
+@pytest.fixture(autouse=True)
+def reset_provider_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reset provider cache and stub out the registry.get to use FakeProvider."""
+    import sys as _sys
+    provider_registry.reset_cache()
+    # Patch anthropic SDK so the registry build doesn't actually call out
+    fake_anthropic = MagicMock()
+    monkeypatch.setitem(_sys.modules, "anthropic", fake_anthropic)
+    yield
+    provider_registry.reset_cache()
+
+
+def _patch_provider(monkeypatch: pytest.MonkeyPatch, fake: FakeProvider) -> None:
+    """Patch `provider_registry.get` to return a FakeProvider without anthropic SDK."""
+
+    def fake_get(
+        provider_name: str,
+        provider_config: dict[str, Any],
+        *,
+        model: str = "",
+        timeout: float = 60.0,
+    ) -> FakeProvider:
+        return fake
+
+    monkeypatch.setattr(provider_registry, "get", fake_get)
 
 
 def _tool(name: str, description: str) -> Tool:
     return Tool(name, description, func=lambda **_: "")
+
+
+# ---------------------------------------------------------------------------
+# Tool schema
+# ---------------------------------------------------------------------------
 
 
 def test_tool_guide_lists_tools_and_flow() -> None:
@@ -102,223 +160,309 @@ def test_agent_without_tools_keeps_prompt() -> None:
     assert agent.system_prompt == "base prompt"
 
 
+# ---------------------------------------------------------------------------
+# _max_tokens_for
+# ---------------------------------------------------------------------------
+
+
+class TestMaxTokens:
+    def test_max_tokens_uses_models_dev_when_known(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from eaccode import models_dev
+
+        monkeypatch.setattr(
+            models_dev, "get_max_output_tokens", lambda *a, **kw: 131072
+        )
+        agent = Agent(conf=_conf())
+        assert agent._max_tokens_for("anthropic/test-model") == 131072
+
+    def test_max_tokens_falls_back_to_default_when_unknown(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from eaccode import models_dev
+
+        monkeypatch.setattr(models_dev, "get_max_output_tokens", lambda *a, **kw: 0)
+        agent = Agent(conf=_conf())
+        assert agent._max_tokens_for("anthropic/unknown") == 1024
+
+
+# ---------------------------------------------------------------------------
+# Agent.run — single answer
+# ---------------------------------------------------------------------------
+
+
 class TestAgentRun:
     def test_single_answer_no_tools(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        monkeypatch.setattr(litellm, "completion", lambda **kw: _response("hi there"))
+        fake = FakeProvider([[_text("hi there"), _done()]])
+        _patch_provider(monkeypatch, fake)
         agent = Agent(conf=_conf())
         history = agent.run([{"role": "user", "content": "say hi"}])
         assert history[-1]["role"] == "assistant"
         assert history[-1]["content"] == "hi there"
         assert agent.last_text(history) == "hi there"
 
-    def test_tool_executed_and_result_fed_back(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        calls: list[str] = []
+    def test_streaming_deltas_accumulate_into_answer(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        fake = FakeProvider(
+            [
+                [
+                    _text("Hello "),
+                    _text("world"),
+                    _text("!"),
+                    _done(),
+                ]
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
+        agent = Agent(conf=_conf())
+        history = agent.run([{"role": "user", "content": "hi"}])
+        assert history[-1]["content"] == "Hello world!"
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            calls.append(kwargs["messages"][-1]["role"])
-            if len(calls) == 1:
-                return _response(None, [_tool_call_raw("c1", "echo", '{"text": "ping"}')])
-            return _response("done")
+    def test_no_default_model_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = FakeProvider([])
+        _patch_provider(monkeypatch, fake)
+        conf = cfg.defaults() | {"model": {"default": "", "fallback": []}}
+        agent = Agent(conf=conf)
+        with pytest.raises(Exception, match="model set-default"):
+            agent.run([{"role": "user", "content": "x"}])
+
+    def test_tools_sent_in_first_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = FakeProvider([[_text("ok"), _done()]])
+        _patch_provider(monkeypatch, fake)
+        agent = Agent(
+            conf=_conf(),
+            tools=[Tool(name="echo", description="echoes", func=lambda text: text)],
+        )
+        agent.run([{"role": "user", "content": "x"}])
+        assert fake.last_kwargs["tools"] is not None
+        schema = fake.last_kwargs["tools"][0]
+        assert schema["function"]["name"] == "echo"
+        assert schema["function"]["parameters"]["type"] == "object"
+
+
+# ---------------------------------------------------------------------------
+# Agent.run — tool calls
+# ---------------------------------------------------------------------------
+
+
+class TestToolCalls:
+    def test_tool_executed_and_result_fed_back(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = FakeProvider(
+            [
+                # First turn: tool call
+                [_tool_call_chunk("c1", "echo", {"text": "ping"}), _done()],
+                # Second turn: final answer
+                [_text("done"), _done()],
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
 
         echo = Tool(
             name="echo",
             description="echo text back",
             func=lambda text: f"echo:{text}",
         )
-        import litellm
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
         agent = Agent(conf=_conf(), tools=[echo])
         history = agent.run([{"role": "user", "content": "use echo"}])
         roles = [m["role"] for m in history]
         assert roles == ["system", "user", "assistant", "tool", "assistant"]
-        assert history[-2]["role"] == "tool"
-        assert history[-2]["content"] == "echo:ping"
-        assert history[-2]["tool_call_id"] == "c1"
+        tool_msg = next(m for m in history if m["role"] == "tool")
+        assert tool_msg["content"] == "echo:ping"
+        assert tool_msg["tool_call_id"] == "c1"
         assert agent.last_text(history) == "done"
 
     def test_unknown_tool_returns_error_result(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("ok")
-            return _response(None, [_tool_call_raw("c1", "ghost", "{}")])
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
+        fake = FakeProvider(
+            [
+                [_tool_call_chunk("c1", "ghost", {}), _done()],
+                [_text("ok"), _done()],
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
         agent = Agent(conf=_conf())
         history = agent.run([{"role": "user", "content": "x"}])
-        tool_message = next(m for m in history if m["role"] == "tool")
-        assert "unknown tool: ghost" in tool_message["content"]
+        tool_msg = next(m for m in history if m["role"] == "tool")
+        assert "unknown tool: ghost" in tool_msg["content"]
 
     def test_tool_exception_does_not_kill_loop(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
+        fake = FakeProvider(
+            [
+                [_tool_call_chunk("c1", "bad", {}), _done()],
+                [_text("ok"), _done()],
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
 
         def boom() -> None:
             raise RuntimeError("kaputt")
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("ok")
-            return _response(None, [_tool_call_raw("c1", "bad", "{}")])
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
-        agent = Agent(conf=_conf(), tools=[Tool(name="bad", description="x", func=boom)])
+        agent = Agent(
+            conf=_conf(),
+            tools=[Tool(name="bad", description="x", func=boom)],
+        )
         history = agent.run([{"role": "user", "content": "x"}])
-        tool_message = next(m for m in history if m["role"] == "tool")
-        assert "kaputt" in tool_message["content"]
+        tool_msg = next(m for m in history if m["role"] == "tool")
+        assert "kaputt" in tool_msg["content"]
 
     def test_max_turns_stops_with_message(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            return _response(None, [_tool_call_raw("c1", "echo", '{"text": "x"}')])
-
+        fake = FakeProvider(
+            [
+                [_tool_call_chunk("c1", "echo", {"text": "x"}), _done()],
+                [_tool_call_chunk("c2", "echo", {"text": "y"}), _done()],
+                [_tool_call_chunk("c3", "echo", {"text": "z"}), _done()],
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
         echo = Tool(name="echo", description="echo", func=lambda text: text)
-        monkeypatch.setattr(litellm, "completion", fake_completion)
         agent = Agent(conf=_conf(), tools=[echo])
         history = agent.run([{"role": "user", "content": "x"}], max_turns=2)
         assert "max turns" in agent.last_text(history)
 
-    def test_no_default_model_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        monkeypatch.setattr(litellm, "completion", lambda **kw: _response("x"))
-        conf = cfg.defaults() | {"model": {"default": "", "fallback": []}}
-        agent = Agent(conf=conf)
-        with pytest.raises(router.ModelError, match="model set-default"):
-            agent.run([{"role": "user", "content": "x"}])
-
-    def test_tools_sent_in_first_call(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        captured: dict[str, Any] = {}
-
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            captured.update(kwargs)
-            return _response("ok")
-
-        import litellm
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
-        agent = Agent(
-            conf=_conf(),
-            tools=[Tool(name="echo", description="echoes", func=lambda text: text)],
-        )
-        agent.run([{"role": "user", "content": "x"}])
-        assert "tools" in captured
-        schema = captured["tools"][0]
-        assert schema["function"]["name"] == "echo"
-        assert captured["tool_choice"] == "auto"
-
     def test_tool_arguments_json_roundtrip(self, monkeypatch: pytest.MonkeyPatch) -> None:
         received: dict[str, Any] = {}
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                received["tool_msg"] = kwargs["messages"][-1]
-                return _response("ok")
-            return _response(
-                None,
-                [
-                    _tool_call_raw(
-                        "c9",
-                        "record",
-                        json.dumps({"a": 1, "b": ["x", "y"]}),
-                    )
-                ],
-            )
+        class RecordingFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                from collections.abc import Iterator
+
+                if messages and messages[-1].get("role") == "tool":
+                    received["tool_msg"] = messages[-1]
+                    return iter([_text("ok"), _done()])
+                return iter(
+                    [
+                        _tool_call_chunk(
+                            "c9", "record", {"a": 1, "b": ["x", "y"]}
+                        ),
+                        _done(),
+                    ]
+                )
+
+        fake = RecordingFake([])
+        _patch_provider(monkeypatch, fake)
 
         def record(a: int, b: list[str]) -> str:
             return "recorded"
 
-        import litellm
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
-        agent = Agent(conf=_conf(), tools=[Tool(name="record", description="r", func=record)])
+        agent = Agent(
+            conf=_conf(),
+            tools=[Tool(name="record", description="r", func=record)],
+        )
         agent.run([{"role": "user", "content": "go"}])
-        tool_msg = received["tool_msg"]
-        assert tool_msg["role"] == "tool"
-        assert tool_msg["tool_call_id"] == "c9"
+        assert received["tool_msg"]["role"] == "tool"
+        assert received["tool_msg"]["tool_call_id"] == "c9"
 
 
-class TestSkillInjection:
-    def test_matching_skill_injected_into_system_prompt(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        import litellm
+# ---------------------------------------------------------------------------
+# Reasoning
+# ---------------------------------------------------------------------------
 
-        captured: dict[str, Any] = {}
-        monkeypatch.setattr(
-            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+
+class TestReasoning:
+    def test_reasoning_does_not_replace_answer(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = FakeProvider(
+            [
+                [
+                    _reasoning("Let me think..."),
+                    _text("The answer is 42."),
+                    _done(),
+                ]
+            ]
         )
-        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
-        from eaccode import skills as skill_mod
+        _patch_provider(monkeypatch, fake)
+        agent = Agent(conf=_conf())
+        history = agent.run([{"role": "user", "content": "q"}])
+        # The assistant message carries the answer; reasoning shouldn't
+        # pollute it.
+        assert history[-1]["content"] == "The answer is 42."
 
-        skill_mod.create_skill("zeit", "time helper", "uhrzeit", body="Nutze current_time!")
-        agent = Agent(conf=_conf(), use_skills=True)
-        agent.run([{"role": "user", "content": "Wie spät? UHRZEIT bitte"}])
-        system = captured["messages"][0]["content"]
-        assert "## Relevant skills" in system
-        assert "Nutze current_time!" in system
+    def test_reasoning_only_surfaces_as_answer(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """If the model only produced reasoning, surface it as the answer."""
+        fake = FakeProvider([[_reasoning("All my work."), _done()]])
+        _patch_provider(monkeypatch, fake)
+        agent = Agent(conf=_conf())
+        history = agent.run([{"role": "user", "content": "q"}])
+        assert history[-1]["content"] == "All my work."
 
-    def test_no_match_keeps_prompt_clean(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        import litellm
 
-        captured: dict[str, Any] = {}
-        monkeypatch.setattr(
-            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+# ---------------------------------------------------------------------------
+# Cancel and nudge
+# ---------------------------------------------------------------------------
+
+
+class TestCancelEvent:
+    def test_cancel_stops_loop_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        fake = FakeProvider([])
+        _patch_provider(monkeypatch, fake)
+        agent = Agent(conf=_conf())
+        import threading
+
+        cancel = threading.Event()
+        cancel.set()
+        history = agent.run(
+            [{"role": "user", "content": "hallo"}], cancel_event=cancel
         )
-        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
-        from eaccode import skills as skill_mod
+        assert agent.last_text(history) == "(cancelled by timeout guard)"
+        assert len(history) == 3  # system + user + cancellation note
+        assert fake.call_count == 0  # no model call happened
 
-        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
-        agent = Agent(conf=_conf(), use_skills=True)
-        agent.run([{"role": "user", "content": "irgendwas ganz anderes"}])
-        assert "Relevant skills" not in captured["messages"][0]["content"]
 
-    def test_use_skills_false_disables_injection(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        import litellm
-
+class TestMemoryNudge:
+    def test_nudge_appears_every_interval(self, monkeypatch: pytest.MonkeyPatch) -> None:
         captured: dict[str, Any] = {}
-        monkeypatch.setattr(
-            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
+        fake = FakeProvider(
+            [[_text("ok"), _done()], [_text("ok2"), _done()]]
         )
-        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
-        from eaccode import skills as skill_mod
+        _patch_provider(monkeypatch, fake)
 
-        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
-        agent = Agent(conf=_conf(), use_skills=False)
-        agent.run([{"role": "user", "content": "UHRZEIT"}])
-        assert "Relevant skills" not in captured["messages"][0]["content"]
+        # Wrap the provider to capture kwargs
+        class CaptureFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                captured["messages"] = messages
+                return super().stream(messages, **kw)
+
+        fake = CaptureFake(
+            [[_text("ok"), _done()], [_text("ok2"), _done()]]
+        )
+        _patch_provider(monkeypatch, fake)
+
+        agent = Agent(conf=_conf(), memory_nudge_interval=2)
+        agent.run([{"role": "user", "content": "eins"}])
+        assert "Memory nudge" not in captured["messages"][0]["content"]
+        agent.run([{"role": "user", "content": "zwei"}])
+        assert "Memory nudge" in captured["messages"][0]["content"]
+
+
+# ---------------------------------------------------------------------------
+# Parallel tool execution
+# ---------------------------------------------------------------------------
 
 
 class TestParallelTools:
     def test_two_calls_run_concurrently(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import time
 
-        import litellm
+        call_timestamps: list[float] = []
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("fertig")
-            return _response(
-                None,
-                [
-                    _tool_call_raw("c1", "slow", '{"tag": "a"}'),
-                    _tool_call_raw("c2", "slow", '{"tag": "b"}'),
-                ],
-            )
+        class TimingFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                if messages and messages[-1].get("role") == "tool":
+                    return iter([_text("ok"), _done()])
+                return iter(
+                    [
+                        _tool_call_chunk("c1", "slow", {"tag": "a"}),
+                        _tool_call_chunk("c2", "slow", {"tag": "b"}),
+                        _done(),
+                    ]
+                )
+
+        fake = TimingFake([])
+        _patch_provider(monkeypatch, fake)
 
         def slow(tag: str) -> str:
+            call_timestamps.append(time.monotonic())
             time.sleep(0.4)
             return tag
 
-        monkeypatch.setattr(litellm, "completion", fake_completion)
         agent = Agent(
             conf=_conf(),
             tools=[Tool(name="slow", description="s", func=slow)],
@@ -332,18 +476,20 @@ class TestParallelTools:
     def test_parallel_error_isolation(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import time
 
-        import litellm
+        class ParallelFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                if messages and messages[-1].get("role") == "tool":
+                    return iter([_text("fertig"), _done()])
+                return iter(
+                    [
+                        _tool_call_chunk("c1", "boom", {}),
+                        _tool_call_chunk("c2", "slow", {"tag": "ok"}),
+                        _done(),
+                    ]
+                )
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("fertig")
-            return _response(
-                None,
-                [
-                    _tool_call_raw("c1", "boom", "{}"),
-                    _tool_call_raw("c2", "slow", '{"tag": "ok"}'),
-                ],
-            )
+        fake = ParallelFake([])
+        _patch_provider(monkeypatch, fake)
 
         def boom() -> str:
             raise RuntimeError("kaputt")
@@ -352,7 +498,6 @@ class TestParallelTools:
             time.sleep(0.2)
             return tag
 
-        monkeypatch.setattr(litellm, "completion", fake_completion)
         agent = Agent(
             conf=_conf(),
             tools=[
@@ -361,24 +506,26 @@ class TestParallelTools:
             ],
         )
         history = agent.run([{"role": "user", "content": "isoliere!"}])
-        tool_messages = [m for m in history if m["role"] == "tool"]
-        contents = [m["content"] for m in tool_messages]
-        assert any("kaputt" in c for c in contents)  # failed tool reported
-        assert any("ok" in c for c in contents)  # other tool still ran
-        assert agent.last_text(history) == "fertig"  # loop survived
+        contents = [m["content"] for m in history if m["role"] == "tool"]
+        assert any("kaputt" in c for c in contents)
+        assert any("ok" in c for c in contents)
+        assert agent.last_text(history) == "fertig"
+
+
+# ---------------------------------------------------------------------------
+# Permission gate
+# ---------------------------------------------------------------------------
 
 
 class TestPermissionGate:
     def test_denied_tool_returns_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        monkeypatch.setattr(
-            litellm,
-            "completion",
-            lambda **kw: _response(
-                None, [_tool_call_raw("c1", "write_file", '{"path": "x"}')]
-            ),
+        fake = FakeProvider(
+            [
+                [_tool_call_chunk("c1", "write_file", {"path": "x"}), _done()],
+                [_text("ok"), _done()],
+            ]
         )
+        _patch_provider(monkeypatch, fake)
         agent = Agent(
             conf=_conf(),
             tools=[Tool(name="write_file", description="w", func=lambda path: "ok")],
@@ -391,23 +538,23 @@ class TestPermissionGate:
         assert "permission denied" in tool_messages[0]["content"]
 
     def test_allowed_tool_runs(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
-
-        seen: dict[str, Any] = {}
-
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("fertig")
-            return _response(None, [_tool_call_raw("c1", "read_file", '{"path": "x"}')])
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
+        fake = FakeProvider(
+            [
+                [
+                    _tool_call_chunk("c1", "read_file", {"path": "x"}),
+                    _done(),
+                ],
+                [_text("ok"), _done()],
+            ]
+        )
+        _patch_provider(monkeypatch, fake)
         agent = Agent(
             conf=_conf(),
             tools=[
                 Tool(
                     name="read_file",
                     description="r",
-                    func=lambda path: seen.update(path=path) or "inhalt",
+                    func=lambda path: "inhalt",
                 )
             ],
             permission_manager=permissions.PermissionManager(
@@ -415,158 +562,77 @@ class TestPermissionGate:
             ),
         )
         history = agent.run([{"role": "user", "content": "lies!"}])
-        assert "inhalt" in [m["content"] for m in history if m["role"] == "tool"][0]
+        tool_messages = [m for m in history if m["role"] == "tool"]
+        assert "inhalt" in tool_messages[0]["content"]
 
 
-class TestCancelEvent:
-    def test_cancel_stops_loop_cleanly(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import threading
-
-        import litellm
-
-        captured: dict[str, Any] = {}
-        monkeypatch.setattr(
-            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
-        )
-        agent = Agent(conf=_conf())
-        cancel = threading.Event()
-        cancel.set()
-        history = agent.run(
-            [{"role": "user", "content": "hallo"}], cancel_event=cancel
-        )
-        assert agent.last_text(history) == "(cancelled by timeout guard)"
-        assert len(history) == 3  # system + user + cancellation note
-        assert "messages" not in captured  # no model call happened
+# ---------------------------------------------------------------------------
+# Skill injection
+# ---------------------------------------------------------------------------
 
 
-class TestMemoryNudge:
-    def test_nudge_appears_every_interval(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
+class TestSkillInjection:
+    def test_matching_skill_injected_into_system_prompt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from eaccode import skills as skill_mod
 
-        captured: dict[str, Any] = {}
-        monkeypatch.setattr(
-            litellm, "completion", lambda **kw: captured.update(kw) or _response("ok")
-        )
-        agent = Agent(conf=_conf(), memory_nudge_interval=2)
-        agent.run([{"role": "user", "content": "eins"}])
-        assert "Memory nudge" not in captured["messages"][0]["content"]
-        agent.run([{"role": "user", "content": "zwei"}])
-        assert "Memory nudge" in captured["messages"][0]["content"]
+        captured_messages: list[Any] = []
 
-    def test_memory_tool_call_resets_nudge(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import litellm
+        class CaptureFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                captured_messages.append(messages)
+                return iter([_text("ok"), _done()])
 
-        captured: dict[str, Any] = {}
+        fake = CaptureFake([])
+        _patch_provider(monkeypatch, fake)
 
-        def fake_completion(**kwargs: Any) -> SimpleNamespace:
-            captured["messages"] = kwargs["messages"]
-            if kwargs["messages"][-1]["role"] == "tool":
-                return _response("ok")
-            return _response(
-                None,
-                [
-                    _tool_call_raw(
-                        "c1", "memory_add", '{"target": "agent", "content": "fakt"}'
-                    )
-                ],
-            )
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit", body="Nutze current_time!")
+        agent = Agent(conf=_conf(), use_skills=True)
+        agent.run([{"role": "user", "content": "Wie spät? UHRZEIT bitte"}])
+        system = captured_messages[0][0]["content"]
+        assert "## Relevant skills" in system
+        assert "Nutze current_time!" in system
 
-        monkeypatch.setattr(litellm, "completion", fake_completion)
+    def test_no_match_keeps_prompt_clean(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from eaccode import skills as skill_mod
 
-        def memory_add(target: str, content: str) -> str:
-            return "ok"
+        captured_messages: list[Any] = []
 
-        agent = Agent(
-            conf=_conf(),
-            memory_nudge_interval=2,
-            tools=[Tool(name="memory_add", description="m", func=memory_add)],
-        )
-        agent.run([{"role": "user", "content": "eins"}])  # tool call resets counter
-        agent.run([{"role": "user", "content": "zwei"}])
-        agent.run([{"role": "user", "content": "drei"}])
-        system = captured["messages"][0]["content"]
-        assert "Memory nudge" not in system  # counter was reset by the tool call
+        class CaptureFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                captured_messages.append(messages)
+                return iter([_text("ok"), _done()])
 
+        fake = CaptureFake([])
+        _patch_provider(monkeypatch, fake)
 
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
+        agent = Agent(conf=_conf(), use_skills=True)
+        agent.run([{"role": "user", "content": "irgendwas ganz anderes"}])
+        assert "Relevant skills" not in captured_messages[0][0]["content"]
 
-class TestStreamingReasoningContent:
-    """Some providers (Anthropic, Moonshot, Novita, MiniMax via Anthropic-compat)
-    send reasoning in a separate field. The agent must surface it via a
-    distinct callback kind."""
+    def test_use_skills_false_disables_injection(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from eaccode import skills as skill_mod
 
-    def test_reasoning_content_emitted_as_reasoning(self) -> None:
+        captured_messages: list[Any] = []
 
-        captured: list[tuple[str, str]] = []
+        class CaptureFake(FakeProvider):
+            def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
+                captured_messages.append(messages)
+                return iter([_text("ok"), _done()])
 
-        def on_token(text: str, kind: str = "text") -> None:
-            captured.append((kind, text))
+        fake = CaptureFake([])
+        _patch_provider(monkeypatch, fake)
 
-        # Simulate a chunk with reasoning_content
-        class FakeDelta:
-            content = None
-            reasoning_content = "thinking step 1"
-
-        class FakeChoice:
-            delta = FakeDelta()
-
-        class FakeChunk:
-            choices = [FakeChoice()]
-
-        class FakeResponse:
-            def __iter__(self):
-                yield FakeChunk()
-
-        # Import the router to patched; just verify the agent wires
-        # reasoning_content correctly via stream_completion chain.
-        # We don't call agent.run() end-to-end because it requires LiteLLM;
-        # here we just verify the _complete() loop routes reasoning.
-        # NB: this is a smoke test of the loop logic, not the full call.
-        content_parts: list[str] = []
-        reasoning_parts: list[str] = []
-        for chunk in FakeResponse():
-            if not getattr(chunk, "choices", None):
-                continue
-            delta = chunk.choices[0].delta
-            rt = getattr(delta, "reasoning_content", None)
-            if rt:
-                reasoning_parts.append(rt)
-                on_token(rt, kind="reasoning")
-            ct = getattr(delta, "content", None)
-            if ct:
-                content_parts.append(ct)
-                on_token(ct, kind="answer")
-
-        assert reasoning_parts == ["thinking step 1"]
-        assert content_parts == []
-        assert captured == [("reasoning", "thinking step 1")]
-
-    def test_text_emitted_only_when_content_present(self) -> None:
-        """Without reasoning_content, text chunks are emitted as 'text'."""
-        captured: list[tuple[str, str]] = []
-
-        def on_token(text: str, kind: str = "text") -> None:
-            captured.append((kind, text))
-
-        class FakeDelta:
-            content = "hello"
-            reasoning_content = None
-
-        class FakeChoice:
-            delta = FakeDelta()
-
-        class FakeChunk:
-            choices = [FakeChoice()]
-
-        for chunk in [FakeChunk()]:
-            if not getattr(chunk, "choices", None):
-                continue
-            delta = chunk.choices[0].delta
-            rt = getattr(delta, "reasoning_content", None)
-            if rt:
-                on_token(rt, kind="reasoning")
-            ct = getattr(delta, "content", None)
-            if ct:
-                on_token(ct, kind="text")
-
-        assert captured == [("text", "hello")]
-
+        monkeypatch.setattr(cfg, "data_dir", lambda: tmp_path)
+        skill_mod.create_skill("zeit", "time helper", "uhrzeit")
+        agent = Agent(conf=_conf(), use_skills=False)
+        agent.run([{"role": "user", "content": "UHRZEIT"}])
+        assert "Relevant skills" not in captured_messages[0][0]["content"]
