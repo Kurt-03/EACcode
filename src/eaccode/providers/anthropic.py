@@ -184,18 +184,23 @@ class AnthropicProvider:
         # iterate the MessageStream events rather than trust the SDK's
         # helpers, so we don't need an SDK client per request.
         kwargs: dict[str, Any] = {
-            "api_key": api_key,
             "timeout": timeout,
             "max_retries": 0,  # we handle retries in the agent loop
         }
+        # Native Anthropic uses ``api_key``; Anthropic-compatible providers
+        # like MiniMax use Bearer auth (Authorization: Bearer <key>) which
+        # the SDK exposes as ``auth_token``. The SDK rejects prefixes that
+        # don't look like ``sk-ant-...`` unless we route through auth_token.
+        is_native_anthropic = (api_key or "").startswith("sk-ant-")
+        if is_native_anthropic:
+            kwargs["api_key"] = api_key
+        else:
+            kwargs["auth_token"] = api_key
         if normalized_base_url:
             kwargs["base_url"] = normalized_base_url
         if default_headers:
             kwargs["default_headers"] = default_headers
         self._client = anthropic.Anthropic(**kwargs)
-        # Suppress SDK-level auth env interference (ANTHROPIC_API_KEY)
-        if not api_key.startswith("sk-ant-"):
-            self._client.api_key = None
 
     def stream(
         self,

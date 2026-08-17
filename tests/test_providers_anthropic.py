@@ -428,16 +428,32 @@ class TestProviderConstruction:
         headers = kwargs["default_headers"]
         assert "fine-grained-tool-streaming" not in headers["anthropic-beta"]
 
-    def test_anthropic_sdk_client_constructed_with_correct_args(self) -> None:
+    def test_anthropic_sdk_client_uses_auth_token_for_non_anthropic_keys(self) -> None:
+        """MiniMax keys (sk-... but not sk-ant-...) must use auth_token."""
         mock_sdk = MagicMock()
         with patch.dict("sys.modules", {"anthropic": mock_sdk}):
             AnthropicProvider(
-                api_key="sk-test",
+                api_key="sk-cp-fake",
                 base_url="https://api.minimax.io/anthropic",
                 model="minimax/MiniMax-M3",
                 timeout=120.0,
             )
         kwargs = mock_sdk.Anthropic.call_args.kwargs
-        assert kwargs["api_key"] == "sk-test"
+        assert kwargs["auth_token"] == "sk-cp-fake"
+        assert "api_key" not in kwargs
         assert kwargs["timeout"] == 120.0
         assert kwargs["max_retries"] == 0
+
+    def test_anthropic_sdk_client_uses_api_key_for_real_anthropic_keys(self) -> None:
+        """Native Anthropic keys (sk-ant-...) use api_key."""
+        mock_sdk = MagicMock()
+        with patch.dict("sys.modules", {"anthropic": mock_sdk}):
+            AnthropicProvider(
+                api_key="sk-ant-test",
+                base_url="https://api.anthropic.com",
+                model="claude-sonnet-4-5",
+                timeout=120.0,
+            )
+        kwargs = mock_sdk.Anthropic.call_args.kwargs
+        assert kwargs["api_key"] == "sk-ant-test"
+        assert "auth_token" not in kwargs
