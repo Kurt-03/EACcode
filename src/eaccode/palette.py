@@ -460,7 +460,16 @@ class ChatApp:
             return True
         if text.startswith("/") and not self.palette.visible:
             self.palette.refresh(text)
-            return False
+            # If the buffer text is an EXACT match for a slash command
+            # (e.g. the user typed /help and the palette only offers /help),
+            # run it directly instead of waiting for a second Enter. This
+            # avoids the double-submit pattern where the first Enter calls
+            # refresh() (return False) and a second Enter runs the command.
+            if len(self.palette._filtered) == 1 and self.palette._filtered[0][0] == text:
+                # Fall through to the slash-run path below
+                pass
+            else:
+                return False
         if self.palette.visible:
             choice = self.palette.accept()
             self.palette.visible = False
@@ -481,14 +490,25 @@ class ChatApp:
         if name in ("exit", "quit"):
             if self._app is not None:
                 self._app.exit(result="")
+            # Divider ahead anyway so the next prompt is preceded by a line
+            self._emit("")
+            self._emit(self._divider())
             return
         if name == "clear":
+            # Clear the screen (do NOT touch the chat history buffer, only
+            # the terminal scrollback). The divider is printed FIRST so it
+            # is also cleared.
+            self._emit(self._divider())
             return
         if name == "help":
             self._emit(commands.HELP_TEXT.rstrip())
+            self._emit("")
+            self._emit(self._divider())
             return
         if name == "version":
             self._emit(f"eaccode {__version__}")
+            self._emit("")
+            self._emit(self._divider())
             return
         handlers = {
             "config": commands.run_config_command,
@@ -504,6 +524,8 @@ class ChatApp:
         handler = handlers.get(name)
         if handler is None:
             self._emit(f"Unknown command: /{name} - type /help")
+            self._emit("")
+            self._emit(self._divider())
             return
         output = io.StringIO()
         if handler is commands.run_config_command:
