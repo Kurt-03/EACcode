@@ -1,10 +1,9 @@
-"""Slash palette (variante 3, "Hermes-Flat"): "/" opens a borderless overlay
-listing commands and skills — arrow keys move the selection, Enter picks,
-Esc closes. Rendered as a custom prompt_toolkit application with a float
-layer, so the look (highlight, separator, ❯ marker) is fully controlled.
+"""Slash palette (variante 5, "Hermes-Bottom-Float"): input chrome pinned at
+the bottom of the terminal via a Float, everything else (banner, chat
+history, answers) lives in the normal terminal scrollback.
 
-Falls back to a plain input() when stdin is not a real terminal
-(pipes, tests) or prompt_toolkit is unavailable.
+Falls back to plain input() when stdin is not a real terminal (pipes, tests)
+or prompt_toolkit is unavailable.
 """
 
 from __future__ import annotations
@@ -12,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import io
 import re
+import shutil
 import sys
 import threading
 import time
@@ -32,7 +32,6 @@ try:
     from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
     from prompt_toolkit.layout import (
         Dimension,
-        Float,
         FloatContainer,
         HSplit,
         Layout,
@@ -91,7 +90,7 @@ STYLE = Style.from_dict(
 
 
 class PalettePrompt:
-    """Borderless slash palette rendered as a prompt_toolkit float."""
+    """Borderless slash palette data model (filter + selection logic)."""
 
     def __init__(self, entries: list[tuple[str, str, bool]] | None = None) -> None:
         self.entries = entries if entries is not None else palette_entries()
@@ -127,35 +126,18 @@ class PalettePrompt:
             return self._filtered[self.selected][0]
         return None
 
-    # -- rendering --------------------------------------------------------
-    def _render_lines(self) -> list[tuple[str, str]]:
-        """Styled (style, text) lines; flat list with aligned columns."""
-        if not self.visible:
-            return []
-        lines: list[tuple[str, str]] = []
-        # dynamic column width: align all names to the longest one
-        max_name = max((len(e[0]) for e in self._filtered), default=0)
-        for index, entry in enumerate(self._filtered):
-            name, description, _is_skill = entry
-            marker = "❯ " if index == self.selected else "  "
-            col = f"{marker}{name:<{max_name + 2}}"
-            if index == self.selected:
-                lines.append(("class:palette.selected", col))
-                lines.append(("class:palette.selected.desc", description))
-            else:
-                lines.append(("class:palette.normal", col))
-                lines.append(("class:palette.desc", description))
-            lines.append(("", "\n"))
-        if not lines:
-            lines.append(("class:palette.desc", "  (no matches)"))
-        return lines
+    def run(self) -> str:
+        """Standalone palette prompt (used by repl_prompt)."""
+        return self.build_application().run()
 
-    def _float(self) -> Float:
-        control = FormattedTextControl(self._render_lines)
-        return Float(Window(control, height=Dimension()), allow_cover_cursor=False)
+    def build_application(self, input: Any = None, output: Any = None) -> Any:
+        """Build a tiny prompt_toolkit app with the slash palette."""
+        from prompt_toolkit.key_binding import KeyBindings, merge_key_bindings
+        from prompt_toolkit.key_binding.bindings.basic import load_basic_bindings
+        from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
+        from prompt_toolkit.layout import HSplit, Layout, Window
+        from prompt_toolkit.layout.controls import BufferControl
 
-    # -- application ------------------------------------------------------
-    def build_application(self, input: Any = None, output: Any = None) -> Application[str]:
         custom = KeyBindings()
 
         @custom.add("down", eager=True)
@@ -190,7 +172,7 @@ class PalettePrompt:
             [custom, load_basic_bindings(), load_emacs_bindings()]
         )
 
-        def _on_text_changed(_buffer: Buffer) -> None:
+        def _on_text_changed(_buffer: Any) -> None:
             self.refresh(self.buffer.text)
 
         self.buffer.on_text_changed += _on_text_changed
@@ -209,8 +191,35 @@ class PalettePrompt:
             output=output,
         )
 
-    def run(self) -> str:
-        return self.build_application().run()
+    def _float(self) -> Any:
+        from prompt_toolkit.layout import Float, Window
+        from prompt_toolkit.layout.controls import FormattedTextControl
+        from prompt_toolkit.layout.dimension import Dimension
+
+        control = FormattedTextControl(self._render_lines)
+        return Float(Window(control, height=Dimension()), allow_cover_cursor=False)
+
+    # -- rendering --------------------------------------------------------
+    def _render_lines(self) -> list[tuple[str, str]]:
+        """Styled (style, text) lines; flat list with aligned columns."""
+        if not self.visible:
+            return []
+        lines: list[tuple[str, str]] = []
+        max_name = max((len(e[0]) for e in self._filtered), default=0)
+        for index, entry in enumerate(self._filtered):
+            name, description, _is_skill = entry
+            marker = "❯ " if index == self.selected else "  "
+            col = f"{marker}{name:<{max_name + 2}}"
+            if index == self.selected:
+                lines.append(("class:palette.selected", col))
+                lines.append(("class:palette.selected.desc", description))
+            else:
+                lines.append(("class:palette.normal", col))
+                lines.append(("class:palette.desc", description))
+            lines.append(("", "\n"))
+        if not lines:
+            lines.append(("class:palette.desc", "  (no matches)"))
+        return lines
 
 
 def repl_prompt() -> str:
@@ -218,18 +227,20 @@ def repl_prompt() -> str:
     if not sys.stdin.isatty() or Application is None:
         return input("eaccode> ")
     try:
+        # For the simple REPL we still use a tiny palette application.
         return PalettePrompt().run()
     except Exception:
         return input("eaccode> ")
 
 
 class ChatApp:
-    """Fullscreen chat REPL (Hermes style, variant A-REPL).
+    """Bottom-pinned chat REPL (Hermes style).
 
-    Log at the top (auto-scroll), slash palette pinned ABOVE the input,
-    input docked at the bottom. Same prompt_toolkit stack as the palette;
-    the stream REPL stays for pipes/scripts. Agent calls run in a worker
-    thread; permission prompts are answered inline (y/N in the input).
+    The conversation transcript (banner, messages, answers, stats) lives in
+    the normal terminal scrollback. prompt_toolkit renders the input chrome
+    (prompt + text field + slash palette) as a float pinned to the bottom of
+    the terminal. Output from worker threads is routed through patch_stdout so
+    it appears above the chrome and the chrome is redrawn automatically.
     """
 
     STYLE = Style.from_dict(
@@ -259,7 +270,6 @@ class ChatApp:
         self._agent = agent
         self._agent_factory = agent_factory
         self._chat_history: list[dict[str, Any]] = []
-        self._log_lines: list[tuple[str, str]] = []
         self._buffer = Buffer()
         self._app: Application[str] | None = None
         self.palette = PalettePrompt()
@@ -270,31 +280,31 @@ class ChatApp:
         self._stream_open = False
         self._streamed_any = False
         self._think_buffer = ""
-        # Hermes-style: the conversation lives in the terminal scrollback;
-        # prompt_toolkit only manages the input chrome at the bottom.
-        self._out = sys.stdout
+        self._banner_printed = False
 
-    # -- log ---------------------------------------------------------------
+    # -- scrollback output --------------------------------------------------
 
-    def _append(self, style: str, text: str) -> None:
-        self._log_lines.append((style, text + "\n"))
-        self._stream_out(text)
+    def _push_input_to_bottom(self) -> None:
+        """Redraw the chrome so it sits at the bottom of the terminal.
 
-    def _stream_out(self, text: str, newline: bool = True) -> None:
-        """Write into the terminal scrollback and redraw the input chrome.
-
-        In the live chat the whole ``run()`` is wrapped in patch_stdout,
-        so writes land above the prompt chrome (Hermes approach); here we
-        only write and let the outer proxy handle the redraw.
+        With full_screen=False + Float (ycursor=True), prompt_toolkit already
+        pins the chrome to the bottom — no need to spam newlines into the
+        scrollback (that caused 30+ blank lines before the prompt).
         """
-        payload = text + ("\n" if newline else "")
         try:
-            self._out.write(payload)
-            self._out.flush()
+            if self._app is not None:
+                self._app.invalidate()
         except Exception:
             pass
-        if self._app is not None:
-            self._app.invalidate()
+
+    def _emit(self, text: str) -> None:
+        """Print one line into the terminal scrollback.
+
+        Called from the main or worker thread; when patch_stdout is active
+        the write lands above the input chrome.
+        """
+        with contextlib.suppress(Exception):
+            print(text)
 
     # -- agent -------------------------------------------------------------
 
@@ -308,12 +318,7 @@ class ChatApp:
         threading.Thread(target=self._agent_worker, args=(text,), daemon=True).start()
 
     def _strip_think(self, text: str) -> str:
-        """Remove <think>...</think> reasoning blocks across chunks.
-
-        Reasoning stays invisible; only the actual answer is shown. A
-        partial block is buffered until it closes so split deltas (
-        "<think>" as one chunk, "...</think>" as another) are handled.
-        """
+        """Remove <think>...</think> reasoning blocks across chunks."""
         if self._think_buffer:
             self._think_buffer += text
             if "</think>" in self._think_buffer:
@@ -324,7 +329,6 @@ class ChatApp:
         if "<think" in text:
             before, _, after = text.partition("<think")
             if "</think>" in after:
-                # whole block in one chunk
                 return before + after.split("</think>", 1)[1]
             self._think_buffer = text[text.index("<think"):]
             return before
@@ -339,7 +343,7 @@ class ChatApp:
     def _on_token(self, delta: str) -> None:
         """Stream callback (worker thread): write directly to the scrollback."""
         if delta == "":
-            self._stream_open = False  # round marker
+            self._stream_open = False
             return
         delta = self._clean_delta(delta)
         delta = self._strip_think(delta)
@@ -347,7 +351,10 @@ class ChatApp:
             return
         self._streamed_any = True
         self._stream_open = True
-        self._stream_out(delta, newline=False)
+        # When stdout is patched by patch_stdout, print() routes safely
+        # above the input chrome and redraws it afterwards.
+        with contextlib.suppress(Exception):
+            print(delta, end="", flush=True)
 
     def _agent_worker(self, text: str) -> None:
         start = time.monotonic()
@@ -360,9 +367,7 @@ class ChatApp:
                 messages = list(self._chat_history) + [
                     {"role": "user", "content": text}
                 ]
-                history = agent.run(
-                    messages, on_token=self._on_token
-                )
+                history = agent.run(messages, on_token=self._on_token)
                 answer = agent.last_text(history)
                 new_messages = history[len(self._chat_history) + 1 :]
                 self._chat_history[:] = history[1:]
@@ -379,20 +384,19 @@ class ChatApp:
             answer = f"Error: {exc}"
         self._stream_open = False
         if self._streamed_any:
-            # streamed text is already in the scrollback; finish the line
-            self._stream_out("")
+            # streamed text is already in the scrollback; terminate the line
+            print()
         elif answer:
-            self._append("class:chat.agent", answer)
+            self._emit(answer)
         try:
             from eaccode import config as cfg
 
-            self._append(
-                "class:chat.stat",
+            self._emit(
                 render_status_line(
                     model_label(cfg.load_config()),
                     time.monotonic() - start,
                     len(answer),
-                ),
+                )
             )
         except Exception:
             pass
@@ -402,7 +406,7 @@ class ChatApp:
     def _ask(self, prompt: str) -> bool:
         self._permission_prompt = prompt
         self._permission_event.clear()
-        self._append("class:chat.permission", f"Allow: {prompt} [y/N]")
+        self._emit(f"Allow: {prompt} [y/N]")
         self._permission_event.wait(timeout=600)
         return self._permission_answer in ("y", "yes")
 
@@ -434,15 +438,16 @@ class ChatApp:
             self._permission_event.set()
             return True
         if text.startswith("/") and not self.palette.visible:
-            self.palette.refresh(text)  # first enter opens the palette
-            return False  # keep the text in the buffer
+            self.palette.refresh(text)
+            return False
         if self.palette.visible:
             choice = self.palette.accept()
             self.palette.visible = False
             if choice is not None:
                 text = choice
-            # no match: run the typed text itself (e.g. unknown command)
-        self._append("class:chat.user", f"> {text}")
+        # Echo the user's message into the scrollback (the prompt itself is
+        # only chrome and will be cleared on submit).
+        self._emit(text)
         if text.startswith("/"):
             self._run_slash(text[1:])
         else:
@@ -456,13 +461,12 @@ class ChatApp:
                 self._app.exit(result="")
             return
         if name == "clear":
-            self._log_lines.clear()
             return
         if name == "help":
-            self._append("", commands.HELP_TEXT.rstrip())
+            self._emit(commands.HELP_TEXT.rstrip())
             return
         if name == "version":
-            self._append("", f"eaccode {__version__}")
+            self._emit(f"eaccode {__version__}")
             return
         handlers = {
             "config": commands.run_config_command,
@@ -477,14 +481,14 @@ class ChatApp:
         }
         handler = handlers.get(name)
         if handler is None:
-            self._append("class:chat.error", f"Unknown command: /{name} - type /help")
+            self._emit(f"Unknown command: /{name} - type /help")
             return
         output = io.StringIO()
         if handler is commands.run_config_command:
             handler(args, stdout=output, stdin=io.StringIO(""))
         else:
             handler(args, stdout=output)
-        self._append("", output.getvalue().rstrip())
+        self._emit(output.getvalue().rstrip())
 
     @staticmethod
     def _parse(command: str) -> tuple[str, list[str]]:
@@ -495,9 +499,6 @@ class ChatApp:
         return (parts[0] if parts else ""), parts[1:]
 
     # -- application --------------------------------------------------------
-
-    def _log_control(self) -> FormattedTextControl:
-        return FormattedTextControl(lambda: list(self._log_lines))
 
     def _palette_control(self) -> FormattedTextControl:
         return FormattedTextControl(lambda: self.palette._render_lines())
@@ -521,15 +522,11 @@ class ChatApp:
         def _up(event: Any) -> None:
             if self.palette.visible:
                 self.palette.move(-1)
-            else:
-                event.current_buffer.cursor_up()
 
         @custom.add("down", eager=True)
         def _down(event: Any) -> None:
             if self.palette.visible:
                 self.palette.move(1)
-            else:
-                event.current_buffer.cursor_down()
 
         @custom.add("escape", eager=True)
         def _escape(event: Any) -> None:
@@ -540,7 +537,6 @@ class ChatApp:
         def _backspace(event: Any) -> None:
             buf = event.current_buffer
             if self.palette.visible:
-                # Close palette and delete the typed prefix
                 self.palette.visible = False
             if buf.text:
                 buf.delete_before_cursor()
@@ -558,6 +554,7 @@ class ChatApp:
         kb = merge_key_bindings(
             [custom, load_basic_bindings(), load_emacs_bindings()]
         )
+
         input_row = Window(
             BufferControl(
                 buffer=self._buffer,
@@ -572,6 +569,7 @@ class ChatApp:
         )
         root = HSplit(
             [
+                Window(height=0),  # filler: push chrome to the bottom
                 input_row,
                 palette_win,
             ]
@@ -582,38 +580,41 @@ class ChatApp:
             style=self.STYLE,
             input=input,
             output=output,
-            full_screen=False,  # conversation lives in the terminal scrollback
-            erase_when_done=True,  # clear the input chrome on exit
+            full_screen=False,
+            erase_when_done=True,
         )
         return self._app
+
+    def _print_banner(self) -> None:
+        """Print banner and welcome text into the scrollback."""
+        if self._banner_printed or banner_quiet():
+            return
+        try:
+            from eaccode import config as cfg
+
+            print(
+                render_banner(
+                    cfg.load_config(),
+                    session_id=self._session_id,
+                    cwd=str(Path.cwd()),
+                )
+            )
+        except Exception:
+            pass
+        self._banner_printed = True
 
     def run(self) -> str:
         with contextlib.suppress(Exception):
             from eaccode import store as _store
 
             self._session_id = _store.new_session()
-        if not banner_quiet() and not self._log_lines:
-            try:
-                from eaccode import config as cfg
 
-                self._append(
-                    "class:chat.banner",
-                    render_banner(
-                        cfg.load_config(),
-                        session_id=self._session_id,
-                        cwd=str(Path.cwd()),
-                    ),
-                )
-            except Exception:
-                pass
+        self._print_banner()
+        # Ensure the cursor is at the bottom of the terminal before we hand
+        # control to prompt_toolkit so the chrome starts pinned at the bottom.
+        self._push_input_to_bottom()
         self._wire_permission()
         app = self.build_application()
-        # Ensure the chrome (input + ❯ prompt) renders on the very first
-        # frame — without this, the ❯ only appears after the first keypress.
-        app.invalidate()
-        # Hermes approach: the whole run is wrapped in patch_stdout so all
-        # transcript writes (from any thread) land above the prompt chrome
-        # in the terminal scrollback and the chrome is redrawn after each.
         from prompt_toolkit.patch_stdout import patch_stdout
 
         with patch_stdout():
