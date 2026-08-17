@@ -1,8 +1,16 @@
-"""Model router: provider registry, model catalog, live pings and fallback chain.
+"""DEPRECATED — kept for back-compat. Use eaccode.providers instead.
 
-Phase A3: BYOK — all keys stay on the user's machine. Every provider is
-configured in config.yaml (``providers``); model ids use LiteLLM syntax
-(``provider/model``).
+This module is a thin shim over the new provider registry. New code should
+import from:
+
+    from eaccode.providers import registry as providers
+    from eaccode.providers.base import StreamChunk, ToolCall
+
+The old LiteLLM-based helpers (``completion_response``, ``stream_completion``,
+``completion_text``, ``call_model``, ``ping_model``) have been replaced by
+the typed provider adapters. The few legacy helpers still in use
+(``all_model_ids``, ``model_chain``, ``provider_names``, ``ModelError``)
+are stubbed here so external commands keep working.
 """
 
 from __future__ import annotations
@@ -13,27 +21,15 @@ from typing import Any
 from eaccode import config as cfg
 
 # Model catalog: well-known model ids per provider (UX aid, not exhaustive).
+# For real catalog data, use eaccode.models_dev.
 KNOWN_MODELS: dict[str, list[str]] = {
-    "openrouter": [
-        "openrouter/anthropic/claude-sonnet-4",
-        "openrouter/anthropic/claude-opus-4",
-        "openrouter/meta-llama/llama-3.3-70b",
-        "openrouter/deepseek/deepseek-chat",
-    ],
     "anthropic": ["anthropic/claude-sonnet-4", "anthropic/claude-opus-4"],
-    "openai": ["openai/gpt-4o", "openai/gpt-4o-mini"],
-    "google": ["gemini/gemini-1.5-pro", "gemini/gemini-1.5-flash"],
-    "xai": ["xai/grok-2"],
-    "deepseek": ["deepseek/deepseek-chat"],
     "minimax": [
         "minimax/MiniMax-M3",
         "minimax/MiniMax-M2.5",
         "minimax/MiniMax-M2.1",
         "minimax/MiniMax-M2.1-lightning",
     ],
-    "ollama": ["ollama/llama3.2", "ollama/qwen2.5"],
-    "vllm": [],
-    "lmstudio": [],
 }
 
 PING_PROMPT = "Reply with exactly: pong"
@@ -85,131 +81,35 @@ def all_model_ids(conf: dict[str, Any]) -> list[str]:
     return unique
 
 
-def _extract_text(response: Any) -> str:
-    """Pull the reply text out of a LiteLLM completion response."""
-    try:
-        return response.choices[0].message.content or ""
-    except (AttributeError, IndexError):
-        return str(response)
+# ---------------------------------------------------------------------------
+# Removed LiteLLM-based helpers — kept as raising shims so direct callers
+# get a clear error pointing them at the new provider registry.
+# ---------------------------------------------------------------------------
 
 
-def _completion_kwargs(
-    model_id: str,
-    messages: list[dict[str, str]],
-    conf: dict[str, Any],
-    timeout: float,
-    extra_kwargs: dict[str, Any] | None,
-) -> dict[str, Any]:
-    """Build the LiteLLM kwargs shared by plain and streaming calls.
-
-    MiniMax-M3 (and other NVIDIA NIM-hosted MiniMax models) requires an
-    explicit ``max_tokens``; without it the endpoint returns HTTP 200 with
-    an empty ``choices[]`` payload. We default to 4096 when the caller
-    did not supply one explicitly.
-    """
-    provider_name = model_id.split("/", 1)[0]
-    provider = (conf.get("providers") or {}).get(provider_name)
-    api_key = resolve_api_key(provider)
-    kwargs: dict[str, Any] = {"model": model_id, "messages": messages, "timeout": timeout}
-    if provider_name == "minimax" and not (extra_kwargs or {}).get("max_tokens"):
-        # MiniMax-M3 family: max_tokens REQUIRED, otherwise empty choices[]
-        kwargs["max_tokens"] = 4096
-    if extra_kwargs:
-        kwargs.update(extra_kwargs)
-    if api_key:
-        kwargs["api_key"] = api_key
-    if provider and provider.get("base_url"):
-        kwargs["api_base"] = provider["base_url"]
-    return kwargs
-
-
-def completion_response(
-    model_id: str,
-    messages: list[dict[str, str]],
-    conf: dict[str, Any],
-    timeout: float = 60.0,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> Any:
-    """One completion call; returns the raw LiteLLM response.
-
-    ``extra_kwargs`` are forwarded to LiteLLM (e.g. tools, max_tokens).
-    """
-    kwargs = _completion_kwargs(model_id, messages, conf, timeout, extra_kwargs)
-    try:
-        import litellm
-
-        litellm.suppress_debug_info = True  # keep errors clean for the user
-        return litellm.completion(**kwargs)
-    except Exception as exc:  # litellm raises a broad family of exceptions
-        raise ModelError(f"model call failed ({model_id}): {exc}") from exc
-
-
-def stream_completion(
-    model_id: str,
-    messages: list[dict[str, str]],
-    conf: dict[str, Any],
-    timeout: float = 90.0,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> Any:
-    """One streaming completion; returns the LiteLLM chunk iterator.
-
-    Each chunk has ``choices[0].delta`` with ``content`` and/or
-    ``tool_calls`` fragments.
-    """
-    kwargs = _completion_kwargs(model_id, messages, conf, timeout, extra_kwargs)
-    kwargs["stream"] = True
-    try:
-        import litellm
-
-        litellm.suppress_debug_info = True
-        return litellm.completion(**kwargs)
-    except Exception as exc:
-        raise ModelError(f"model call failed ({model_id}): {exc}") from exc
-
-
-def completion_text(
-    model_id: str,
-    messages: list[dict[str, str]],
-    conf: dict[str, Any],
-    timeout: float = 60.0,
-    extra_kwargs: dict[str, Any] | None = None,
-) -> str:
-    """One completion call; returns the extracted reply text."""
-    response = completion_response(model_id, messages, conf, timeout, extra_kwargs)
-    return _extract_text(response)
-
-
-def call_model(
-    conf: dict[str, Any],
-    messages: list[dict[str, str]],
-    model_id: str | None = None,
-    timeout: float = 60.0,
-) -> str:
-    """Call the default model, then fall back through the chain.
-
-    Raises ModelError when no model is configured or every call failed.
-    """
-    chain = [model_id] if model_id else model_chain(conf)
-    if not chain:
-        raise ModelError("no default model configured - run 'model set-default <model>'")
-    last_error: Exception | None = None
-    for candidate in chain:
-        try:
-            return completion_text(candidate, messages, conf, timeout)
-        except ModelError as exc:
-            last_error = exc
+def _removed(_name: str) -> Any:
     raise ModelError(
-        f"all models failed ({', '.join(chain)}): {last_error}"
-    ) from last_error
-
-
-def ping_model(
-    model_id: str,
-    conf: dict[str, Any] | None = None,
-    timeout: float = 30.0,
-) -> str:
-    """Send a minimal live call; returns the model's reply (expected: 'pong')."""
-    conf = conf or cfg.load_config()
-    return call_model(
-        conf, [{"role": "user", "content": PING_PROMPT}], model_id=model_id, timeout=timeout
+        f"{_name}() was removed when LiteLLM was replaced by the "
+        "Anthropic provider registry. Use 'provider registry' "
+        "(eaccode.providers.registry.get) and StreamChunk iterators instead."
     )
+
+
+def completion_response(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+    _removed("completion_response")
+
+
+def stream_completion(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+    _removed("stream_completion")
+
+
+def completion_text(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+    _removed("completion_text")
+
+
+def call_model(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+    _removed("call_model")
+
+
+def ping_model(*args: Any, **kwargs: Any) -> Any:  # pragma: no cover
+    _removed("ping_model")

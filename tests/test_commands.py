@@ -336,33 +336,50 @@ class TestModelCommands:
     def test_ping_success(
         self, model_runner: tuple[callable, Path], monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        from eaccode.providers import registry as providers
+        from eaccode.providers.base import StreamChunk
+
+        class FakeProvider:
+            def stream(self, messages, **kw):
+                return iter(
+                    [StreamChunk(kind="text", content="pong"), StreamChunk(kind="done")]
+                )
+
+        monkeypatch.setattr(providers, "get", lambda *a, **kw: FakeProvider())
         run, _ = model_runner
-        import litellm
-
-        def fake_completion(**kwargs: object) -> SimpleNamespace:
-            return SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content="pong"))]
-            )
-
-        monkeypatch.setattr(litellm, "completion", fake_completion)
-        code, out = run("ping", "openrouter/foo")
+        code, out = run("ping", "anthropic/foo")
         assert code == 0
         assert "replied: pong" in out
 
     def test_ping_failure_clean_error(
         self, model_runner: tuple[callable, Path], monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        from eaccode.providers import registry as providers
+
+        class BoomProvider:
+            def stream(self, messages, **kw):
+                raise RuntimeError("invalid api key")
+
+        monkeypatch.setattr(providers, "get", lambda *a, **kw: BoomProvider())
         run, _ = model_runner
-        import litellm
-
-        def boom(**kwargs: object) -> None:
-            raise RuntimeError("invalid api key")
-
-        monkeypatch.setattr(litellm, "completion", boom)
-        code, out = run("ping", "openrouter/foo")
+        code, out = run("ping", "anthropic/foo")
         assert code == 1
         assert "Error" in out
         assert "invalid api key" in out
+
+    def test_ping_unsupported_provider(
+        self, model_runner: tuple[callable, Path], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from eaccode.providers import registry as providers
+
+        def fail(*a, **kw):
+            raise NotImplementedError("only anthropic supported")
+
+        monkeypatch.setattr(providers, "get", fail)
+        run, _ = model_runner
+        code, out = run("ping", "openai/foo")
+        assert code == 1
+        assert "Error" in out
 
     def test_ping_usage(self, model_runner: tuple[callable, Path]) -> None:
         run, _ = model_runner

@@ -1,62 +1,88 @@
-"""Tests for the model router: provider config, kwargs, and MiniMax-specific setup."""
+"""Tests for the eaccode.router deprecation shim.
+
+The router module is back-compat: it keeps working helpers (model_chain,
+provider_names, all_model_ids, ModelError) and rejects removed LiteLLM
+helpers with a clear error pointing to the new provider registry.
+"""
 
 from __future__ import annotations
+
+import pytest
 
 from eaccode import router
 
 
-class TestMinimaxSetup:
-    """MiniMax-M3 needs an explicit base_url and max_tokens to work."""
-
-    def test_minimax_default_max_tokens(self) -> None:
-        """Without caller max_tokens, MiniMax gets 4096 by default."""
-        conf = {"providers": {"minimax": {"api_key": "sk-fake"}}}
-        kwargs = router._completion_kwargs(
-            "minimax/MiniMax-M3",
-            [{"role": "user", "content": "hi"}],
-            conf, 30.0, None,
-        )
-        assert kwargs["max_tokens"] == 4096
-
-    def test_minimax_base_url_propagation(self) -> None:
-        """base_url from config is forwarded to LiteLLM as api_base."""
-        conf = {"providers": {"minimax": {
-            "api_key": "sk-fake",
-            "base_url": "https://api.minimax.io/anthropic",
-        }}}
-        kwargs = router._completion_kwargs(
-            "minimax/MiniMax-M3",
-            [{"role": "user", "content": "hi"}],
-            conf, 30.0, None,
-        )
-        assert kwargs["api_base"] == "https://api.minimax.io/anthropic"
-
-    def test_minimax_explicit_max_tokens_not_overridden(self) -> None:
-        """Caller-provided max_tokens is preserved."""
-        conf = {"providers": {"minimax": {"api_key": "sk-fake"}}}
-        kwargs = router._completion_kwargs(
-            "minimax/MiniMax-M3",
-            [{"role": "user", "content": "hi"}],
-            conf, 30.0, {"max_tokens": 100},
-        )
-        assert kwargs["max_tokens"] == 100
-
-    def test_non_minimax_unaffected(self) -> None:
-        """Other providers do NOT get a default max_tokens."""
-        conf = {"providers": {"anthropic": {"api_key": "sk-fake"}}}
-        kwargs = router._completion_kwargs(
-            "anthropic/claude-sonnet-4",
-            [{"role": "user", "content": "hi"}],
-            conf, 30.0, None,
-        )
-        assert "max_tokens" not in kwargs
-
-    def test_known_models_includes_minimax_family(self) -> None:
-        """All real MiniMax-M3 / M2.x models are in the catalog."""
-        expected = [
+class TestKnownModels:
+    def test_minimax_family_listed(self) -> None:
+        for model in (
             "minimax/MiniMax-M3",
             "minimax/MiniMax-M2.5",
             "minimax/MiniMax-M2.1",
             "minimax/MiniMax-M2.1-lightning",
+        ):
+            assert model in router.KNOWN_MODELS["minimax"]
+
+    def test_anthropic_models_listed(self) -> None:
+        assert "anthropic/claude-sonnet-4" in router.KNOWN_MODELS["anthropic"]
+        assert "anthropic/claude-opus-4" in router.KNOWN_MODELS["anthropic"]
+
+    def test_known_models_returns_lists(self) -> None:
+        for value in router.KNOWN_MODELS.values():
+            assert isinstance(value, list)
+            for item in value:
+                assert isinstance(item, str)
+
+
+class TestModelChain:
+    def test_default_only(self) -> None:
+        assert router.model_chain({"model": {"default": "anthropic/foo"}}) == [
+            "anthropic/foo"
         ]
-        assert all(model in router.KNOWN_MODELS["minimax"] for model in expected)
+
+    def test_default_with_fallback(self) -> None:
+        assert router.model_chain(
+            {"model": {"default": "anthropic/foo", "fallback": ["anthropic/bar"]}}
+        ) == ["anthropic/foo", "anthropic/bar"]
+
+    def test_no_model_returns_empty(self) -> None:
+        assert router.model_chain({}) == []
+        assert router.model_chain({"model": {}}) == []
+
+
+class TestAllModelIds:
+    def test_chain_and_catalog(self) -> None:
+        conf = {
+            "model": {"default": "anthropic/foo", "fallback": []},
+            "providers": {
+                "anthropic": {
+                    "models": ["anthropic/custom-model"],
+                },
+            },
+        }
+        ids = router.all_model_ids(conf)
+        assert "anthropic/foo" in ids
+        assert "anthropic/custom-model" in ids
+        assert "anthropic/claude-sonnet-4" in ids
+        # Deduplicated
+        assert len(ids) == len(set(ids))
+
+    def test_empty_config(self) -> None:
+        assert router.all_model_ids({}) == []
+
+
+class TestRemovedHelpers:
+    """The removed LiteLLM helpers should raise a clear ModelError."""
+
+    @pytest.mark.parametrize(
+        "func",
+        [
+            router.completion_response,
+            router.stream_completion,
+            router.completion_text,
+            router.call_model,
+            router.ping_model,
+        ],
+    )
+    def test_removed_helper_raises(self, func: object) -> None:
+        with pytest.raises(router.ModelError, match="removed"):
+            func()  # type: ignore[operator]

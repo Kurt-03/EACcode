@@ -398,11 +398,33 @@ def _cmd_model_ping(rest: list[str], stdout: TextIO) -> int:
     if len(rest) != 1:
         stdout.write("Usage: model ping <provider/model>\n")
         return 1
+    from eaccode.providers import registry as providers
+    from eaccode.providers.base import StreamChunk
+    conf = cfg.load_config()
+    provider_name, _, model_short = rest[0].partition("/")
+    provider_config = (conf.get("providers") or {}).get(provider_name, {})
     try:
-        reply = router.ping_model(rest[0])
-    except router.ModelError as exc:
+        provider = providers.get(provider_name, provider_config, model=rest[0])
+    except NotImplementedError as exc:
         stdout.write(f"Error: {exc}\n")
         return 1
+    except Exception as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    text_parts: list[str] = []
+    try:
+        for chunk in provider.stream(
+            [{"role": "user", "content": router.PING_PROMPT}],
+            max_tokens=64,
+        ):
+            if chunk.kind == "text" and chunk.content:
+                text_parts.append(chunk.content)
+            if chunk.kind == "done":
+                break
+    except Exception as exc:
+        stdout.write(f"Error: {exc}\n")
+        return 1
+    reply = "".join(text_parts).strip() or "(no content)"
     stdout.write(f"{rest[0]} replied: {reply}\n")
     return 0
 
