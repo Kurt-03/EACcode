@@ -32,6 +32,7 @@ try:
     from prompt_toolkit.key_binding.bindings.emacs import load_emacs_bindings
     from prompt_toolkit.layout import (
         Dimension,
+        Float,
         FloatContainer,
         HSplit,
         Layout,
@@ -562,17 +563,18 @@ class ChatApp:
             ),
             height=1,
         )
-        palette_win = Window(
-            self._palette_control(),
-            height=Dimension(max=12),
-            dont_extend_height=True,
+        palette_float = Float(
+            content=Window(
+                self._palette_control(),
+                height=Dimension(max=8),
+                dont_extend_height=True,
+            ),
+            ycursor=True,
+            allow_cover_cursor=False,
         )
-        root = HSplit(
-            [
-                Window(height=0),  # filler: push chrome to the bottom
-                input_row,
-                palette_win,
-            ]
+        root = FloatContainer(
+            content=HSplit([input_row]),
+            floats=[palette_float],
         )
         self._app = Application(
             layout=Layout(root, focused_element=self._buffer),
