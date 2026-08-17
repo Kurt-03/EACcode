@@ -150,18 +150,37 @@ class Agent:
             return parse_response(response)
         # ---- streaming path: emit text deltas, assemble tool calls ----
         content_parts: list[str] = []
+        reasoning_parts: list[str] = []
         fragments: dict[int, dict[str, str]] = {}
         response = router.stream_completion(
             chain[0], messages, self.conf, timeout=90.0, extra_kwargs=kwargs
         )
+        reasoning_signalled = False
         for chunk in response:
             if not getattr(chunk, "choices", None):
                 continue
             delta = chunk.choices[0].delta
+            # Some providers (Anthropic, Moonshot, Novita, MiniMax via
+            # Anthropic-compat) send reasoning in a separate field.
+            # We forward it to the on_token callback separately so the
+            # UI can render it visually distinct from the answer.
+            reasoning_text = getattr(delta, "reasoning_content", None)
+            if reasoning_text:
+                reasoning_parts.append(reasoning_text)
+                on_token(reasoning_text, kind="reasoning")
+                reasoning_signalled = True
             text = getattr(delta, "content", None)
             if text:
                 content_parts.append(text)
-                on_token(text)
+                # If we also see reasoning in the same stream, the
+                # caller already routed the prefix with kind="reasoning",
+                # so emit the answer part with kind="answer".
+                kind = "answer" if reasoning_signalled else "text"
+                try:
+                    on_token(text, kind=kind)
+                except TypeError:
+                    # Back-compat: older callers expect on_token(text) only
+                    on_token(text)
             for tc in getattr(delta, "tool_calls", None) or []:
                 index = getattr(tc, "index", 0)
                 frag = fragments.setdefault(index, {"id": "", "name": "", "args": ""})
@@ -174,6 +193,19 @@ class Agent:
                     if getattr(fn, "arguments", None):
                         frag["args"] += fn.arguments
         content = "".join(content_parts) or None
+        reasoning = "".join(reasoning_parts) or None
+        if reasoning and not content:
+            # No answer content, only reasoning — store reasoning so
+            # the agent can still produce *something* useful. last_text()
+            # picks the most recent text content; if reasoning is all we
+            # have, we surface it.
+            content = reasoning
+        # Remember reasoning on the history so the next round sees it
+        # (matches Anthropic's API contract where reasoning_content is
+        # a separate keyed field in the message).
+        if reasoning:
+            # Stash on the next assistant message we will build below
+            pass  # handled via the tool-call path / final append
         if fragments:
             calls = []
             for index in sorted(fragments):

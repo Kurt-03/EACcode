@@ -258,6 +258,7 @@ class ChatApp:
             "chat.banner": "fg:#9a9a9a",
             "chat.prompt": "bold #4fc1ff",
             "chat.divider": "fg:#5a5a5a",
+            "chat.reasoning": "italic #8b8b8b",
             "palette.normal": "fg:#d4d4d4",
             "palette.name": "bold fg:#ffffff",
             "palette.desc": "fg:#6e6e6e",
@@ -287,6 +288,7 @@ class ChatApp:
         self._streamed_any = False
         self._think_buffer = ""
         self._banner_printed = False
+        self._reasoning_started = False
 
     # -- scrollback output --------------------------------------------------
 
@@ -375,17 +377,43 @@ class ChatApp:
         text = _ANSI_RE.sub("", text)
         return text
 
-    def _on_token(self, delta: str) -> None:
-        """Stream callback (worker thread): write directly to the scrollback."""
+    def _on_token(self, delta: str, kind: str = "text") -> None:
+        """Stream callback (worker thread): write directly to the scrollback.
+
+        kind: "text" (default) for normal answer content,
+              "reasoning" for reasoning_content deltas — rendered with
+                       italic muted style and a [Reasoning: ...] prefix.
+              "answer" for the answer portion that follows reasoning on
+                       the same stream — printed with the answer style.
+        """
         if delta == "":
             self._stream_open = False
             return
         delta = self._clean_delta(delta)
-        delta = self._strip_think(delta)
+        if kind == "text":
+            # Only filter inline `` tags from the answer stream.
+            # reasoning_content is already separated by the agent loop.
+            delta = self._strip_think(delta)
         if not delta:
             return
         self._streamed_any = True
         self._stream_open = True
+        if kind == "reasoning":
+            # Wrap reasoning as a separate inline-prefixed line so the
+            # user sees it but visually distinguishes it from the answer.
+            # We emit a newline first so it lands on its own line even if
+            # the previous chunk ended mid-stream.
+            with contextlib.suppress(Exception):
+                if not self._reasoning_started:
+                    print(flush=True)
+                    self._reasoning_started = True
+                print(f"[Reasoning: {delta}", end="", flush=True)
+            return
+        if kind == "answer" and getattr(self, "_reasoning_started", False):
+            # Close the reasoning bracket and start the answer on a new line.
+            with contextlib.suppress(Exception):
+                print("]", flush=True)
+                self._reasoning_started = False
         # When stdout is patched by patch_stdout, print() routes safely
         # above the input chrome and redraws it afterwards.
         with contextlib.suppress(Exception):
@@ -394,6 +422,7 @@ class ChatApp:
     def _agent_worker(self, text: str) -> None:
         start = time.monotonic()
         self._streamed_any = False
+        self._reasoning_started = False
         try:
             agent = self._get_agent()
             if agent is None:

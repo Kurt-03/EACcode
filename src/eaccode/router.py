@@ -25,7 +25,12 @@ KNOWN_MODELS: dict[str, list[str]] = {
     "google": ["gemini/gemini-1.5-pro", "gemini/gemini-1.5-flash"],
     "xai": ["xai/grok-2"],
     "deepseek": ["deepseek/deepseek-chat"],
-    "minimax": ["minimax/MiniMax-M3", "minimax/minimax-text-01"],
+    "minimax": [
+        "minimax/MiniMax-M3",
+        "minimax/MiniMax-M2.5",
+        "minimax/MiniMax-M2.1",
+        "minimax/MiniMax-M2.1-lightning",
+    ],
     "ollama": ["ollama/llama3.2", "ollama/qwen2.5"],
     "vllm": [],
     "lmstudio": [],
@@ -95,11 +100,20 @@ def _completion_kwargs(
     timeout: float,
     extra_kwargs: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Build the LiteLLM kwargs shared by plain and streaming calls."""
+    """Build the LiteLLM kwargs shared by plain and streaming calls.
+
+    MiniMax-M3 (and other NVIDIA NIM-hosted MiniMax models) requires an
+    explicit ``max_tokens``; without it the endpoint returns HTTP 200 with
+    an empty ``choices[]`` payload. We default to 4096 when the caller
+    did not supply one explicitly.
+    """
     provider_name = model_id.split("/", 1)[0]
     provider = (conf.get("providers") or {}).get(provider_name)
     api_key = resolve_api_key(provider)
     kwargs: dict[str, Any] = {"model": model_id, "messages": messages, "timeout": timeout}
+    if provider_name == "minimax" and not (extra_kwargs or {}).get("max_tokens"):
+        # MiniMax-M3 family: max_tokens REQUIRED, otherwise empty choices[]
+        kwargs["max_tokens"] = 4096
     if extra_kwargs:
         kwargs.update(extra_kwargs)
     if api_key:

@@ -274,6 +274,24 @@ und `❯`. Nach dem Fix: 0 LZ.
 
 ---
 
+
+
+---
+
+## MiniMax-M3 Provider-Setup (08-17)
+
+Voraussetzung: Anthropic-kompatibler MiniMax-Account (api.minimax.io).
+
+| Check | Aktion | Erwartung |
+|---|---|---|
+| Provider-Config | `eaccode config show` | `minimax` Block enthält `base_url` = `https://api.minimax.io/anthropic` |
+| Models-Liste | `eaccode model list` | `minimax/MiniMax-M3`, `minimax/MiniMax-M2.5`, `minimax/MiniMax-M2.1`, `minimax/MiniMax-M2.1-lightning` |
+| Live-Ping | `eaccode model ping minimax/MiniMax-M3` | Antwort enthält `pong` (Reasoning + Antwort beide sichtbar) |
+| Stream-Test | `eaccode`, dann `hi` | `[Reasoning: ...]` (italic muted) gefolgt von Antwort in normalem Style |
+| Antwort-Vollständigkeit | `eaccode`, dann `was kannst du?` | Antwort kommt **vollständig**, nicht mitten im Satz abgeschnitten |
+| Token-Stats | Status-Zeile | `MiniMax-M3 │ X.Ys │ NNN chars` (nicht "0 chars") |
+| Fallback | `minimax` API-Key ungültig setzen, dann chatten | Fallback zu `ollama/llama3.2` greift |
+
 ## Fehler melden (wichtig für die Zusammenarbeit)
 
 Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:
