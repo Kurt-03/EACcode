@@ -66,12 +66,19 @@ Render-Sektionen, Pipe-Integration)
   Eingabezeile** (nicht darüber) — HSplit-Reihenfolge Log → Input →
   Palette; Höhe dynamisch 0–12 Zeilen (`Dimension(max=12)`,
   `dont_extend_height=True`); unsichtbar wenn zu (render leer)
-- **Stream-Bereinigung** (08-14): Think-Blöcke (`<think>...</think>`)
+- **Stream-Bereinigung** (08-14, **Fix 08-17**): Think-Blöcke (`<think>...</think>`)
   werden chunk-übergreifend gefiltert (MiniMax sendet Reasoning),
   `
 ` + ANSI-Escapes aus dem Stream entfernt — Antwort immer sichtbar
-  (live: „Hallo Welt" statt `</think>`); Backspace/Delete löschen auch
-  bei offener Palette, kein Bell bei leerem Buffer
+  (live: „Hallo Welt" statt `</think>`); Backspace/Delete löschen auch bei
+  offener Palette, kein Bell bei leerem Buffer. **Wichtig:** Tag-Strings sind im Code
+  als `THINK_OPEN`/`THINK_CLOSE` Modul-Konstanten definiert (nicht inline!), weil das
+  Edit-Tool die Tags sonst in leere Strings umwandelt. **Bug 08-17:**
+  `split(`</think>`, 1)[1]` hat die Antwort verschluckt, wenn die Antwort
+  in einem separaten Chunk NACH `</think>` kommt. Fix: `partition(THINK_CLOSE)`
+  — Partition gibt konsistent alles nach dem ersten Match zurück, auch wenn `before` leer ist.
+  Symptom war: Antworten mit abgeschnittenem Anfang (". I can help with..." statt "Hi! I'm your
+  eaccode...") oder einzelne Satzzeichen ("?"). Tests in `test_palette.py::TestStreamStripThink`.
 - **Layout-Chrome (`ChatApp`) als `FloatContainer`** (08-17): `ChatApp.build_application`
   baut `root = FloatContainer(content=HSplit([input_row]), floats=[palette_float])`
   mit `palette_float = Float(content=Window(...), ycursor=True, allow_cover_cursor=False)`.
