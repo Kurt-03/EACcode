@@ -1,13 +1,12 @@
 """Tests for the agent core loop.
 
-Each test uses a `FakeProvider` (subclass of eaccode.from eaccode.providers import base as provider_base.Provider)
+Each test uses a `FakeProvider` (subclass of eaccode.providers.base.Provider)
 that yields a fixed sequence of StreamChunks. The agent does not care
 about Anthropic-specific events — only the StreamChunk contract.
 """
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -17,9 +16,8 @@ import pytest
 from eaccode import config as cfg
 from eaccode import permissions
 from eaccode.agent import Agent, Tool, ToolCall
-from eaccode.providers import base as provider_base
 from eaccode.providers import registry as provider_registry
-from eaccode.providers.base import StreamChunk, ToolCall
+from eaccode.providers.base import StreamChunk
 
 
 def _conf() -> dict[str, Any]:
@@ -52,7 +50,6 @@ class FakeProvider:
         cancel_event: Any | None = None,
         extra: dict[str, Any] | None = None,
     ) -> Any:
-        from collections.abc import Iterator
 
         self.last_kwargs = {
             "messages": messages,
@@ -61,10 +58,11 @@ class FakeProvider:
             "max_tokens": max_tokens,
             "temperature": temperature,
         }
-        if self.call_count < len(self.responses):
-            response = self.responses[self.call_count]
-        else:
-            response = []
+        response = (
+            self.responses[self.call_count]
+            if self.call_count < len(self.responses)
+            else []
+        )
         self.call_count += 1
         return iter(response)
 
@@ -323,7 +321,6 @@ class TestToolCalls:
 
         class RecordingFake(FakeProvider):
             def stream(self, messages: list[dict[str, Any]], **kw: Any) -> Any:
-                from collections.abc import Iterator
 
                 if messages and messages[-1].get("role") == "tool":
                     received["tool_msg"] = messages[-1]

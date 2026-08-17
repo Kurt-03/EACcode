@@ -26,7 +26,7 @@ import json
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -341,10 +341,9 @@ def fetch_models_dev(
     if disk_data:
         _models_dev_cache = disk_data
         disk_age = _disk_cache_age_seconds()
-        if disk_age is not None:
-            _models_dev_cache_time = time.time() - disk_age
-        else:
-            _models_dev_cache_time = 0.0
+        _models_dev_cache_time = (
+            time.time() - disk_age if disk_age is not None else 0.0
+        )
         _start_background_refresh_models_dev()
         return _models_dev_cache
 

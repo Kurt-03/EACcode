@@ -399,7 +399,6 @@ def _cmd_model_ping(rest: list[str], stdout: TextIO) -> int:
         stdout.write("Usage: model ping <provider/model>\n")
         return 1
     from eaccode.providers import registry as providers
-    from eaccode.providers.base import StreamChunk
     conf = cfg.load_config()
     provider_name, _, model_short = rest[0].partition("/")
     provider_config = (conf.get("providers") or {}).get(provider_name, {})

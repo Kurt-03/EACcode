@@ -18,8 +18,6 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from eaccode import config as cfg
-
 # Model catalog: well-known model ids per provider (UX aid, not exhaustive).
 # For real catalog data, use eaccode.models_dev.
 KNOWN_MODELS: dict[str, list[str]] = {

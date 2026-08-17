@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -62,11 +61,17 @@ class TestApiKeyResolution:
 
     def test_env_var_wins(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("MY_KEY", "sk-from-env")
-        assert registry._api_key_from_config({"api_key": "sk-from-file", "api_key_env": "MY_KEY"}) == "sk-from-env"
+        result = registry._api_key_from_config(
+            {"api_key": "sk-from-file", "api_key_env": "MY_KEY"}
+        )
+        assert result == "sk-from-env"
 
     def test_file_when_env_missing(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("MY_KEY", raising=False)
-        assert registry._api_key_from_config({"api_key": "sk-from-file", "api_key_env": "MY_KEY"}) == "sk-from-file"
+        result = registry._api_key_from_config(
+            {"api_key": "sk-from-file", "api_key_env": "MY_KEY"}
+        )
+        assert result == "sk-from-file"
 
     def test_no_env_no_file(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("MY_KEY", raising=False)

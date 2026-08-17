@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from eaccode.providers import anthropic as anthropic_mod
 from eaccode.providers.anthropic import (
     AnthropicProvider,
     _build_beta_headers,
@@ -16,8 +12,6 @@ from eaccode.providers.anthropic import (
     _convert_tools_to_anthropic,
     _is_minimax_endpoint,
 )
-from eaccode.providers.base import StreamChunk
-
 
 # ---------------------------------------------------------------------------
 # Message/tool conversion

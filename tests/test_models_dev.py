@@ -12,7 +12,6 @@ import pytest
 
 from eaccode import models_dev
 
-
 # ---------------------------------------------------------------------------
 # Sample registry fixture (mimics models.dev/api.json shape)
 # ---------------------------------------------------------------------------

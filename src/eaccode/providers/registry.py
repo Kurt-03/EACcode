@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from eaccode.providers.anthropic import AnthropicProvider, _is_minimax_endpoint
+from eaccode.providers.anthropic import AnthropicProvider
 from eaccode.providers.base import Provider
-
 
 _FAMILY_ANTHROPIC = "anthropic"
 _FAMILY_UNSUPPORTED = "unsupported"

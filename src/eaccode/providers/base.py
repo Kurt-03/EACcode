@@ -7,8 +7,9 @@ instances; the agent downstream never touches anthropic/openai types.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Protocol
+from typing import Any, Protocol
 
 
 @dataclass
