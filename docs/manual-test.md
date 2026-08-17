@@ -246,6 +246,34 @@ Hinweis: Browser-Tools sind mutierend → Permission-Prompt `Allow: browser_navi
 
 ---
 
+## ChatApp: Layout, Palette, Turn-Marker (2026-08-17)
+
+Slash-Palette sitzt **unter** `❯`, `●`-User-Echo, gestrichelte Linie vor `❯`,
+0 leere Zeilen beim Start.
+
+Voraussetzung: echtes Terminal (Windows-Terminal oder CMD), Breite ≥ 80.
+
+| Check | Aktion | Erwartung |
+|---|---|---|
+| Start ohne LZ-Spam | `uv run eaccode` | Banner 1×, `Welcome` + `Tip`, **0 leere Zeilen**, gestrichelte Linie `─ ─ ─`, dann `❯ ▌` |
+| User-Echo `●` | `hi` + Enter | `● hi` (blau fett), Agent-Antwort weiß fett, Statusline gedimmt, **1 LZ + Linie**, dann `❯` |
+| Slash-Palette Position | `/` | Palette erscheint **direkt unter** `❯`, **nicht** zwischen Statusline und `❯` |
+| Palette Filter | `/mem` | Sofort auf 1 Treffer gefiltert (`/memory`), ❯-Marker auf Index 0 |
+| Palette Navigation | `/m` + ↓ 4× | ❯ wandert nach unten, vorherige Zeile wird wieder idle |
+| Palette kein Match | `/xyz` | `(no matches)` (kursiv, gedimmt) |
+| Enter 1× | `/mem` + Enter | Palette schließt, `/memory` in Buffer, `❯ /memory\|` |
+| Enter 2× | dann nochmal Enter | `eaccode 0.0.1` (oder Usage), 1 LZ + Linie, `❯` |
+| Slash-Command-Output | `/version` + Enter | `eaccode 0.0.1`, Linie, `❯` |
+| Permission (kein Spacer) | `rm -rf /test` + Enter | `Allow: run_command … [y/N]` **ohne** 1 LZ davor, direkt `❯` |
+| Permission y | `y` | `[user] y` (oder direkter Run), Statusline, Linie, `❯` |
+| Stream-Verhalten | normaler Chat | Chunks streamen live in Scrollback, `❯` bleibt unten (patch_stdout) |
+| Ctrl+C | Ctrl+C | `bye`, Exit 0 |
+
+**Wichtig:** Vorher vergleichen — `abstand zu oben.md` zeigte 30+ LZ zwischen Tip
+und `❯`. Nach dem Fix: 0 LZ.
+
+---
+
 ## Fehler melden (wichtig für die Zusammenarbeit)
 
 Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:

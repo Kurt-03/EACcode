@@ -24,6 +24,13 @@ Welcome/Tip + Stat-Zeile nach Antworten.
   Einzeiler — nur wenn `stdout.isatty()` und nicht `EACCODE_QUIET=1`
   (Hermes-`-Q`-Parität); sonst kompakter Einzeiler (Tests/Pipes bleiben
   stabil)
+- **Gestrichelte Linie vor `❯`** (08-17, mit
+  [[15-features/system/slash-palette.md|Slash-Palette]]): Eine `- - - - -` × N
+  Zeile (60 Zeichen, clamped 40-80) wird einmal beim Start UND nach jedem
+  Turn gedruckt. Style `chat.divider` (fg:#5a5a5a, fast unsichtbar).
+  Trennt visuell den Input-Bereich vom Scrollback. Nach `_agent_worker` und
+  `_run_slash`: 1 LZ + Linie vor nächstem `❯`. Nach `Allow: …` (Permission):
+  **kein** Spacer, der User antwortet direkt.
 - **ChatApp** (Vollbild): Banner als erste Log-Zeilen (Style
   `chat.banner`, grau) mit Session-ID; nach jeder Agent-Antwort eine
   Stat-Zeile (Style `chat.stat`, gedimmt) mit Modell, Dauer, Zeichen —

@@ -72,7 +72,28 @@ Render-Sektionen, Pipe-Integration)
 ` + ANSI-Escapes aus dem Stream entfernt — Antwort immer sichtbar
   (live: „Hallo Welt" statt `</think>`); Backspace/Delete löschen auch
   bei offener Palette, kein Bell bei leerem Buffer
-- **patch_stdout um `app.run()`** (08-16, WURZELFIX live gefunden):
+- **Layout-Chrome (`ChatApp`) als `FloatContainer`** (08-17): `ChatApp.build_application`
+  baut `root = FloatContainer(content=HSplit([input_row]), floats=[palette_float])`
+  mit `palette_float = Float(content=Window(...), ycursor=True, allow_cover_cursor=False)`.
+  Ersetzt die alte `HSplit` mit `Window(height=0)` als Filler — der hatte unter
+  `full_screen=False` keinen Effekt, Palette rutschte über `❯` statt darunter.
+  Vorlage: `PalettePrompt.build_application` (Z. 180-200), die das Pattern bereits
+  richtig nutzte. Palette-Max jetzt 8 Zeilen (war 12, Nutzerwunsch 08-17).
+- **`_push_input_to_bottom` ohne Spacer-Spam** (08-17): Der `print("\n" * (term_lines - 1))`-
+  Hack stand noch aus dem Vollbild-Mode und produzierte 30+ leere Zeilen vor `❯`.
+  Ersetzt durch nur `app.invalidate()` — `full_screen=False` + `Float(ycursor=True)`
+  pinnt die Chrome bereits ans untere Terminal-Ende.
+- **`_divider()` als gestrichelte Linie vor `❯`** (08-17): `- - - - -` × N (60 Zeichen,
+  clamped 40-80), Style `chat.divider` (fg:#5a5a5a, fast unsichtbar). Eine Leerzeile
+  vor der Linie, Linie sitzt direkt vor `❯`. Wird einmal beim Start geprintet UND
+  nach jedem Turn (Statusline-Ende) — getrennte visuelle Bereiche.
+- **`●` User-Echo-Marker** (08-17): Jede User-Nachricht kriegt einen `● ` (U+25CF)
+  vorangestellt — wie Hermes, hebt User-Echo vom Agent-Text ab. Code: `self._emit(f"● {text}")`
+  in `ChatApp._submit`. Pattern: kein Box-Rahmen, kein Symbol-Wirrwarr.
+- **`_emit("")` = explizite Leerzeile** (08-17): Vorher warf `_emit("")` einen
+  AssertionError. Patch: `if text: print(text); else: print()`. Wird gebraucht für
+  Turn-Spacer (1 LZ zwischen Statusline und Divider).
+- **`patch_stdout` um `app.run()`** (08-16, WURZELFIX live gefunden):
   Der komplette Lauf ist in `with patch_stdout():` gewrappt (Hermes-
   Ansatz, cli.py:18085) — NICHT pro Write! Vorher renderten sich die
   ❯-Chrome-Zeichen MITTEN in den gestreamten Text (`Hi! How can❯ I
