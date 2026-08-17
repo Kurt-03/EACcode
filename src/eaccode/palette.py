@@ -536,6 +536,13 @@ class ChatApp:
 
         def _on_text_changed(_buffer: Buffer) -> None:
             self.palette.refresh(self._buffer.text)
+            # Force the layout to redraw so the float actually appears
+            # (full_screen=False does not auto-redraw on text changes).
+            if self._app is not None:
+                try:
+                    self._app.invalidate()
+                except Exception:
+                    pass
 
         self._buffer.on_text_changed += _on_text_changed
 
