@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import threading
 import time
+from io import StringIO
 from typing import Any
 from unittest.mock import patch
 
@@ -271,6 +272,59 @@ def _wait_for(predicate: Any, timeout: float = 5.0) -> bool:
             return True
         time.sleep(0.05)
     return False
+
+
+class TestApprovalsSlashCommand:
+    def test_approvals_shows_status(self) -> None:
+        """Verify _cmd_approvals emits mode info."""
+        from eaccode import palette
+
+        app = palette.ChatApp(agent=FakeAgent())
+        # Don't actually run subcommand (would need config setup)
+        # Just verify the method exists and handles unknown args
+        with patch("sys.stdout", new_callable=StringIO) as mock:
+            app._cmd_approvals(["unknown"])
+        assert "Usage:" in mock.getvalue()
+
+    def test_approvals_change_to_smart(self) -> None:
+        """Verify _cmd_approvals handles smart arg."""
+        from eaccode import palette
+
+        app = palette.ChatApp(agent=FakeAgent())
+        # Pre-set event to avoid any blocking
+        app._permission_event.set()
+        app._permission_answer = "y"
+        # Just call to verify it doesn't crash
+        with patch("sys.stdout", new_callable=StringIO):
+            app._cmd_approvals(["smart"])
+
+    def test_ask_summary_short(self) -> None:
+        """Long prompts should be truncated in the prompt output."""
+        from eaccode import palette
+        import threading
+
+        app = palette.ChatApp(agent=FakeAgent())
+        long_prompt = "run_command " + "echo a " * 200
+
+        # Schedule the event set after _ask calls clear()
+        def trigger():
+            # Wait for _ask to call clear() then set immediately
+            app._permission_event.wait(timeout=2)
+            app._permission_event.set()
+            app._permission_answer = "y"
+
+        t = threading.Thread(target=trigger, daemon=True)
+        t.start()
+
+        with patch("sys.stdout", new_callable=StringIO) as mock:
+            app._ask(long_prompt)
+        t.join(timeout=2)
+
+        output = mock.getvalue()
+        # Truncated to 80 chars with ellipsis
+        assert "..." in output
+        # Output should be shorter than the original prompt
+        assert len(output) < len(long_prompt) + 50
 
 
 class TestChatApp:

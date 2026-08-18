@@ -471,9 +471,17 @@ class ChatApp:
     # -- permission (inline) ------------------------------------------------
 
     def _ask(self, prompt: str) -> bool:
+        """Prompt the user inline for tool approval.
+
+        Long prompts (e.g. run_command with several args) are truncated so
+        the inline ask is easy to read.
+        """
         self._permission_prompt = prompt
         self._permission_event.clear()
-        self._emit(f"Allow: {prompt} [y/N]")
+        summary = prompt
+        if len(summary) > 80:
+            summary = summary[:77] + "..."
+        self._emit(f"✖ allow {summary}? [y/N]")
         self._permission_event.wait(timeout=600)
         return self._permission_answer in ("y", "yes")
 
@@ -531,6 +539,30 @@ class ChatApp:
             self._run_agent(text)
         return True
 
+    def _cmd_approvals(self, rest: list[str]) -> None:
+        """Show current mode or change via /approvals [manual|smart|off]."""
+        from io import StringIO
+        from eaccode.commands import run_permissions_command
+
+        if not rest:
+            stdout = StringIO()
+            run_permissions_command(["status"], stdout=stdout)
+            self._emit(stdout.getvalue().rstrip())
+            return
+        if rest[0] in ("manual", "smart", "off", "read_only"):
+            stdout = StringIO()
+            code = run_permissions_command(["mode", rest[0]], stdout=stdout)
+            self._emit(stdout.getvalue().rstrip())
+            if code != 0:
+                self._emit(f"(exit {code})")
+            return
+        if rest[0] == "status":
+            stdout = StringIO()
+            run_permissions_command(["status"], stdout=stdout)
+            self._emit(stdout.getvalue().rstrip())
+            return
+        self._emit(f"Usage: /approvals [manual|smart|off]")
+
     def _run_slash(self, command: str) -> None:
         name, args = self._parse(command)
         if name in ("exit", "quit"):
@@ -548,6 +580,11 @@ class ChatApp:
             return
         if name == "help":
             self._emit(commands.HELP_TEXT.rstrip())
+            self._emit("")
+            self._emit(self._divider())
+            return
+        if name == "approvals":
+            self._cmd_approvals(args)
             self._emit("")
             self._emit(self._divider())
             return
