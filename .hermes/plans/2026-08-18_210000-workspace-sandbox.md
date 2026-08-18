@@ -1,7 +1,8 @@
-# Plan H.minimal: Isolated Workspace — 3 Stufen
+# Plan H.minimal: Isolated Workspace — 3 Stufen (run_command NICHT in Sandbox)
 
 > **Fokus:** Nur Block B + Minimum an Block A für Sandbox-Funktionalität.
 > **Stand:** eaccode hat aktuell 0% Sandbox-Isolation.
+> **Vergleichsbasis:** Claude Code (seatbelt/bubblewrap), OpenCode (Git-Worktree), Hermes (Docker-Container).
 
 ## Was bedeutet "isolated" konkret — 3 Stufen
 
@@ -27,8 +28,15 @@ Alle Tools die **Pfade akzeptieren** werden durch den Sandbox-Layer geschickt:
 | `memory_*` | MEMORY.md bleibt in echtem Filesystem (User-Profile) |
 | `create_skill`, `improve_skill` | Skills bleiben in echtem Filesystem |
 | `browser_*` | Browser hat eigene Sandbox (URLs, nicht Pfade) |
-| `run_command` | **Bleibt nativ** in Stufe 1 (siehe Stufe 2) |
 | `http_get`, `web_search` | URLs, keine Pfade |
+
+> **`run_command` bleibt in Stufe 1+2 nativ.** Es ist bewusst KEIN Sandbox-Target, weil:
+> - User hat das Tool explizit designed für Shell-Aufgaben
+> - Smart-Mode Aux-LLM bewertet jeden Command
+> - Hardline-Pattern (rm -rf /, sudo -S, etc.) blocken bereits
+> - Wenn User shell-comfortable ist, soll er Shell kriegen
+>
+> **Stufe 3 (Docker-Container)** hat separate Container für `run_command` (Hermes-Verbatim).
 
 **Für dich:**
 ```
@@ -49,8 +57,8 @@ $ eaccode
 ### Stufe 2 — Hard-Sandbox mit Permission-Bridge (2-3 Wochen, ~1500 LOC)
 
 **Was es macht (zusätzlich zu Stufe 1):**
-- `run_command` läuft auch in Sandbox (chroot/Windows-Junction-basierter Container)
-- Alle Tools (read/write/edit/git/repo/etc.) checken via `validate_within_dir`
+- `run_command` bleibt nativ (siehe Hinweis oben)
+- Alle anderen Tools (read/write/edit/git/repo/etc.) checken via `validate_within_dir`
 - Permission-Bridge: User kann einzelne Pfade explizit aus der Sandbox **rausmappen** (`/approvals allow-path C:/...`)
 - Bei allen Tools außerhalb sandbox: explicit user-approval nötig
 
