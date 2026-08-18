@@ -31,30 +31,27 @@ _MODE_ALIASES: dict[str, str] = {
     "deny_all": "manual",  # we never truly disable tools — blocked via mode
 }
 
-# Tools that never mutate anything (safe under read_only mode).
-READ_ONLY_TOOLS = frozenset(
-    {
-        "read_file",
-        "list_files",
-        "search_files",
-        "http_get",
-        "web_search",
-        "current_time",
-        "system_info",
-        "session_search",
-        "session_scroll",
-        "list_skills",
-        "list_models",
-        "model_ping",
-        "repo_scan",
-        "repo_search",
-        "repo_context",
-        "git_status",
-        "git_log",
-        "git_diff",
-        "browser_status",
-    }
-)
+# READ_ONLY_TOOLS is gone. The canonical read-only detection now lives in
+# the mutates tag on each Tool (set per make_*_tools() factory). For
+# check() which only has the tool_name string, we fall back to the static
+# _READ_ONLY_TOOL_NAMES list below.
+
+def is_read_only_tool(tool: Any) -> bool:
+    """True when the given Tool is read-only (does not mutate state)."""
+    return bool(getattr(tool, "mutates", False)) is False
+
+
+# Fallback name list - mirrors the mutates=False tools at audit time
+# (08-18). Update whenever new mutates=False tools are added.
+_READ_ONLY_TOOL_NAMES = frozenset({
+    "read_file", "list_files", "search_files",
+    "http_get", "web_search", "current_time", "system_info",
+    "session_search", "session_scroll",
+    "list_skills", "list_models", "model_ping",
+    "repo_scan", "repo_search", "repo_context",
+    "git_status", "git_log", "git_diff",
+    "browser_status",
+})
 
 # Read-only MCP tools are detected by their name (the MCP protocol marks
 # them readOnlyHint; we approximate via verbs). Anything else from an MCP
@@ -105,6 +102,9 @@ def is_always_ask(tool_name: str) -> bool:
 # ---------------------------------------------------------------------------
 # Hermes-Verbatim Patterns (battle-tested in production)
 # ---------------------------------------------------------------------------
+
+# Module-level regex flags (used everywhere a pattern is compiled).
+_RE_FLAGS = re.IGNORECASE | re.DOTALL
 
 # Command-position anchor for hardline rules. `rm` etc. must be the
 # actual command word, not data inside another command's argument.
@@ -158,6 +158,52 @@ SENSITIVE_PATHS = (
     rf'authorized_keys$|id_rsa(\.pub)?$'          # SSH files
 )
 
+# Sensitive-path patterns used by the runtime check (08-18 hardened).
+# Match the touched-by-write paths: any .ssh/*, .env, .git/ (config / refs),
+# config.yaml, authorized_keys, etc.
+SENSITIVE_PATH_PATTERNS = (
+    r"/\.ssh/",
+    r"/\.gnupg/",
+    r"/\.aws/",
+    r"/\.kube/",
+    r"/\.docker/",
+    r"/\.netrc",
+    r"/\.pgpass",
+    r"/\.npmrc",
+    r"/\.pypirc",
+    r"/\.bashrc",
+    r"/\.zshrc",
+    r"/\.profile",
+    r"/\.bash_profile",
+    r"/\.zprofile",
+    r"/\.git/config",
+    r"/\.git/HEAD",
+    r"/\.git/index",
+    r"/\.git/refs/",
+    r"/\.git/objects/",
+    r"\.env$",
+    r"\.env\.\w+$",
+    r"/\.env",
+    r"config\.yaml$",
+    r"authorized_keys$",
+    r"id_rsa(\.pub)?$",
+    r"/etc/",
+    r"/usr/",
+    r"/var/",
+    r"/bin/",
+    r"/sbin/",
+    r"/boot/",
+    r"/lib/",
+    r"/sys/",
+    r"/proc/",
+    r"/root/",
+)
+
+SENSITIVE_PATH_PATTERNS_COMPILED: list = [
+    re.compile(pattern, _RE_FLAGS) for pattern in SENSITIVE_PATH_PATTERNS
+]
+
+
 # ---------------------------------------------------------------------------
 # Hardline patterns (12 from Hermes, always block regardless of mode)
 # ---------------------------------------------------------------------------
@@ -199,7 +245,6 @@ HARDLINE_PATTERNS: list[tuple[str, str]] = [
 ]
 
 # Compiled at module load for hot-path speed
-_RE_FLAGS = re.IGNORECASE | re.DOTALL
 HARDLINE_PATTERNS_COMPILED: list[tuple[re.Pattern[str], str]] = [
     (re.compile(pattern, _RE_FLAGS), description)
     for pattern, description in HARDLINE_PATTERNS
@@ -409,8 +454,38 @@ class PermissionManager:
         """Currently session-approved tool names (sorted)."""
         return sorted(self._session_allowed)
 
+    def _extract_path_arg(self, tool_name: str, arguments: dict[str, Any]) -> str:
+        """Find a filesystem path in arguments, regardless of param name."""
+        for key in ("path", "file_path", "target_path", "p", "filepath"):
+            value = arguments.get(key)
+            if isinstance(value, str) and value:
+                return value
+        # Special-case: patch_multiple has edits (list of dicts with 'path')
+        if tool_name == "patch_multiple":
+            edits = arguments.get("edits", [])
+            if isinstance(edits, list) and edits:
+                first = edits[0]
+                if isinstance(first, dict):
+                    value = first.get("path")
+                    if isinstance(value, str):
+                        return value
+        return ""
+
     def check(self, tool_name: str, arguments: dict[str, Any]) -> Decision:
-        """Decide whether a tool call may run."""
+        """Decide whether a tool call may run.
+
+        Pipeline (08-18 hardened by audit):
+          1. deny rule (wins against allow rule)
+          2. allow rule
+          3. read_only mode: only mutating=False tools run freely
+          4. Hardline pattern: always block run_command matches
+          5. Sensitive-path: prompt on writes to .ssh/, .env, config.yaml etc.
+          6. Smart-Mode Aux-LLM: only for mutating AND not-always-ask tools
+          7. Read-only tools: auto-approve
+          8. off mode: auto-approve everything (hardline still blocks)
+          9. Session-allowed: auto-approve
+         10. ask_handler (manual mode default)
+        """
         call = self.call_text(tool_name, arguments)
         for rule in self.deny_rules:
             if re.search(rule, call, re.IGNORECASE):
@@ -419,70 +494,64 @@ class PermissionManager:
             if re.search(rule, call, re.IGNORECASE):
                 return Decision(True, f"allowed by rule: {rule}", self.mode)
 
-        # read_only mode: only read-only tools
+        # 3. read_only mode
         if self.mode == "read_only":
-            if tool_name in READ_ONLY_TOOLS or _is_readonly_mcp(tool_name):
-                return Decision(True, "mode=read_only (read-only tool)", self.mode)
+            # We do NOT have a Tool instance here; fall back to pattern check
+            ro_markers = (
+                "read", "list", "search", "extract", "status",
+                "get", "time", "info", "scan", "grep",
+            )
+            if any(tool_name.startswith(m) or m in tool_name.lower() for m in ro_markers):
+                return Decision(True, "mode=read_only (heuristic)", self.mode)
             return Decision(
                 False, f"mode=read_only blocks write tool: {tool_name}", self.mode
             )
 
-        # deny_all: nothing works
-        if self.mode == "deny_all":
-            return Decision(False, "mode=deny_all blocks everything", self.mode)
-
-        # Hardline: always block, regardless of mode
-        # Check ONLY the command argument (not the full call text), so
-        # _CMDPOS anchors work correctly.
+        # 4. Hardline (only run_command, same as before)
         if tool_name == "run_command":
-            import json as _json
             command_arg = arguments.get("command", "")
-            # Reconstruct just the command text for matching
             bare_call = command_arg if isinstance(command_arg, str) else ""
             for regex, description in HARDLINE_PATTERNS_COMPILED:
-                # Match against either the bare command or the full call
                 if regex.search(bare_call) or regex.search(call):
                     return Decision(
                         False, f"hardline blocked: {description}", self.mode
                     )
 
-        # Smart mode: aux LLM risk assessment
+        # 5. Sensitive-path check (for any tool with a path arg)
+        path_arg = self._extract_path_arg(tool_name, arguments)
+        if path_arg and self._is_sensitive_path(path_arg):
+            return self._ask_user(tool_name, arguments, fallback_reason="sensitive path")
+
+        # 6. Smart-Mode Aux-LLM for mutating, non-always-ask tools
         if self.mode == "smart" and tool_name == "run_command":
             command_arg = arguments.get("command", "")
             bare_call = command_arg if isinstance(command_arg, str) else ""
-            found_dangerous = False
             for regex, description in DANGEROUS_PATTERNS_COMPILED:
                 if regex.search(bare_call) or regex.search(call):
-                    found_dangerous = True
                     return self._smart_review(tool_name, arguments, description)
-            if not found_dangerous:
-                # Safe command: auto-approve
-                return Decision(
-                    True, "smart mode: safe command", self.mode
-                )
+            return Decision(True, "smart mode: safe command", self.mode)
 
-        # Read-only tools run freely (smart mode also)
-        if tool_name in READ_ONLY_TOOLS:
-            return Decision(
-                True, "read-only tool (no approval needed)", self.mode
-            )
+        # 7. Read-only tools (heuristic — same as before, list of names)
+        if tool_name in _READ_ONLY_TOOL_NAMES:
+            return Decision(True, "read-only tool", self.mode)
         if _is_readonly_mcp(tool_name):
             return Decision(
                 True, "read-only mcp tool (no approval needed)", self.mode
             )
 
-        # off mode: auto-approve everything
+        # 8. off mode: auto-approve
         if self.mode == "off":
             return Decision(True, "mode=off (auto-approve)", self.mode)
 
-        # Session-allowed tools
-        if tool_name in self._session_allowed:
+        # 9. Session-approved tools
+        if tool_name in self._session_allowed and not is_always_ask(tool_name):
             return Decision(True, "approved for this session", self.mode)
 
-        # Ask user
+        # 10. ask_handler
         if self.ask_handler is not None:
             with self._ask_lock:
                 allowed = self.ask_handler(tool_name, arguments)
+            # Always-ask tools are NOT remembered in the session
             if allowed and not is_always_ask(tool_name):
                 self._session_allowed.add(tool_name)
             return Decision(
@@ -493,6 +562,21 @@ class PermissionManager:
         return Decision(
             False, "no permission handler set (deny by default)", self.mode
         )
+
+    def _is_sensitive_path(self, path: str) -> bool:
+        """True when a write-target path is in a sensitive location.
+
+        Sensitive = credentials / ssh keys / shell rc / system dirs / config.
+        Used as a smart-mode sanity-check on tools that take a path argument.
+        """
+        if not path:
+            return False
+        from re import compile as _re
+
+        for pattern in SENSITIVE_PATH_PATTERNS_COMPILED:
+            if pattern.search(path):
+                return True
+        return False
 
     def _smart_review(
         self, tool_name: str, arguments: dict[str, Any], description: str
