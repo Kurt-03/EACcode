@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import re
 import shutil
 import sys
@@ -447,9 +448,17 @@ class ChatApp:
         except Exception as exc:
             answer = f"Error: {exc}"
         self._stream_open = False
+        # Give patch_stdout a beat to drain pending output from the worker
+        # thread. Without this, the very last chunks land AFTER the status
+        # line is printed, leaving the answer body invisible above the
+        # status line. Skip in tests (EACCODE_TEST=1).
+        if not os.environ.get("EACCODE_TEST"):
+            time.sleep(0.05)
         if self._streamed_any:
             # streamed text is already in the scrollback; terminate the line
-            print()
+            sys.stdout.flush()
+            print(flush=True)
+            sys.stdout.flush()
         elif answer:
             self._emit(answer)
         try:
