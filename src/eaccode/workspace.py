@@ -105,13 +105,13 @@ class Workspace:
 
 
 def get_default_workspace() -> Workspace:
-    """Build a Workspace rooted at ``<cwd>/.eaccode-workspace/``.
+    """Build a Workspace rooted at ``Path.cwd()``.
 
-    Creates the directory if it doesn't exist yet.
+    The current working directory IS the workspace. eaccode does NOT
+    create a separate sub-directory - that would confuse users
+    (``cd test1`` would mean workspace=test1, not test1/.eaccode-workspace/).
     """
-    root = Path.cwd() / ".eaccode-workspace"
-    root.mkdir(parents=True, exist_ok=True)
-    return Workspace(root=root.resolve())
+    return Workspace(root=Path.cwd().resolve())
 
 
 def load_workspace_from_config(config: Optional[dict] = None) -> Workspace:
@@ -129,8 +129,7 @@ def load_workspace_from_config(config: Optional[dict] = None) -> Workspace:
     if root_str:
         root = Path(root_str).expanduser().resolve()
     else:
-        root = (Path.cwd() / ".eaccode-workspace").resolve()
-    root.mkdir(parents=True, exist_ok=True)
+        root = Path.cwd().resolve()
 
     allow_paths: list[Path] = []
     for raw in ws_cfg.get("allow_paths") or []:

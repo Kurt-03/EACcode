@@ -135,19 +135,17 @@ class TestExempt:
 
 
 class TestGetDefaultWorkspace:
-    def test_creates_dir(self, tmp_path, monkeypatch) -> None:
+    def test_workspace_is_cwd(self, tmp_path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
         ws_obj = get_default_workspace()
-        assert ws_obj.root.exists()
-        assert ws_obj.root.parent == tmp_path.resolve()
-        assert ws_obj.root.name == ".eaccode-workspace"
+        assert ws_obj.root == tmp_path.resolve()
 
 
 class TestLoadFromConfig:
-    def test_default_workspace_when_no_config(self, tmp_path, monkeypatch) -> None:
+    def test_default_workspace_is_cwd(self, tmp_path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
         ws_obj = load_workspace_from_config({})
-        assert ws_obj.root.name == ".eaccode-workspace"
+        assert ws_obj.root == tmp_path.resolve()
 
     def test_custom_root_from_config(self, tmp_path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
