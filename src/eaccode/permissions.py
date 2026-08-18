@@ -571,13 +571,37 @@ class PermissionManager:
 
         # 5. Sensitive-path check (for any tool with a path arg)
         path_arg = self._extract_path_arg(tool_name, arguments)
-        if path_arg and self._is_sensitive_path(path_arg):
-            return self._ask_user(
-                tool_name,
-                arguments,
-                fallback_reason="sensitive path",
-                sensitive=True,
+        if path_arg:
+            # 5a. Phase 2: file_safety.hardcoded-paths (more strict than our
+            # generic regex match). Block unconditionally - no prompt.
+            # Only check on mutating tools (writing to file).
+            _mutating_tools = (
+                "write_file", "patch_file", "patch_multiple",
+                "file_edit", "git_commit", "git_branch_new",
+                "git_commit_undo", "create_skill", "improve_skill",
+                "memory_add", "memory_replace", "memory_remove",
+                "memory_apply_batch", "browser_screenshot",
             )
+            if tool_name in _mutating_tools:
+                try:
+                    from eaccode.file_safety import is_write_denied
+
+                    if is_write_denied(path_arg):
+                        return Decision(
+                            False,
+                            "file_safety blocked (exact sensitive path)",
+                            self.mode,
+                        )
+                except Exception:
+                    pass
+            # 5b. Our generic sensitive-path check (allows prompt)
+            if self._is_sensitive_path(path_arg):
+                return self._ask_user(
+                    tool_name,
+                    arguments,
+                    fallback_reason="sensitive path",
+                    sensitive=True,
+                )
 
         # 6. Smart-Mode Aux-LLM for mutating, non-always-ask tools
         if self.mode == "smart" and tool_name == "run_command":
