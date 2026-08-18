@@ -327,6 +327,26 @@ class TestApprovalsSlashCommand:
         assert "[n]" in output
         assert "[A]" in output
 
+    def test_preview_unknown_tool_marks_unknown(self) -> None:
+        """Hallucinated tool names (echo, del) get "unknown" prefix."""
+        from eaccode import palette
+
+        app = palette.ChatApp(agent=FakeAgent())
+        prompt = "echo hello world"
+        preview = app._preview_prompt(prompt)
+        # "echo" is not a real eaccode tool, so it should be marked unknown
+        assert preview["tool"].startswith("(unknown)"), preview["tool"]
+
+    def test_preview_known_tool_no_unknown(self) -> None:
+        """Known tool names appear without the unknown marker."""
+        from eaccode import palette
+
+        app = palette.ChatApp(agent=FakeAgent())
+        # read_file is a real tool (from BUILTIN_TOOLS)
+        prompt = 'read_file {"path": "/tmp/x.txt"}'
+        preview = app._preview_prompt(prompt)
+        assert not preview["tool"].startswith("(unknown)"), preview["tool"]
+
     def test_ask_passes_through_simple_prompt(self) -> None:
         """Plain prompts (non-JSON) display without parse error."""
         from eaccode import palette

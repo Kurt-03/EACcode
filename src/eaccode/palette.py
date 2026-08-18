@@ -579,15 +579,45 @@ class ChatApp:
 
         `_wire_agent_gate` calls us with "<tool_name> <json-args>" - we
         parse the JSON and surface the most interesting fields.
+
+        If the tool name is not in the known set we flag it as "unknown"
+        so the user knows the model is calling something that does not
+        actually exist.
         """
         import json as _json
+        from eaccode import tools as _tools_mod
 
-        preview = {"tool": "tool", "action": "", "risk": ""}
+        known_names = {
+            tool.name for tool in _tools_mod.BUILTIN_TOOLS
+        }
+        for make in (
+            "make_editing_tools",
+            "make_learning_tools",
+            "make_memory_tools",
+            "make_repo_tools",
+            "make_git_tools",
+            "make_session_tools",
+            "make_test_tools",
+            "make_browser_tools",
+        ):
+            try:
+                for tool in getattr(_tools_mod, make)():
+                    known_names.add(tool.name)
+            except Exception:
+                pass
+
+        preview = {"tool": "(unknown)", "action": "", "risk": ""}
         space = prompt.find(" ")
         if space < 0:
-            preview["tool"] = prompt[:30]
+            head = prompt[:30]
+            preview["tool"] = (
+                f"(unknown){head}" if head not in known_names else head
+            )
             return preview
-        preview["tool"] = prompt[:space]
+        head = prompt[:space]
+        preview["tool"] = (
+            f"(unknown) {head}" if head not in known_names else head
+        )
         rest = prompt[space + 1 :]
         try:
             data = _json.loads(rest)
