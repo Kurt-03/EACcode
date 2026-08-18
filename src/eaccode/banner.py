@@ -119,8 +119,22 @@ def render_banner(
     return "\n".join([LOGO, "", *box, "", WELCOME, TIP])
 
 
-def status_line(model: str, seconds: float = 0.0, chars: int = 0) -> str:
-    """Compact line after an answer: model, duration, output size."""
-    if seconds:
-        return f"{model} │ {seconds:.1f}s │ {chars} chars"
-    return f"{model} │ ready"
+def status_line(
+    model: str,
+    seconds: float = 0.0,
+    chars: int = 0,
+    *,
+    warning: str | None = None,
+    exit_code: int | None = None,
+) -> str:
+    """Compact line after an answer: model, duration, output size.
+
+    Phase B.1: include a `⚠` warning marker when the last tool returned
+    a non-zero exit code (or set `warning=`).
+    """
+    base = f"{model} │ {seconds:.1f}s │ {chars} chars" if seconds else f"{model} │ ready"
+    if exit_code is not None and exit_code != 0:
+        base = f"{base} │ ⚠ exit={exit_code}"
+    elif warning:
+        base = f"{base} │ ⚠ {warning}"
+    return base

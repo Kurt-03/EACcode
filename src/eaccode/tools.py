@@ -111,7 +111,9 @@ def run_command(command: str, cwd: str | None = None, timeout: int = 30) -> str:
         return f"Error: {exc}"
     output = ((result.stdout or "") + (result.stderr or "")).strip()
     if result.returncode != 0:
-        output = f"{output}\n(exit {result.returncode})".strip()
+        # Phase B.1: surface exit-code via warning prefix that the
+        # status_line picks up. Format: "⚠ exit=N: <output>"
+        output = f"{output}\n⚠ exit={result.returncode} (non-zero)".strip()
     return output or "(no output)"
 
 

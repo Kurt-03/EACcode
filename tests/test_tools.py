@@ -181,3 +181,62 @@ class TestCatalog:
         for tool in tools.BUILTIN_TOOLS:
             assert tool.description
             assert tool.parameters is not None
+
+
+class TestRunCommandExitCode:
+    """Phase B.1: non-zero exit produces visible warning."""
+
+    def test_exit_code_in_output(self) -> None:
+        """When the command exits non-zero, output shows ⚠ exit=N."""
+        from eaccode import tools
+        from eaccode.permissions import PermissionManager
+
+        old_handler = tools.permission_handler
+        try:
+            manager = PermissionManager()
+            manager.ask_handler = lambda n, a: True
+            tools.permission_handler = lambda cmd: True
+
+            # Use `exit 1` as the command (POSIX-bash)
+            result = tools.run_command("bash -c " + chr(34) + "exit 1" + chr(34), timeout=5)
+            assert "⚠ exit=1" in result
+            assert "non-zero" in result
+        finally:
+            tools.permission_handler = old_handler
+
+    def test_success_no_warning(self) -> None:
+        """When the command succeeds, no warning is added."""
+        from eaccode import tools
+
+        old_handler = tools.permission_handler
+        try:
+            tools.permission_handler = lambda cmd: True
+            result = tools.run_command("echo hello", timeout=5)
+            assert "hello" in result
+            assert "⚠ exit=" not in result
+        finally:
+            tools.permission_handler = old_handler
+
+
+class TestStatusLine:
+    """Phase B.1: status_line surfaces exit-code warnings."""
+
+    def test_exit_code_marker(self) -> None:
+        from eaccode.banner import status_line
+
+        line = status_line("model", 1.5, 100, exit_code=1)
+        assert "⚠ exit=1" in line
+        assert "model" in line
+
+    def test_success_no_marker(self) -> None:
+        from eaccode.banner import status_line
+
+        line = status_line("model", 1.5, 100, exit_code=0)
+        assert "⚠" not in line
+
+    def test_warning_marker(self) -> None:
+        from eaccode.banner import status_line
+
+        line = status_line("model", 1.5, 100, warning="permission denied")
+        assert "⚠" in line
+        assert "permission denied" in line
