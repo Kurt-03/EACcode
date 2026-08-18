@@ -24,6 +24,7 @@ from eaccode import skills as skills_mod
 from eaccode.banner import model_label, render_banner
 from eaccode.banner import quiet as banner_quiet
 from eaccode.banner import status_line as render_status_line
+from eaccode.redact import redact as _redact_display
 
 try:
     from prompt_toolkit.application import Application
@@ -284,7 +285,7 @@ class ChatApp:
         self._session_id: str | None = None
         self._permission_prompt: str | None = None
         self._permission_event = threading.Event()
-        self._permission_answer = "n"
+        self._permission_answer = None  # filled by _ask on timeout
         self._stream_open = False
         self._streamed_any = False
         self._think_buffer = ""
@@ -319,18 +320,30 @@ class ChatApp:
         width = max(40, min(width - 4, 80))
         return "- - " * (width // 4)
 
-    def _emit(self, text: str) -> None:
+    def _emit(
+        self, text: str, *, end: str | None = None, flush: bool = False
+    ) -> None:
         """Print one line into the terminal scrollback.
 
         Called from the main or worker thread; when patch_stdout is active
         the write lands above the input chrome.
+
         Empty text means an explicit blank line (used as turn spacer).
+        `end=` is forwarded to print() so callers can suppress the
+        trailing newline (used while drawing the prompt-the-user line).
+        `flush=True` is forwarded for line-buffered interactivity.
         """
         with contextlib.suppress(Exception):
             if text:
-                print(text)
+                print(text, end=end, flush=flush)
             else:
-                print()  # explicit blank line for turn spacer
+                print()
+
+    def _write(self, text: str) -> None:
+        """Write without newline (alias for _emit("", flush=True))."""
+        with contextlib.suppress(Exception):
+            sys.stdout.write(text)
+            sys.stdout.flush()
 
     # -- agent -------------------------------------------------------------
 
@@ -480,20 +493,140 @@ class ChatApp:
 
     # -- permission (inline) ------------------------------------------------
 
-    def _ask(self, prompt: str) -> bool:
-        """Prompt the user inline for tool approval.
+    def _ask(self, prompt: str) -> tuple[str, bool]:
+        """Prompt the user inline for tool approval (5-option UX).
 
-        Long prompts (e.g. run_command with several args) are truncated so
-        the inline ask is easy to read.
+        Returns (scope, allow) where scope ∈
+            {"once", "session", "always", "deny", "deny_always", "timeout"}
+        and allow is True/False.
         """
         self._permission_prompt = prompt
         self._permission_event.clear()
-        summary = prompt
-        if len(summary) > 80:
-            summary = summary[:77] + "..."
-        self._emit(f"✖ allow {summary}? [y/N]")
+
+        preview = self._preview_prompt(prompt)
+        self._emit(self._permission_header(preview, owner_override=False))
+        self._permission_choices = ("y", "n", "s", "a", "A")
+        # Render the explicit choice menu for the user
+        self._emit("")
+        self._emit("Choose action:")
+        self._emit("  [y] once          approve this call only")
+        self._emit("  [s] session       approve all calls in this session")
+        self._emit("  [a] always        approve every matching call globally")
+        self._emit("  [n] deny")
+        self._emit("  [A] deny always   deny every matching call globally")
+        self._emit("")
+        self._emit("(y/n/s/a/A)? ", end="", flush=True)
+
         self._permission_event.wait(timeout=600)
-        return self._permission_answer in ("y", "yes")
+        if self._permission_answer is None:
+            self._emit("")
+            self._emit("⏳ timeout (auto-deny)")
+            self._permission_prompt = None
+            return ("timeout", False)
+
+        self._emit(self._permission_answer.strip())
+        self._permission_prompt = None
+        return self._interpret_answer(self._permission_answer)
+
+    def _ask_owner_override(self, prompt: str, reason: str) -> tuple[str, bool]:
+        """Ask user to override an aux-LLM uncertainty (once/deny only)."""
+        self._permission_prompt = prompt
+        self._permission_event.clear()
+
+        self._emit(self._permission_header(self._preview_prompt(prompt), owner_override=True))
+        self._emit(f"  Aux-LLM said: {reason}")
+        self._emit("")
+        self._emit("Once or deny? No permanent allow (aux LLM was uncertain).")
+        self._permission_choices = ("o", "n")
+        self._emit("(o/n)? ", end="", flush=True)
+
+        self._permission_event.wait(timeout=600)
+        if self._permission_answer is None:
+            self._emit("")
+            self._emit("⏳ timeout (auto-deny)")
+            self._permission_prompt = None
+            return ("timeout", False)
+        self._emit(self._permission_answer.strip())
+        self._permission_prompt = None
+        return self._interpret_answer(self._permission_answer)
+
+    @staticmethod
+    def _permission_header(preview: dict, owner_override: bool) -> str:
+        cols = 60
+        try:
+            cols = shutil.get_terminal_size().columns
+        except Exception:
+            pass
+        line = "-" * min(cols - 4, 76)
+        body = [
+            "⚠ Permission needed" + (" — OWNER OVERRIDE" if owner_override else ""),
+            f"  Tool:   {preview.get('tool', '?')}",
+        ]
+        if preview.get("action"):
+            body.append(f"  Action: {preview['action']}")
+        if preview.get("risk"):
+            body.append(f"  Risk:   {preview['risk']}")
+        return "\n".join([line] + body + [line])
+
+    @staticmethod
+    def _preview_prompt(prompt: str) -> dict:
+        """Extract tool + action / risk from the ask prompt string.
+
+        `_wire_agent_gate` calls us with "<tool_name> <json-args>" - we
+        parse the JSON and surface the most interesting fields.
+        """
+        import json as _json
+
+        preview = {"tool": "tool", "action": "", "risk": ""}
+        space = prompt.find(" ")
+        if space < 0:
+            preview["tool"] = prompt[:30]
+            return preview
+        preview["tool"] = prompt[:space]
+        rest = prompt[space + 1 :]
+        try:
+            data = _json.loads(rest)
+            cmd = data.get("command", "")
+            if cmd:
+                display_cmd = _redact_display(cmd) if len(cmd) < 200 else _redact_display(cmd[:197] + "...")
+                preview["action"] = display_cmd
+            path = data.get("path") or data.get("file_path")
+            if path:
+                preview["action"] = f"path: {path}"
+            preview["risk"] = ""
+        except Exception:
+            if len(rest) < 120:
+                preview["action"] = rest
+        return preview
+
+    def _interpret_answer(self, raw: str) -> tuple[str, bool]:
+        """Map user input to (scope, allow)."""
+        choice = raw.strip().lower()
+        if getattr(self, "_permission_choices", None) == ("o", "n"):
+            mapping = {
+                "o": ("once", True),
+                "y": ("once", True),
+                "n": ("deny", False),
+                "no": ("deny", False),
+            }
+        else:
+            mapping = {
+                "y": ("once", True),
+                "yes": ("once", True),
+                "s": ("session", True),
+                "session": ("session", True),
+                "a": ("always", True),
+                "always": ("always", True),
+                "n": ("deny", False),
+                "no": ("deny", False),
+                "A": ("deny_always", False),
+                "deny_always": ("deny_always", False),
+            }
+        if choice in mapping:
+            return mapping[choice]
+        # Unknown input → safe default (deny once)
+        self._emit("(unrecognized input — default deny)")
+        return ("deny", False)
 
     def _wire_permission(self) -> None:
         """Wire the inline ask into the tool wrapper (run_command gate)."""
@@ -518,7 +651,7 @@ class ChatApp:
         if not text:
             return True
         if self._permission_prompt is not None:
-            self._permission_answer = text.lower() or "n"
+            self._permission_answer = text
             self._permission_prompt = None
             self._permission_event.set()
             return True

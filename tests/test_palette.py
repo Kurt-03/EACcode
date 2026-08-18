@@ -298,17 +298,15 @@ class TestApprovalsSlashCommand:
         with patch("sys.stdout", new_callable=StringIO):
             app._cmd_approvals(["smart"])
 
-    def test_ask_summary_short(self) -> None:
-        """Long prompts should be truncated in the prompt output."""
+    def test_ask_header_emitted(self) -> None:
+        """The 5-option UX header + choices emitted."""
         from eaccode import palette
         import threading
 
         app = palette.ChatApp(agent=FakeAgent())
-        long_prompt = "run_command " + "echo a " * 200
+        prompt = "run_command " + "echo a " * 50
 
-        # Schedule the event set after _ask calls clear()
         def trigger():
-            # Wait for _ask to call clear() then set immediately
             app._permission_event.wait(timeout=2)
             app._permission_event.set()
             app._permission_answer = "y"
@@ -317,14 +315,43 @@ class TestApprovalsSlashCommand:
         t.start()
 
         with patch("sys.stdout", new_callable=StringIO) as mock:
-            app._ask(long_prompt)
+            app._ask(prompt)
         t.join(timeout=2)
 
         output = mock.getvalue()
-        # Truncated to 80 chars with ellipsis
-        assert "..." in output
-        # Output should be shorter than the original prompt
-        assert len(output) < len(long_prompt) + 50
+        assert "Permission needed" in output
+        assert "Tool:" in output
+        assert "[y]" in output
+        assert "[s]" in output
+        assert "[a]" in output
+        assert "[n]" in output
+        assert "[A]" in output
+
+    def test_ask_passes_through_simple_prompt(self) -> None:
+        """Plain prompts (non-JSON) display without parse error."""
+        from eaccode import palette
+        import threading
+
+        app = palette.ChatApp(agent=FakeAgent())
+        prompt = "selecting from menu"
+
+        def trigger():
+            app._permission_event.wait(timeout=2)
+            app._permission_event.set()
+            app._permission_answer = "y"
+
+        t = threading.Thread(target=trigger, daemon=True)
+        t.start()
+
+        with patch("sys.stdout", new_callable=StringIO) as mock:
+            app._ask(prompt)
+        t.join(timeout=2)
+
+        # The header is rendered, the user's selection is consumed
+        output = mock.getvalue()
+        assert "Permission needed" in output
+        assert "Tool:" in output
+        assert "[y]" in output
 
 
 class TestChatApp:
@@ -368,20 +395,30 @@ class TestChatApp:
         assert app._permission_answer == "y"
         assert app._permission_prompt is None
 
-    def test_ask_returns_bool(self) -> None:
+    def test_ask_returns_tuple(self) -> None:
+        """_ask() returns (scope, allow) tuple."""
         app = palette.ChatApp(agent=FakeAgent())
-        result: dict[str, bool] = {}
+        result: dict[str, tuple[str, bool]] = {}
 
-        def ask() -> None:
+        def ask_y() -> None:
             result["value"] = app._ask("x")
 
-        thread = threading.Thread(target=ask, daemon=True)
+        thread = threading.Thread(target=ask_y, daemon=True)
         thread.start()
         assert _wait_for(lambda: app._permission_prompt is not None)
         app._submit("y")  # answer yes
         thread.join(timeout=5)
-        assert not thread.is_alive()
-        assert result.get("value") is True
+        assert result.get("value") == ("once", True)
+
+        def ask_s() -> None:
+            result["value"] = app._ask("x")
+
+        thread = threading.Thread(target=ask_s, daemon=True)
+        thread.start()
+        assert _wait_for(lambda: app._permission_prompt is not None)
+        app._submit("s")  # session
+        thread.join(timeout=5)
+        assert result.get("value") == ("session", True)
 
         def ask_no() -> None:
             result["value"] = app._ask("x")
@@ -391,8 +428,7 @@ class TestChatApp:
         assert _wait_for(lambda: app._permission_prompt is not None)
         app._submit("n")  # answer no
         thread.join(timeout=5)
-        assert not thread.is_alive()
-        assert result.get("value") is False
+        assert result.get("value") == ("deny", False)
 
     def test_agent_gate_wired(self) -> None:
         from types import SimpleNamespace
@@ -413,8 +449,10 @@ class TestChatApp:
         assert _wait_for(lambda: app._permission_prompt is not None)
         app._submit("yes")  # inline answer
         thread.join(timeout=5)
-        assert not thread.is_alive()
-        assert result.get("value") is True
+        # ask_handler returns (scope, allow) tuple now
+        scope, allowed = result.get("value", (None, False))
+        assert allowed is True
+        assert scope == "once"
 
     def test_unknown_slash_reports_error(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
