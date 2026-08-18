@@ -423,26 +423,25 @@ class TestChatApp:
             app._submit("/nonsense")
             assert "Unknown command" in mock.getvalue()
 
-    def test_stream_think_filter(self) -> None:
+    def test_stream_think_filter_in_buffer(self) -> None:
+        """Tokens accumulate in _stream_buffer; think blocks are stripped."""
         app = palette.ChatApp(agent=FakeAgent())
-        with patch("sys.stdout", new_callable=io.StringIO) as mock:
-            app._on_token("")
-            app._on_token("<think>reasoning")
-            app._on_token("more</think>Answer")
-            output = mock.getvalue()
-            assert "Answer" in output
-            assert "think" not in output
+        app._on_token("")
+        app._on_token("<think>reasoning")
+        app._on_token("more</think>Answer")
+        buffer = getattr(app, "_stream_buffer", "")
+        assert "Answer" in buffer
+        assert "think" not in buffer
 
-    def test_stream_cr_and_ansi_removed(self) -> None:
+    def test_stream_cr_and_ansi_removed_in_buffer(self) -> None:
         app = palette.ChatApp(agent=FakeAgent())
-        with patch("sys.stdout", new_callable=io.StringIO) as mock:
-            app._on_token("")
-            app._on_token("first" + chr(13) + chr(27) + "[31msecond")
-            output = mock.getvalue()
-            assert chr(13) not in output
-            assert chr(27) not in output
-            assert "first" in output
-            assert "second" in output
+        app._on_token("")
+        app._on_token("first" + chr(13) + chr(27) + "[31msecond")
+        buffer = getattr(app, "_stream_buffer", "")
+        assert chr(13) not in buffer
+        assert chr(27) not in buffer
+        assert "first" in buffer
+        assert "second" in buffer
 
 
 class TestChatAppPipeIntegration:

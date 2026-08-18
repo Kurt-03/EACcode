@@ -399,26 +399,25 @@ class ChatApp:
             return
         self._streamed_any = True
         self._stream_open = True
+        # Accumulate chunks in a buffer instead of streaming raw to stdout.
+        # We emit everything at the end of the worker thread in a single
+        # block. This avoids patch_stdout race conditions where the
+        # terminal re-renders the prompt chrome over our streaming output,
+        # "eating" the first chunks.
+        if not hasattr(self, "_stream_buffer"):
+            self._stream_buffer = ""
         if kind == "reasoning":
-            # Wrap reasoning as a separate inline-prefixed line so the
-            # user sees it but visually distinguishes it from the answer.
-            # We emit a newline first so it lands on its own line even if
-            # the previous chunk ended mid-stream.
-            with contextlib.suppress(Exception):
-                if not self._reasoning_started:
-                    print(flush=True)
-                    self._reasoning_started = True
-                print(f"[Reasoning: {delta}", end="", flush=True)
+            # Reasoning content stays inline in the buffer; we render it
+            # as a separate [Reasoning: ...] markdown block at the end.
+            if not self._reasoning_started:
+                self._stream_buffer += "\n\n[Reasoning: "
+                self._reasoning_started = True
+            self._stream_buffer += delta
             return
         if kind == "answer" and getattr(self, "_reasoning_started", False):
-            # Close the reasoning bracket and start the answer on a new line.
-            with contextlib.suppress(Exception):
-                print("]", flush=True)
-                self._reasoning_started = False
-        # When stdout is patched by patch_stdout, print() routes safely
-        # above the input chrome and redraws it afterwards.
-        with contextlib.suppress(Exception):
-            print(delta, end="", flush=True)
+            self._stream_buffer += "]\n\n"
+            self._reasoning_started = False
+        self._stream_buffer += delta
 
     def _agent_worker(self, text: str) -> None:
         start = time.monotonic()
@@ -448,19 +447,21 @@ class ChatApp:
         except Exception as exc:
             answer = f"Error: {exc}"
         self._stream_open = False
-        # Give patch_stdout a beat to drain pending output from the worker
-        # thread. Without this, the very last chunks land AFTER the status
-        # line is printed, leaving the answer body invisible above the
-        # status line. Skip in tests (EACCODE_TEST=1).
-        if not os.environ.get("EACCODE_TEST"):
-            time.sleep(0.05)
+        # Emit the accumulated stream content, then status line
         if self._streamed_any:
-            # streamed text is already in the scrollback; terminate the line
-            sys.stdout.flush()
-            print(flush=True)
-            sys.stdout.flush()
+            buffer = getattr(self, "_stream_buffer", "")
+            if buffer:
+                # Print the whole accumulated buffer in one write to avoid
+                # patch_stdout races where chunked output lands after the
+                # status line.
+                self._emit(buffer)
+            else:
+                self._emit(answer)
         elif answer:
             self._emit(answer)
+        # Reset buffer for next turn
+        self._stream_buffer = ""
+        self._reasoning_started = False
         try:
             from eaccode import config as cfg
 
