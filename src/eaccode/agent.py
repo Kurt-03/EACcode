@@ -18,8 +18,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from eaccode import config as cfg
-from eaccode import models_dev, permissions, providers, skills
-from eaccode.providers.base import StreamChunk, ToolCall
+from eaccode import models_dev, permissions, skills
+from eaccode.providers import base as provider_base
+from eaccode.providers import registry as provider_registry
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are eaccode, a self-improving generalist agent running locally "
@@ -29,6 +30,10 @@ DEFAULT_SYSTEM_PROMPT = (
 
 MAX_TURNS = 8
 MAX_OUTPUT_TOKENS = 1024
+
+
+# Re-export for back-compat with tests/internal callers
+from eaccode.providers.base import ToolCall  # noqa: E402,F401
 
 
 class AgentError(Exception):
@@ -82,7 +87,7 @@ def tool_guide(tools: dict[str, Tool]) -> str:
 
 def _state_to_provider(
     conf: dict[str, Any], model_id: str = ""
-) -> tuple[providers.base.Provider, providers.base.Provider, str]:
+) -> tuple[provider_base.Provider, provider_base.Provider, str]:
     """Resolve the configured provider/model to a Provider instance.
 
     Returns (provider, tools_view, model_id). The provider is fetched via
@@ -99,7 +104,7 @@ def _state_to_provider(
     chosen = model_id or chain[0]
     provider_name, _, model_short = chosen.partition("/")
     provider_config = (conf.get("providers") or {}).get(provider_name, {})
-    provider = providers.registry.get(
+    provider = provider_registry.get(
         provider_name, provider_config, model=chosen
     )
     return provider, provider, chosen
@@ -156,7 +161,7 @@ class Agent:
         _, _, model_id = _state_to_provider(self.conf)
         provider_name, _, model_short = model_id.partition("/")
         provider_config = (self.conf.get("providers") or {}).get(provider_name, {})
-        provider = providers.registry.get(
+        provider = provider_registry.get(
             provider_name, provider_config, model=model_id
         )
 
