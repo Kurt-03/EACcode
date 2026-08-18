@@ -67,6 +67,8 @@ class StreamChunk:
 
 **Wichtig:** Der Agent sieht **nie** Anthropic-Events. Nur `StreamChunk`. Jeder Adapter konvertiert nativ → StreamChunk.
 
+**⚠ MiniMax-M3 Reasoning-Stream-Caveat (08-17):** MiniMax-M3 wirbt mit `reasoning=True` in models.dev, sendet aber im Anthropic-COMPAT-Format **kein** `thinking_delta`-Event. Reasoning kommt stattdessen inline im `text_delta` mit Newline-Tokens dazwischen. Hermes hat denselben Bug. Workaround: User-Prompt zwingt `<think>...</think>`-Format, dann greift `_strip_think` in palette.py.
+
 ## Implementierter Adapter
 
 Nur **Anthropic-Messages-kompatibel**:
