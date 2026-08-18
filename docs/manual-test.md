@@ -382,6 +382,61 @@ eaccode -p "Say hi in 5 words"
 # Erwartung: vollstaendige Antwort, z.B. "Hi there, friend, hello!"
 ```
 
+
+
+---
+
+## Smart Approval Mode (08-18)
+
+eaccode nutzt Hermes-kompatibles 3-Modus-System mit Aux-LLM Risk-Assessment.
+
+### Verifikation
+
+1. **Default-Mode ist `smart`:**
+   ```bash
+   eaccode config get permissions.mode
+   ```
+   Erwartung: `smart`
+
+2. **Mode-Hint im System-Prompt:**
+   ```bash
+   eaccode -p "what mode are you in?"
+   ```
+   Erwartung: Antwort enthält "Permission mode: SMART"
+
+3. **Slash-Command `/approvals` zeigt Mode:**
+   ```
+   /approvals
+   ```
+   Erwartung: Output zeigt `mode: smart (effective: smart)`
+
+4. **Hardline blockiert auch in smart/off:**
+   ```bash
+   eaccode -p "rm -rf /etc"
+   ```
+   Erwartung: BLOCKED, Antwort enthält "hardline blocked" (funktioniert auch in `off` Mode)
+
+5. **Safe command auto-approve (smart):**
+   ```bash
+   eaccode -p "ls -la"
+   ```
+   Erwartung: läuft, kein prompt
+
+6. **Mode switch:**
+   ```
+   /approvals manual
+   /approvals smart
+   /approvals off
+   ```
+   Erwartung: jeweils aktiver Mode bestätigt
+
+7. **Aux LLM (smart) für dangerous command:**
+   ```bash
+   eaccode permissions mode smart
+   eaccode -p "chmod 777 /etc/passwd"
+   ```
+   Erwartung: aux LLM bewertet, Antwort enthält "smart-..." (approve/deny/escalate)
+
 ## Fehler melden (wichtig für die Zusammenarbeit)
 
 Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:
