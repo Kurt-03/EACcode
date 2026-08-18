@@ -527,6 +527,38 @@ class PermissionManager:
                 False, f"mode=read_only blocks write tool: {tool_name}", self.mode
             )
 
+        # 4a. Command normalization + parser-limit (Phase 1, H4/H5/H6)
+        if tool_name == "run_command":
+            from eaccode.command_normalize import (
+                _command_parser_limit_exceeded,
+                normalize_command_for_detection,
+            )
+            command_arg = arguments.get("command", "")
+            bare_call = command_arg if isinstance(command_arg, str) else ""
+            if _command_parser_limit_exceeded(bare_call):
+                return Decision(
+                    False,
+                    "command too complex to safely analyze (parser limit)",
+                    self.mode,
+                )
+            # Use the normalized form for downstream pattern matching
+            normalized = normalize_command_for_detection(bare_call)
+            bare_call = normalized
+
+        # 4b. Sudo-stdin-guard (Phase 1, H7) - BEFORE hardline
+        if tool_name == "run_command":
+            from eaccode.sudo_guard import is_sudo_stdin_guess
+
+            command_arg = arguments.get("command", "")
+            bare_call = command_arg if isinstance(command_arg, str) else ""
+            is_sudo_guess, sudo_guess_desc = is_sudo_stdin_guess(bare_call)
+            if is_sudo_guess:
+                return Decision(
+                    False,
+                    f"sudo-stdin blocked: {sudo_guess_desc}",
+                    self.mode,
+                )
+
         # 4. Hardline (only run_command, same as before)
         if tool_name == "run_command":
             command_arg = arguments.get("command", "")
