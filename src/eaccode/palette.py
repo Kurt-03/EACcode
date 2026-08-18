@@ -788,6 +788,7 @@ class ChatApp:
             "skill": commands.run_skill_command,
             "session": commands.run_session_command,
             "permissions": commands.run_permissions_command,
+            "approvals": commands.run_approvals_command,
             "job": commands.run_job_command,
             "mcp": commands.run_mcp_command,
         }

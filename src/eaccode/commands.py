@@ -676,6 +676,105 @@ def run_permissions_command(args: list[str], stdout: TextIO | None = None) -> in
     return 1
 
 
+APPROVALS_USAGE = """\
+Usage: approvals <command> [args]
+
+Manage workspace exception rules (Plan H.minimal v4, Stufe 2).
+allow-paths and deny-paths can use glob patterns (?, *, [seq]).
+
+Commands:
+  allow-path <path> [--once|--session|--always]
+                                Allow access to a path outside the workspace.
+  deny-path <path> [--once|--session|--always]
+                                Deny access to a path inside or outside the workspace.
+  list                         List all registered allow/deny rules.
+  reset                        Remove all session-scoped rules.
+"""
+
+
+def _scope_from_args(rest: list[str]) -> str:
+    """Pull the optional --once/--session/--always flag from a rest list."""
+    for arg in rest:
+        if arg in {"--once", "--session", "--always"}:
+            return arg[2:]
+    return "session"  # default
+
+
+def run_approvals_command(
+    args: list[str],
+    stdout: TextIO | None = None,
+) -> int:
+    """Manage workspace allow/deny rules (Plan H.minimal v4)."""
+    stdout = stdout or sys.stdout
+    if not args or args[0] in {"help", "--help", "-h"}:
+        stdout.write(APPROVALS_USAGE)
+        return 0
+    command, rest = args[0], args[1:]
+
+    # Lazy-import so the workspace module is only loaded when the user
+    # actually uses /approvals.
+    from eaccode import approvals_store, workspace as ws_mod
+    from eaccode.workspace import PathRule
+
+    if command == "list":
+        workspace = ws_mod._get_active_workspace()
+        rules = workspace.list_rules()
+        if not rules:
+            stdout.write("No registered allow/deny rules.\n")
+            return 0
+        # Show allow first, then deny
+        allows = [r for r in rules if r.kind == "allow"]
+        denies = [r for r in rules if r.kind == "deny"]
+        if allows:
+            stdout.write("Allow-paths:\n")
+            for r in allows:
+                stdout.write(f"  - {r.raw}  ({r.scope})\n")
+        if denies:
+            stdout.write("Deny-paths:\n")
+            for r in denies:
+                stdout.write(f"  - {r.raw}  ({r.scope})\n")
+        return 0
+
+    if command == "reset":
+        workspace = ws_mod._get_active_workspace()
+        kept: list[PathRule] = []
+        removed = 0
+        for rule in workspace.list_rules():
+            if rule.scope in {"session", "once"}:
+                workspace.remove_rule(rule)
+                removed += 1
+            else:
+                kept.append(rule)
+        stdout.write(f"Removed {removed} session/once-scoped rule(s); kept {len(kept)} always-scoped\n")
+        return 0
+
+    if command in {"allow-path", "deny-path"}:
+        # Strip the scope flag from rest, keep only path
+        paths = [a for a in rest if not a.startswith("--")]
+        if not paths:
+            stdout.write(f"Usage: approvals {command} <path> [--once|--session|--always]\n")
+            return 1
+        scope = _scope_from_args(rest)
+        workspace = ws_mod._get_active_workspace()
+        rule: PathRule
+        if command == "allow-path":
+            rule = workspace.add_allow(paths[0], scope=scope)
+        else:
+            rule = workspace.add_deny(paths[0], scope=scope)
+        # Persist always-scoped rules
+        if rule.scope == "always":
+            store = approvals_store.ApprovalsStore(
+                path=approvals_store.default_store_path()
+            )
+            existing = [r for r in workspace.list_rules() if r.scope == "always"]
+            store.save(existing)
+        stdout.write(f"{rule.kind.title()}ed {rule.raw} (scope: {rule.scope})\n")
+        return 0
+
+    stdout.write(f"Unknown approvals command: {command}\n\n{APPROVALS_USAGE}")
+    return 1
+
+
 JOB_USAGE = """\
 Usage: job <command> [args]
 

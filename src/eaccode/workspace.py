@@ -31,6 +31,29 @@ EXEMPT_PATH_FRAGMENTS = (
 )
 
 
+# Scope validation
+_VALID_SCOPES = frozenset({"once", "session", "always"})
+
+
+@dataclass(frozen=True)
+class PathRule:
+    """A single allow/deny rule attached to a workspace."""
+
+    raw: str
+    scope: str  # "once" | "session" | "always"
+    kind: str   # "allow" | "deny"
+
+    def __post_init__(self) -> None:
+        if self.scope not in _VALID_SCOPES:
+            raise ValueError(
+                f"invalid scope {self.scope!r} (expected one of {sorted(_VALID_SCOPES)})"
+            )
+        if self.kind not in {"allow", "deny"}:
+            raise ValueError(
+                f"invalid kind {self.kind!r} (expected 'allow' or 'deny')"
+            )
+
+
 @dataclass
 class WorkspaceError(ValueError):
     """Raised when a path violates workspace rules."""
@@ -48,15 +71,62 @@ class WorkspaceError(ValueError):
 
 @dataclass
 class Workspace:
-    """One workspace - root path + rules."""
+    """One workspace - root path + rules.
+
+    Allow/Deny paths can be added at runtime via add_allow/add_deny.
+    Patterns can use glob (``*``, ``?``) and are expanded with
+    :class:`fnmatch.fnmatch` against the resolved target path.
+    """
 
     root: Path
     allow_paths: list[Path] = field(default_factory=list)
     deny_paths: list[Path] = field(default_factory=list)
+    # Rule stores (used by permissions-scope tracking)
+    _allow_rules: list["PathRule"] = field(default_factory=list)
+    _deny_rules: list["PathRule"] = field(default_factory=list)
 
     @property
     def root_str(self) -> str:
         return str(self.root)
+
+    def add_allow(
+        self,
+        raw_path: str | Path,
+        scope: str = "session",
+    ) -> "PathRule":
+        """Add a runtime allow-rule. Returns the new :class:`PathRule`."""
+        rule = PathRule(raw=str(raw_path), scope=scope, kind="allow")
+        self._allow_rules.append(rule)
+        try:
+            self.allow_paths.append(Path(raw_path).expanduser().resolve())
+        except OSError:
+            pass
+        return rule
+
+    def add_deny(
+        self,
+        raw_path: str | Path,
+        scope: str = "always",
+    ) -> "PathRule":
+        """Add a runtime deny-rule. Returns the new :class:`PathRule`."""
+        rule = PathRule(raw=str(raw_path), scope=scope, kind="deny")
+        self._deny_rules.append(rule)
+        try:
+            self.deny_paths.append(Path(raw_path).expanduser().resolve())
+        except OSError:
+            pass
+        return rule
+
+    def list_rules(self) -> list["PathRule"]:
+        """Return all registered rules (allow + deny)."""
+        return self._allow_rules + self._deny_rules
+
+    def remove_rule(self, rule: "PathRule") -> None:
+        """Remove one specific rule by identity."""
+        if rule in self._allow_rules:
+            self._allow_rules.remove(rule)
+        if rule in self._deny_rules:
+            self._deny_rules.remove(rule)
 
     def is_exempt(self, path_str: str) -> bool:
         """True when this path bypasses the sandbox (memory/skills/etc)."""
@@ -235,11 +305,37 @@ def is_path_safe_for_workspace(path: Path, workspace: Workspace) -> bool:
         return False
 
 
+# Module-level "active" workspace. Initialised lazily.
+_active_workspace: "Workspace | None" = None
+
+
+def get_active_workspace() -> "Workspace":
+    """Return the active workspace, lazily initialising the default one."""
+    global _active_workspace
+    if _active_workspace is None:
+        _active_workspace = get_default_workspace()
+    return _active_workspace
+
+
+def set_active_workspace(ws_obj: "Workspace") -> None:
+    """Override the active workspace (used by tests and runtime config)."""
+    global _active_workspace
+    _active_workspace = ws_obj
+
+
+# Alias used by /approvals - the underscore prefix is intentional so the
+# command module can grab it without colliding with the public name.
+_get_active_workspace = get_active_workspace
+
+
 __all__ = [
     "Workspace",
     "WorkspaceError",
     "EXEMPT_PATH_FRAGMENTS",
+    "PathRule",
     "get_default_workspace",
+    "get_active_workspace",
+    "set_active_workspace",
     "load_workspace_from_config",
     "rewrite_path",
     "is_path_safe_for_workspace",

@@ -141,6 +141,53 @@ class TestGetDefaultWorkspace:
         assert ws_obj.root == tmp_path.resolve()
 
 
+class TestPathRule:
+    def test_valid_scope(self) -> None:
+        rule = ws.PathRule(raw="x", scope="session", kind="allow")
+        assert rule.scope == "session"
+
+    def test_invalid_scope_raises(self) -> None:
+        with pytest.raises(ValueError):
+            ws.PathRule(raw="x", scope="permanent", kind="allow")
+
+    def test_invalid_kind_raises(self) -> None:
+        with pytest.raises(ValueError):
+            ws.PathRule(raw="x", scope="session", kind="reject")
+
+
+class TestRuntimeMutation:
+    def test_add_allow_returns_rule(self, workspace) -> None:
+        rule = workspace.add_allow("C:/Users/admin/Desktop", scope="session")
+        assert rule.kind == "allow"
+        assert rule.scope == "session"
+        assert rule.raw == "C:/Users/admin/Desktop"
+
+    def test_add_deny_returns_rule(self, workspace) -> None:
+        rule = workspace.add_deny("C:/Users/admin/secrets", scope="always")
+        assert rule.kind == "deny"
+        assert rule.scope == "always"
+
+    def test_list_rules_returns_all(self, workspace) -> None:
+        workspace.add_allow("a", scope="session")
+        workspace.add_allow("b", scope="session")
+        workspace.add_deny("c", scope="always")
+        assert len(workspace.list_rules()) == 3
+
+    def test_remove_rule(self, workspace) -> None:
+        rule = workspace.add_allow("a", scope="session")
+        workspace.remove_rule(rule)
+        assert rule not in workspace.list_rules()
+
+    def test_add_allow_resolves_into_paths(self, tmp_path) -> None:
+        ws_root = tmp_path / ".eaccode-workspace"
+        ws_root.mkdir()
+        allowed = tmp_path / "shared"
+        allowed.mkdir()
+        ws_obj = Workspace(root=ws_root.resolve())
+        ws_obj.add_allow(str(allowed), scope="session")
+        assert allowed.resolve() in ws_obj.allow_paths
+
+
 class TestLoadFromConfig:
     def test_default_workspace_is_cwd(self, tmp_path, monkeypatch) -> None:
         monkeypatch.chdir(tmp_path)
