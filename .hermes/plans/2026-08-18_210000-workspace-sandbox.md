@@ -13,28 +13,46 @@
 - Model **sieht nicht** dass es gemappt wird — gibt einfach Pfade an wie es will
 - read/write/list/search/file_edit **alle** gehen durch die Sandbox
 
-**Was es NICHT macht:**
-- `run_command` läuft noch **nativ** auf echtem Filesystem
-- Docker wird nicht benutzt
+**Was es macht (alle deine Tools, nicht nur `run_command`):**
+
+Alle Tools die **Pfade akzeptieren** werden durch den Sandbox-Layer geschickt:
+
+| Tool | Sandbox-Verhalten |
+|---|---|
+| `read_file`, `write_file` | Pfad wird in workspace gemappt |
+| `list_files`, `search_files` | Nur innerhalb workspace |
+| `file_edit`, `patch_file`, `patch_multiple` | Nur innerhalb workspace |
+| `git_*` (status, diff, log, commit, ...) | Working-Dir wird auf workspace gemappt |
+| `repo_scan`, `repo_search`, `repo_context` | Nur innerhalb workspace |
+| `memory_*` | MEMORY.md bleibt in echtem Filesystem (User-Profile) |
+| `create_skill`, `improve_skill` | Skills bleiben in echtem Filesystem |
+| `browser_*` | Browser hat eigene Sandbox (URLs, nicht Pfade) |
+| `run_command` | **Bleibt nativ** in Stufe 1 (siehe Stufe 2) |
+| `http_get`, `web_search` | URLs, keine Pfade |
 
 **Für dich:**
 ```
 $ eaccode
 > lies meine Desktop-Datei test.py
-→ ERROR: cannot access path (sandboxed)
+→ ERROR: cannot access /Users/admin/Desktop/test.py (outside workspace)
 
-> schreibe test.py in cwd
-→ Schreibt nach ./eaccode-workspace/test.py
-→ Du kannst es in deinem cwd finden und ins echte Filesystem moven
+> schreibe test.py
+→ Schreibt nach ./eaccode-workspace/test.py ✓
+
+> git status
+→ git status im workspace (nicht dein ganzes cwd)
+
+> memory_add "User mag Pizza"
+→ Speichert in echtem MEMORY.md (cross-session, persistent)
 ```
 
 ### Stufe 2 — Hard-Sandbox mit Permission-Bridge (2-3 Wochen, ~1500 LOC)
 
 **Was es macht (zusätzlich zu Stufe 1):**
 - `run_command` läuft auch in Sandbox (chroot/Windows-Junction-basierter Container)
-- read/write/edit-tools checken via `validate_within_dir`
+- Alle Tools (read/write/edit/git/repo/etc.) checken via `validate_within_dir`
 - Permission-Bridge: User kann einzelne Pfade explizit aus der Sandbox **rausmappen** (`/approvals allow-path C:/...`)
-- Bei `run_command` außerhalb sandbox: explicit user-approval nötig
+- Bei allen Tools außerhalb sandbox: explicit user-approval nötig
 
 **Für dich:**
 ```
@@ -188,10 +206,11 @@ $ eaccode
 
 ## Was es **nicht** macht (Stufe 1)
 
-- `run_command` läuft **noch nativ** (echtes Filesystem)
-- Docker wird **nicht** benutzt
-- Per-Task-Image-Selection nicht
-- Sub-Agent-Sandbox-Isolation nicht
+- **`run_command` läuft noch nativ** (echtes Filesystem, kein chroot/junction)
+- **Docker wird nicht benutzt** (kein Container-Per-Task)
+- **Per-Task-Image-Selection nicht** (kein Python:3.11 vs Python:3.12)
+- **Sub-Agent-Sandbox-Isolation nicht** (Sub-Agents teilen parent's Sandbox)
+- **Memory/Skill-Pfade ausgenommen** (MEMORY.md, Skills bleiben im echten Profile-Verzeichnis, weil sie cross-session persistent sind)
 
 Diese sind Stufe 2 und 3.
 
