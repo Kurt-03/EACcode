@@ -453,10 +453,26 @@ class ChatApp:
                     with contextlib.suppress(Exception):
                         for message in new_messages:
                             if message.get("role") in ("user", "assistant", "tool"):
-                                store.add_message(
+                                # Persist tool_calls so the session
+                                # search and replay see what the model
+                                # did. Plan G v6 (U1) — 08-18.
+                                tool_calls = message.get("tool_calls")
+                                tool_calls_str = (
+                                    json.dumps(tool_calls)
+                                    if tool_calls
+                                    else ""
+                                )
+                                tool_call_id = ""
+                                if message.get("role") == "tool":
+                                    tool_call_id = str(
+                                        message.get("tool_call_id", "")
+                                    )
+                                store.add_message_with_tool_calls(
                                     self._session_id,
                                     str(message.get("role", "")),
                                     str(message.get("content", "")),
+                                    tool_calls=tool_calls_str,
+                                    tool_call_id=tool_call_id,
                                 )
         except Exception as exc:
             answer = f"Error: {exc}"

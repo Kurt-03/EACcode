@@ -8,6 +8,7 @@ TUI (Phase A8).
 from __future__ import annotations
 
 import contextlib
+import json
 import re
 import sys
 from collections.abc import Iterable
@@ -148,8 +149,21 @@ def _handle_chat(
             for message in new_messages:
                 role = message.get("role")
                 if role in ("user", "assistant", "tool"):
-                    store.add_message(
-                        session_id, role, str(message.get("content", ""))
+                    tool_calls = message.get("tool_calls")
+                    tool_calls_str = (
+                        json.dumps(tool_calls) if tool_calls else ""
+                    )
+                    tool_call_id = (
+                        str(message.get("tool_call_id", ""))
+                        if role == "tool"
+                        else ""
+                    )
+                    store.add_message_with_tool_calls(
+                        session_id,
+                        role,
+                        str(message.get("content", "")),
+                        tool_calls=tool_calls_str,
+                        tool_call_id=tool_call_id,
                     )
     chat_history[:] = history[1:]  # keep the conversation (drop the system message)
 

@@ -16,6 +16,20 @@ from typing import Any
 from eaccode import config as cfg
 from eaccode.agent import Tool
 
+_MIGRATIONS = [
+    "ALTER TABLE messages ADD COLUMN tool_calls TEXT NOT NULL DEFAULT ''",
+    "ALTER TABLE messages ADD COLUMN tool_call_id TEXT NOT NULL DEFAULT ''",
+]
+
+# Try the ALTER statements against an existing DB; ignore "duplicate column" errors.
+def _migrate(conn):
+    for stmt in _MIGRATIONS:
+        try:
+            conn.execute(stmt)
+        except Exception:
+            pass  # column already exists or pre-migration schema
+
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -28,6 +42,8 @@ CREATE TABLE IF NOT EXISTS messages (
     session_id TEXT NOT NULL REFERENCES sessions(id),
     role TEXT NOT NULL,
     content TEXT NOT NULL,
+    tool_calls TEXT NOT NULL DEFAULT '',
+    tool_call_id TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
 );
 """
@@ -141,11 +157,34 @@ def set_title(session_id: str, title: str, db: Path | None = None) -> None:
 
 def add_message(session_id: str, role: str, content: str, db: Path | None = None) -> int:
     """Append a message; returns its rowid."""
+    return add_message_with_tool_calls(
+        session_id, role, content, tool_calls="", tool_call_id="", db=db,
+    )
+
+
+def add_message_with_tool_calls(
+    session_id: str,
+    role: str,
+    content: str,
+    *,
+    tool_calls: str = "",
+    tool_call_id: str = "",
+    db: Path | None = None,
+) -> int:
+    """Append a message including tool-call data. Returns rowid."""
     conn = _connect(db)
     try:
+        _migrate(conn)
         cursor = conn.execute(
-            "INSERT INTO messages (session_id, role, content, created_at) VALUES (?, ?, ?, ?)",
-            (session_id, role, content, datetime.now().isoformat(timespec="seconds")),
+            "INSERT INTO messages (session_id, role, content, tool_calls, tool_call_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                session_id,
+                role,
+                content,
+                tool_calls,
+                tool_call_id,
+                datetime.now().isoformat(timespec="seconds"),
+            ),
         )
         conn.commit()
         return int(cursor.lastrowid)
