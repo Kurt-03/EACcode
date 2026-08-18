@@ -36,12 +36,26 @@ tags: [type/feature, feature/system, tools, hermes]
 
 ## Endstand
 
-- 877 Tests grün, 4 skipped
+- **988 Tests grün** (Stand 08-18, Plan H Audit-Phase `146ffce`)
 - 13 neue Module, ~4500 LOC neu
 - Plan G v5 + Plan G v6 komplett abgearbeitet
+- **Plan H Stufe 1 + Stufe 2:** Workspace-Sandbox (`workspace.py`) +
+  `/approvals allow-path` (`approvals_store.py` + `path_security.py`)
 - Hermes-Inventar-Coverage: ~95%
 
 ## Reference
 
 - Plan: `.hermes/plans/2026-08-18_180301-aux-llm-coverage.md`
-- Hermes source: `_ref/hermes/tools/registry.py`, `tool_search.py`, `tool_result_storage.py`, `clarify_tool.py`, `schema_sanitizer.py`, `env_probe.py`, `delegation_live_log.py`, `mcp_tool.py`, `skills_guard.py`, `approval.py`
+- Hermes source: `_ref/hermes/tools/registry.py`, `tool_search.py`,
+  `tool_result_storage.py`, `clarify_tool.py`, `schema_sanitizer.py`,
+  `env_probe.py`, `delegation_live_log.py`, `mcp_tool.py`,
+  `skills_guard.py`, `approval.py`
+
+## Modul-Notizen (jedes Tool-G-Modul einzeln)
+
+- [[15-features/system/tool-registry.md|tool-registry]] · [[15-features/system/tool-search.md|tool-search]] · [[15-features/system/tool-result-storage.md|tool-result-storage]] · [[15-features/system/tool-output-limits.md|tool-output-limits]] · [[15-features/system/middlewares.md|middlewares]] · [[15-features/system/clarify-tool.md|clarify-tool]] · [[15-features/system/schema-sanitizer.md|schema-sanitizer]] · [[15-features/system/env-probe.md|env-probe]] · [[15-features/system/live-transcript.md|live-transcript]] · [[15-features/system/mcp-description-scan.md|mcp-description-scan]] · [[15-features/system/skills-guard.md|skills-guard]] · [[15-features/system/denial-breaker.md|denial-breaker]] · [[15-features/system/human-wait-window.md|human-wait-window]] · [[15-features/system/blocked-list.md|blocked-list]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/blocked.py` → [[15-features/system/config.md|config.yaml]]
+

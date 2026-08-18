@@ -23,49 +23,63 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 
 ## Aktuelle Entscheidungen (ADR)
 
-- **0002** — [[ADR/0002-phase-a-architecture.md|0002-phase-a-architecture]] (Router, Loop, Memory, TUI) · 2026-08-13
-- **0001** — [[ADR/0001-config-yaml-design.md|0001-config-yaml-config]] · 2026-08-13
-- **ADR-0003** *(geplant)* — Smart Approval Mode mit Aux LLM (08-18) — siehe
-  [[15-features/system/permissions.md|permissions]] + [[15-features/system/smart-approval.md|smart-approval]]
-- **ADR-0004** *(geplant)* — LiteLLM out, Anthropic SDK direkt (08-17) —
-  siehe [[15-features/system/providers.md|providers]]
-- **ADR-0005** *(geplant)* — Tool-Schema-Audit + Permission-Hardening (08-18) —
-  siehe [[15-features/system/permissions.md|permissions]]
-- **ADR-0006** *(geplant)* — Permission Deep-Hardening (Plan C, Hermes-Voll) (08-18) -
-- **ADR-0007** *(geplant)* — Hermes-Safety-Hardening (Plan D, 16 von 16 must-have Features) (08-18) —
-  siehe [[15-features/system/permissions.md#08-18-plan-c-audit-hardening-2|Plan C]]
+- **0001** — [[ADR/0001-config-yaml-design.md\|0001-config-yaml-design]] · 2026-08-13
+- **0002** — [[ADR/0002-phase-a-architecture.md\|0002-phase-a-architecture]] (Router, Loop, Memory, TUI) · 2026-08-13
+- **0003** — Smart Approval Mode mit Aux LLM · 2026-08-18 (siehe
+  [[15-features/system/permissions.md\|permissions]] + [[15-features/system/smart-approval.md\|smart-approval]])
+- **0004** — LiteLLM out, Anthropic-SDK direkt · 2026-08-17 (siehe
+  [[15-features/system/providers.md\|providers]] + [[ADR/0004-litellm-to-anthropic-sdk.md\|0004-litellm-to-anthropic-sdk]])
+- **0005** — Workspace-Sandbox-Architektur (Plan H.minimal) · 2026-08-18
+  (siehe [[15-features/system/workspace.md\|workspace]] + [[ADR/0005-workspace-sandbox.md\|0005-workspace-sandbox]])
+- **0006** — Permission Deep-Hardening (Plan C, Hermes-Voll, 5 Outcomes) ·
+  2026-08-18 (siehe [[15-features/system/permissions.md\|permissions]])
+- **0007** — Hermes-Safety-Hardening (Plan D, 16 must-have Features) ·
+  2026-08-18 (siehe [[15-features/system/permissions.md\|permissions]])
 
-### Permission Deep-Hardening (08-18)
+### Kurz-Stand der ADR-Plan-Verdichtung
 
-5 Outcomes: once / session / always / deny / deny_always / timeout. Hermesische
-[[15-features/system/permissions.md|Permission-Pipeline]] mit Secret-Redaction,
-Owner-Override-Aux-LLM, persistent Deny_Always-Blocklist, Path-Symlink-Resolve,
-Exit-Code-Warnings. 641 Tests grün. Inline-Prompt-UX mit 5 Options ([y/s/a/n/A]) + Echo.
-  siehe [[15-features/system/providers.md|providers]]
+| Plan | Hermes-Coverage | Notiz-Spine |
+|---|---|---|
+| Plan A | Tool-Property-Descriptions, `mutates`-Tag | (in `permissions.md` Plan B-Abschnitt) |
+| Plan B | Sensitive-Path + Always-Ask-Enforcement | (in `permissions.md` Plan B-Abschnitt) |
+| Plan C | Smart-Mode 5 Outcomes, persistent Blocklist, Path-Symlink-Resolve, Exit-Code-Warnings | [[15-features/system/permissions.md\|permissions]] |
+| Plan D | Tirith, file_safety, sudo-guard, runtime_context, blocked-list, human-wait-window | [[15-features/system/permissions.md\|permissions]] + [[15-features/system/tirith-security.md\|tirith-security]] + [[15-features/system/file_safety.md\|file_safety]] + [[15-features/system/blocked-list.md\|blocked-list]] + [[15-features/system/human-wait-window.md\|human-wait-window]] |
+| Plan G v5 | Tool-Architecture 12 Module | [[15-features/system/tool-architecture.md\|tool-architecture]] |
+| Plan G v6 | U1 Tool-Calls-DB-Persistenz | (in `store.py` schema migration) |
+| Plan H.minimal | Workspace-Sandbox 3 Stufen | [[15-features/system/workspace.md\|workspace]] + [[15-features/system/path-security.md\|path-security]] + [[15-features/system/write-approval.md\|write-approval]] + [[15-features/system/container.md\|container]] |
 
 ## Projekt-Kurzstand (2026-08-18)
 
 - **Phase A (Foundation) ✅** · **Phase B (Hermes-Core) ✅** · **C1–C3 ✅**
-  (C4/C5 bewusst auf später verschoben) · **Phase D (Coding-Stärke) ✅ KOMPLETT**
-- **08-17:** LiteLLM raus, Anthropic-SDK rein. Catalog via models.dev.
-- **08-18:** Smart Approval (Hermes-kompatibel 3 Modi + Aux LLM, default `smart`) +
-  Streaming-Bug-Fix (Buffer-Accumulator für REPL)
-- **609 Tests grün** · Plan A (Tool-Property-Descriptions + mutates-Tag) und Plan B (Permission-Hardening: sensitive-path, always_ask enforcement) sind gefixt
-- Smart-mode jetzt safe für .ssh/.env/config.yaml writes (vorher silent approved) + ruff clean; Live-Verifikationen zu jeder Phase
-  (manual-test.md im Repo)
+  (C4 Gateway/Telegram + C5 Packaging bewusst auf später verschoben) ·
+  **Phase D (Coding-Stärke) ✅ KOMPLETT** · **Phase E (Smart Approval) ✅** ·
+  **Phase F (Deep Permission Hardening) ✅** · **Phase G (Tool Architecture
+  Hermes-Verbatim) ✅ v5+v6** · **Phase H (Workspace-Sandbox) ✅ Stufe 1+2** ·
+  Stufe 3 (Container) ist **code-ready aber opt-in**
+- **988 Tests grün** (Stand 08-18, Plan H Audit-Phase `146ffce`), +380 seit 08-17
+- **52 src-Module** im Code, **45+ dedizierte Brain-Notizen** (jedes Tool-G + Plan-H-Modul einzeln)
 - Agent kann heute: Skills lernen, Sessions durchsuchen, Memory kuratieren,
-  Subagents parallel, **Smart Permissions**, MCP (Roblox Studio), Repo-Verständnis,
-  Diff-Editing, Tests laufen lassen, Git/PR, Browser-Steuerung,
-  **models.dev Catalog** (4000+ Models)
+  Subagents parallel, **Smart Permissions** (5 Outcomes + Aux LLM + Owner-Override
+  + Secret-Redaction), MCP (mit Description-Scan gegen Prompt-Injection),
+  Repo-Verständnis, Diff-Editing, Tests laufen lassen, Git/PR,
+  Browser-Steuerung, **models.dev Catalog** (4000+ Models), **Workspace-Sandbox**
+  (cwd = workspace + `/approvals allow-path` + Container-Backend opt-in),
+  **Tirith External Scanner** mit SHA-256 + Cosign
+- `run_command` ist 08-18 komplett aus dem Code entfernt (Commit `11faf9c`)
 - Repo: `C:\Projekte\EACcode V3` · Remote: `github.com:Kurt-03/EACcode` (gepusht 2026-08-18)
 
 ## Offene Entscheidungen (Auszug)
 
-- C4 Gateway/Telegram + C5 Packaging: **später** (Nutzer)
-- Optionale Ideen (nur auf Nachfrage): D5 Coding-Routing, Toolset-Gruppierung
-  → [[10-projects/phase-d.md|phase-d]]
+- C4 Gateway/Telegram + C5 Packaging: **später** (Nutzer-Entscheid)
+- Plan H Stufe 4: Image-Caching + cgroups-Resource-Limits (in Code, noch nicht
+  verdrahtet)
+- D5 Coding-Routing (LLM-Router anhand Repo-State) — Idee, nicht spezifiziert
+- Hermes-Adapter für OpenAI-Compat-Provider (OpenRouter, Ollama wieder aktivieren)
+- OpenAI/Ollama-Provider-Re-Aktivierung (Post-LiteLLM-Exit OpenAI-compat-Adapter fehlt)
+- Stuck at MiniMax OAuth-tokens perimeter ab 08-13 (separat tracken)
+- H22 Two-Layer Pre-Execution Guards (Tirith + dangerous patterns combined) — in-progress
+- H17/H19 classification categories / `raise_if_read_blocked` — Hermes-spezifisch, deferred
 - Background-Review (Hermes-Learning-Loop) — nach Cron existent, noch offen
-- GitHub-Remote: gesetzt + gepusht (alte `eac-code`-Remote ist Geschichte)
 
 ---
-*Zuletzt gepflegt: 2026-08-18 (Smart Approval + Streaming-Bug-Fix + Anthropic-SDK, 578 Tests, gepusht)*
+*Zuletzt gepflegt: 2026-08-18 (Plan H Audit-Phase + Workspace-Sandbox-Notes + 988 Tests grün)*

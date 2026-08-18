@@ -93,6 +93,11 @@ kostengünstig).
 
 ## Verwandt
 
-- `[[permissions|Smart Permission System]]`
-- `[[approvals-slash-cmd|/approvals Command]]`
-- `[[commands/permissions|/permissions Command]]`
+- [[15-features/system/permissions.md|permissions]]
+- [[15-features/commands/approvals.md|approvals]]
+- [[15-features/commands/permissions.md|permissions]]
+
+## Code-Graph (generiert)
+
+- `src/eaccode/smart_approval.py` → —
+

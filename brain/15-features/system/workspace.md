@@ -107,11 +107,42 @@ Deny-paths:
 - `is_blocked_device(path)` - NUL, CON, COM1, /dev/null, etc.
 - `is_unc_path(path)` - `\\server\share` detection
 
-## Endstand (Stufe 2)
+## Endstand (Stufe 1+2, committed `a30654b`)
 
-- 945 Tests grün
-- 5 neue Module: `workspace.py` (extended), `approvals_store.py`, `path_security.py`, + 35 new tests
-- ~600 LOC neu (Stufe 2)
+- **988 Tests grün** (Audit-Phase `146ffce`)
+- 5 neue Module: `workspace.py` (extended), `approvals_store.py`,
+  `path_security.py`, `write_approval.py`, `container.py`
+- ~1650 LOC neu (Stufe 1 + Stufe 2 zusammen)
+- `run_command` komplett aus eaccode entfernt (`11faf9c`)
+- `cwd` selbst ist Workspace (Fix `bcf8b75` — vorher `cwd/.eaccode-workspace`)
+
+## Live-Test
+
+```
+$ cd /path/to/myproject
+$ eaccode
+
+> lies Desktop-Datei test.py
+→ ERROR: cannot access (outside workspace)
+
+> schreibe test.py
+→ Schreibt nach CWD/test.py ✓
+
+> cat ../secrets.txt
+→ ERROR: path-traversal blocked
+
+> git status
+→ git status im workspace (cwd = workspace, Fix 146ffce bcf8b75)
+
+> /approvals allow-path C:/Users/admin/Desktop --session
+✓ Allowed C:/Users/admin/Desktop (scope: session)
+```
+
+## Verknüpft (Modul-Notizen)
+
+- [[15-features/system/permissions.md|permissions]] (enthält `approvals_store.py` API) · [[15-features/system/path-security.md|path-security]] · [[15-features/system/write-approval.md|write-approval]] · [[15-features/system/container.md|container]]
+- [[15-features/system/tirith-security.md|tirith-security]] (H1, Layer 7)
+- [[15-features/system/permissions.md|permissions]] (Inline-Prompt UX)
 
 ## Reference
 
@@ -119,3 +150,8 @@ Deny-paths:
 - Stufe 2 Plan: `.hermes/plans/2026-08-18_213000-stufe-2-permission-bridge.md`
 - Code: `src/eaccode/workspace.py`, `src/eaccode/tools.py`, `src/eaccode/editing.py`, `src/eaccode/git.py`, `src/eaccode/approvals_store.py`, `src/eaccode/path_security.py`
 - Tests: `tests/test_workspace.py`, `tests/test_approvals.py`, `tests/test_approvals_store.py`, `tests/test_path_security.py`
+
+## Code-Graph (generiert)
+
+- `src/eaccode/workspace.py` → [[15-features/system/config.md|config.yaml]] · [[15-features/system/path-security.md|path-security]]
+

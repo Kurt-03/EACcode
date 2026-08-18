@@ -93,6 +93,6 @@ Accepted — komplett am 08-17 umgesetzt, +streaming-bug-Fix 08-18.
 
 ## Verwandt
 
-- [[15-features/system/providers.md|Provider Architecture]]
-- [[15-features/system/models-dev.md|models.dev Catalog]]
-- [[15-features/providers/minimax.md|minimax Provider]]
+- [[15-features/system/providers.md|providers]]
+- [[15-features/system/models-dev.md|models-dev]]
+- [[15-features/providers/minimax.md|minimax]]

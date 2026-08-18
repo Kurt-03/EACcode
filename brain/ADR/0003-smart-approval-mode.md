@@ -70,6 +70,6 @@ Accepted — code shipped via Phase D + 08-18.
 
 - [[15-features/system/permissions.md|permissions]]
 - [[15-features/system/smart-approval.md|smart-approval]]
-- [[15-features/commands/approvals.md|/approvals slash command]]
-- [[15-features/commands/permissions.md|/permissions subcommand]]
+- [[15-features/commands/approvals.md|approvals]]
+- [[15-features/commands/permissions.md|permissions]]
 - Plan: `.hermes/plans/2026-08-18_071745-smart-approval-mode.md`

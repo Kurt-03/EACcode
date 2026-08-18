@@ -103,3 +103,8 @@ Beim eaccode-Start wird **einmal** `fetch_models_dev()` aufgerufen (z.B. wenn Ag
 - `brain/15-features/system/model-router.md` — der frühere LiteLLM-Router
 - `brain/15-features/system/providers.md` — die provider adapters, die models.dev nutzen
 - Commit-Log: `7079bf2` (init), `66aeab6` (Anthropic-Adapter)
+
+## Code-Graph (generiert)
+
+- `src/eaccode/models_dev.py` → [[15-features/system/config.md|config.yaml]]
+

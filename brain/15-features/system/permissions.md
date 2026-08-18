@@ -399,3 +399,8 @@ Total: 13 of 16 must-have Hermes-Features done.
 Plan: `.hermes/plans/2026-08-18_170452-hermes-safety-hardening.md`
 
 Hermes source: `_ref/hermes/tools/approval.py` (4553 lines), `_ref/hermes/agent/file_safety.py` (693 lines), `_ref/hermes/tools/tirith_security.py` (872 lines)
+
+## Code-Graph (generiert)
+
+- `src/eaccode/runtime_context.py` → [[15-features/system/config.md|config.yaml]]
+

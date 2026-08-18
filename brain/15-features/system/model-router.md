@@ -108,5 +108,5 @@ providers:
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/router.py` → [[15-features/system/config.md|config.yaml]]
+- `src/eaccode/router.py` → —
 

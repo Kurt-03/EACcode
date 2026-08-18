@@ -25,7 +25,7 @@ Welcome/Tip + Stat-Zeile nach Antworten.
   (Hermes-`-Q`-Parität); sonst kompakter Einzeiler (Tests/Pipes bleiben
   stabil)
 - **Gestrichelte Linie vor `❯`** (08-17, mit
-  [[15-features/system/slash-palette.md|Slash-Palette]]): Eine `- - - - -` × N
+  [[15-features/system/slash-palette.md|slash-palette]]): Eine `- - - - -` × N
   Zeile (60 Zeichen, clamped 40-80) wird einmal beim Start UND nach jedem
   Turn gedruckt. Style `chat.divider` (fg:#5a5a5a, fast unsichtbar).
   Trennt visuell den Input-Bereich vom Scrollback. Nach `_agent_worker` und

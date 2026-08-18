@@ -83,6 +83,6 @@ os.environ.setdefault("EACCODE_TEST", "1")
 
 ## Verwandt
 
-- `[[slash-palette|Palette + Stream]]
+- `[[15-features/system/slash-palette.md|slash-palette]]
 - Plan: `.hermes/plans/...` (nicht vorhanden, aber im Commit-Verlauf)
 - Commit: `48a3dad` "fix(palette): accumulate stream buffer"

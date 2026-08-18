@@ -15,33 +15,72 @@ BRAIN = ROOT / "brain"
 SRC = ROOT / "src" / "eaccode"
 
 # module -> note path (relative to brain root)
+# 2026-08-18: complete mapping — every src/eaccode/*.py file is mapped
+# to its canonical feature note. New notes created today:
+# tool-architecture, path-security, write-approval, container,
+# approvals_store, clarifiers/standalone modules all wired up.
 MODULE_NOTES: dict[str, str] = {
+    # --- entry points ---
+    "__init__.py": "15-features/system/repl.md",
+    "__main__.py": "15-features/system/repl.md",
     "cli.py": "15-features/system/repl.md",
-    "repl.py": "15-features/system/repl.md",
-    "commands.py": "15-features/commands/README.md",
+    # --- core agent + tools ---
+    "agent.py": "15-features/system/agent-core.md",
+    "tools.py": "15-features/system/tools-layer.md",
+    "registry.py": "15-features/system/tool-architecture.md",
+    "tool_search.py": "15-features/system/tool-architecture.md",
+    "tool_result_storage.py": "15-features/system/tool-architecture.md",
+    "tool_output_limits.py": "15-features/system/tool-architecture.md",
+    "middlewares.py": "15-features/system/tool-architecture.md",
+    "clarify_tool.py": "15-features/system/tool-architecture.md",
+    "schema_sanitizer.py": "15-features/system/tool-architecture.md",
+    "env_probe.py": "15-features/system/tool-architecture.md",
+    "live_transcript.py": "15-features/system/tool-architecture.md",
+    "mcp_description_scan.py": "15-features/system/tool-architecture.md",
+    "skills_guard.py": "15-features/system/tool-architecture.md",
+    "denial_breaker.py": "15-features/system/tool-architecture.md",
+    "human_wait_window.py": "15-features/system/tool-architecture.md",
+    "blocked.py": "15-features/system/tool-architecture.md",
+    "tirith_security.py": "15-features/system/tirith-security.md",
+    # --- config / router / models ---
     "config.py": "15-features/system/config.md",
     "router.py": "15-features/system/model-router.md",
-    "agent.py": "15-features/system/agent-core.md",
+    "models_dev.py": "15-features/system/models-dev.md",
+    # --- memory / skills / learning / store ---
+    "memory.py": "15-features/system/memory.md",
     "skills.py": "15-features/system/skill-system.md",
     "learning.py": "15-features/system/learning-loop.md",
-    "memory.py": "15-features/system/memory.md",
     "store.py": "15-features/system/session-store.md",
-    "subagents.py": "15-features/system/subagents.md",
-    "tools.py": "15-features/system/tools-layer.md",
-    "tui.py": "15-features/system/tui.md",
+    # --- permissions / safety / approval ---
     "permissions.py": "15-features/system/permissions.md",
+    "smart_approval.py": "15-features/system/smart-approval.md",
+    "approvals_store.py": "15-features/system/permissions.md",
+    "file_safety.py": "15-features/system/file_safety.md",
+    "path_security.py": "15-features/system/path-security.md",
+    "write_approval.py": "15-features/system/write-approval.md",
+    "sudo_guard.py": "15-features/system/permissions.md",
+    "command_normalize.py": "15-features/system/permissions.md",
+    "redact.py": "15-features/system/permissions.md",
+    "runtime_context.py": "15-features/system/permissions.md",
+    "container.py": "15-features/system/container.md",
+    # --- workspace sandbox (Plan H.minimal v3 + Stufe 2) ---
+    "workspace.py": "15-features/system/workspace.md",
+    # --- REPL / TUI / commands / palette ---
+    "repl.py": "15-features/system/repl.md",
+    "tui.py": "15-features/system/tui.md",
+    "palette.py": "15-features/system/slash-palette.md",
+    "banner.py": "15-features/system/start-banner.md",
+    "commands.py": "15-features/commands/README.md",
+    # --- subagents + parallel ---
+    "subagents.py": "15-features/system/subagents.md",
+    # --- external systems ---
     "cron.py": "15-features/system/cron-daemon.md",
     "mcp.py": "15-features/system/mcp-client.md",
     "repo.py": "15-features/system/repo-understanding.md",
     "editing.py": "15-features/system/diff-editing.md",
     "testrunner.py": "15-features/system/test-runner.md",
     "git.py": "15-features/system/git-pr.md",
-    "banner.py": "15-features/system/start-banner.md",
     "browser.py": "15-features/system/browser.md",
-    "palette.py": "15-features/system/slash-palette.md",
-    # entry points: version (0.0.1) and `python -m eaccode`
-    "__init__.py": "15-features/system/repl.md",
-    "__main__.py": "15-features/system/repl.md",
 }
 
 IMPORT_RE = re.compile(

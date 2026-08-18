@@ -58,6 +58,6 @@ Anschluss sonst mit `400 Bad Request` terminiert.
 
 ## Verknüpft
 [[15-features/README.md|Feature-Register]] ·
-[[15-features/system/providers.md|Provider Architecture]] ·
-[[15-features/system/models-dev.md|models.dev Catalog]] ·
-[[15-features/system/smart-approval.md|Aux LLM Reviewer]]
+[[15-features/system/providers.md|providers]] ·
+[[15-features/system/models-dev.md|models-dev]] ·
+[[15-features/system/smart-approval.md|smart-approval]]

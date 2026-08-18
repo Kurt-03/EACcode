@@ -27,7 +27,12 @@ providers:
 ```
 
 ## Status
+
 - Konfiguriert (Stand 2026-08-13); Live-Ping hängt davon ab, ob Ollama läuft
+- **08-17:** Wie OpenRouter — Ollama ist seit LiteLLM-Exit ohne
+  OpenAI-compat-Adapter **nicht direkt angebunden**. Diese Notiz bleibt
+  als Byok-Fallback-Pointer. Aktiver Path:
+  `[[15-features/system/providers.md|providers]]` + `models-dev`.
 
 ## Offene Punkte
 - (keine)

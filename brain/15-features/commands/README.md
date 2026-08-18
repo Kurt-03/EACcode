@@ -25,5 +25,5 @@ Implementierung, Tests). **Neue Commands → eigene Notiz + Zeile hier.**
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/commands.py` → [[15-features/system/config.md|config.yaml]] · [[15-features/system/cron-daemon.md|cron-daemon]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/permissions.md|permissions]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]]
+- `src/eaccode/commands.py` → [[15-features/system/permissions.md|permissions]] · [[15-features/system/config.md|config.yaml]] · [[15-features/system/cron-daemon.md|cron-daemon]] · [[15-features/system/memory.md|Memory]] · [[15-features/system/permissions.md|permissions]] · [[15-features/system/model-router.md|Model Router]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/workspace.md|workspace]]
 

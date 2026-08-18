@@ -87,3 +87,8 @@ no user prompt even in smart-mode/off-mode.
 Hermes source: `_ref/hermes/agent/file_safety.py` (693 lines, Hermes-Verbatim patterns).
 
 Plan: `.hermes/plans/2026-08-18_170452-hermes-safety-hardening.md`
+
+## Code-Graph (generiert)
+
+- `src/eaccode/file_safety.py` → [[15-features/system/config.md|config.yaml]]
+

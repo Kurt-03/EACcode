@@ -40,9 +40,9 @@ Permission-Modi und Regeln im REPL verwalten (CLI-Äquivalent:
 - Dangerous-Patterns (77) gehen in `smart` mode an Aux LLM
 - deny-Regeln gewinnen immer gegen allow-Regeln
 - `_MODE_ALIASES` normalisiert `ask` → `manual`, `allow_all` → `off`
-- Siehe `[[15-features/system/smart-approval|Aux LLM Reviewer]]` für Details
+- Siehe `[[15-features/system/smart-approval.md|smart-approval]]` für Details
 
 ## Verknüpft
 [[15-features/system/permissions.md|permissions]] ·
 [[15-features/system/smart-approval.md|smart-approval]] ·
-[[15-features/commands/approvals.md|/approvals]]
+[[15-features/commands/approvals.md|approvals]]

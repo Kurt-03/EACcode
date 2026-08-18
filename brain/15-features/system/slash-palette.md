@@ -177,7 +177,7 @@ if self._streamed_any:
 
 Im Tests überspringbar via `EACCODE_TEST=1` (siehe `tests/conftest.py`).
 
-Siehe [[15-features/system/streaming-buffer-fix.md|Streaming-Buffer-Fix]] für Details.
+Siehe [[15-features/system/streaming-buffer-fix.md|streaming-buffer-fix]] für Details.
 
 
 ## Verknüpft
@@ -185,5 +185,5 @@ Siehe [[15-features/system/streaming-buffer-fix.md|Streaming-Buffer-Fix]] für D
 
 ## Code-Graph (generiert)
 
-- `src/eaccode/palette.py` → [[15-features/system/start-banner.md|start-banner]] · [[15-features/commands/README.md|README]] · [[15-features/system/config.md|config.yaml]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
+- `src/eaccode/palette.py` → [[15-features/system/start-banner.md|start-banner]] · [[15-features/commands/README.md|README]] · [[15-features/system/config.md|config.yaml]] · [[15-features/system/tool-architecture.md|tool-architecture]] · [[15-features/system/permissions.md|permissions]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/session-store.md|session-store]] · [[15-features/system/tools-layer.md|tools-layer]]
 
