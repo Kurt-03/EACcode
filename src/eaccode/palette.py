@@ -25,6 +25,7 @@ from eaccode.banner import model_label, render_banner
 from eaccode.banner import quiet as banner_quiet
 from eaccode.banner import status_line as render_status_line
 from eaccode.redact import redact as _redact_display
+from eaccode.human_wait_window import human_wait_window
 
 try:
     from prompt_toolkit.application import Application
@@ -500,6 +501,10 @@ class ChatApp:
             {"once", "session", "always", "deny", "deny_always", "timeout"}
         and allow is True/False.
         """
+        with human_wait_window():
+            return self._ask_inner(prompt)
+
+    def _ask_inner(self, prompt: str) -> tuple[str, bool]:
         self._permission_prompt = prompt
         self._permission_event.clear()
 
