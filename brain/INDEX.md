@@ -24,19 +24,26 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 ## Aktuelle Entscheidungen (ADR)
 
 - **0002** — [[ADR/0002-phase-a-architecture.md|0002-phase-a-architecture]] (Router, Loop, Memory, TUI) · 2026-08-13
-- **0001** — [[ADR/0001-config-yaml-design.md|0001-config-yaml-design]] · 2026-08-13
+- **0001** — [[ADR/0001-config-yaml-design.md|0001-config-yaml-config]] · 2026-08-13
+- **ADR-0003** *(geplant)* — Smart Approval Mode mit Aux LLM (08-18) — siehe
+  [[15-features/system/permissions.md|permissions]] + [[15-features/system/smart-approval.md|smart-approval]]
+- **ADR-0004** *(geplant)* — LiteLLM out, Anthropic SDK direkt (08-17) —
+  siehe [[15-features/system/providers.md|providers]]
 
-## Projekt-Kurzstand (2026-08-13)
+## Projekt-Kurzstand (2026-08-18)
 
 - **Phase A (Foundation) ✅** · **Phase B (Hermes-Core) ✅** · **C1–C3 ✅**
   (C4/C5 bewusst auf später verschoben) · **Phase D (Coding-Stärke) ✅ KOMPLETT**
-  — DoD erfüllt (Übungs-Repo: Issue → Implementierung → Suite → Commit, live)
-- **402 Tests grün** + ruff clean; Live-Verifikationen zu jeder Phase
-  (Test-Map + manual-test.md im Repo)
+- **08-17:** LiteLLM raus, Anthropic-SDK rein. Catalog via models.dev.
+- **08-18:** Smart Approval (Hermes-kompatibel 3 Modi + Aux LLM, default `smart`) +
+  Streaming-Bug-Fix (Buffer-Accumulator für REPL)
+- **578 Tests grün** + ruff clean; Live-Verifikationen zu jeder Phase
+  (manual-test.md im Repo)
 - Agent kann heute: Skills lernen, Sessions durchsuchen, Memory kuratieren,
-  Subagents parallel, Permissions, MCP (Roblox Studio), Repo-Verständnis,
-  Diff-Editing, Tests laufen lassen, Git/PR, Browser-Steuerung
-- Repo: `C:\Projekte\EACcode V3` · Remote: `github.com/Kurt-03/EACcode` (gepusht 2026-08-13)
+  Subagents parallel, **Smart Permissions**, MCP (Roblox Studio), Repo-Verständnis,
+  Diff-Editing, Tests laufen lassen, Git/PR, Browser-Steuerung,
+  **models.dev Catalog** (4000+ Models)
+- Repo: `C:\Projekte\EACcode V3` · Remote: `github.com:Kurt-03/EACcode` (gepusht 2026-08-18)
 
 ## Offene Entscheidungen (Auszug)
 
@@ -47,4 +54,4 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 - GitHub-Remote: gesetzt + gepusht (alte `eac-code`-Remote ist Geschichte)
 
 ---
-*Zuletzt gepflegt: 2026-08-13 (Stand: Phase D KOMPLETT, 402 Tests, Repo gepusht)*
+*Zuletzt gepflegt: 2026-08-18 (Smart Approval + Streaming-Bug-Fix + Anthropic-SDK, 578 Tests, gepusht)*

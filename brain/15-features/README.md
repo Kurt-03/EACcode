@@ -18,6 +18,8 @@ eintragen.
 | Provider: OpenRouter | provider | done | A3 | [[15-features/providers/openrouter.md|OpenRouter]] |
 | Provider: Ollama | provider | done | A3 | [[15-features/providers/ollama.md|Ollama]] |
 | Provider: MiniMax | provider | done | A3 | [[15-features/providers/minimax.md|minimax]] |
+| Models.dev Catalog | system | done | 08-17 | [[15-features/system/models-dev.md|models-dev]] |
+| Provider-Architecture | system | done | 08-17 | [[15-features/system/providers.md|providers]] |
 | Agent Core (ReAct) | system | done | A4 | [[15-features/system/agent-core.md|Agent Core]] |
 | Tool: read_file | tool | done | A5 | [[15-features/tools/read-file.md|Tool: read_file]] |
 | Tool: write_file | tool | done | A5 | [[15-features/tools/write-file.md|Tool: write_file]] |
@@ -35,7 +37,10 @@ eintragen.
 | Permission-Gate | system | done (REPL) | A5/C1 | [[15-features/system/permission-gate.md|Permission-Gate]] |
 | Subagents | agent | done | B5 | [[15-features/system/subagents.md\|subagents]] |
 | Parallel-Execution | system | done | B6 | [[15-features/system/parallel-execution.md\|parallel-execution]] |
-| Permissions (C1) | system | done | C1 | [[15-features/system/permissions.md\|permissions]] |
+| Permissions (Smart) | system | done | C1+08-18 | [[15-features/system/permissions.md\|permissions]] |
+| Smart Approval (Aux LLM) | system | done | 08-18 | [[15-features/system/smart-approval.md\|smart-approval]] |
+| Streaming-Buffer-Fix | system | done | 08-18 | [[15-features/system/streaming-buffer-fix.md\|streaming-buffer-fix]] |
+| /approvals (Smart Mode Switch) | command | done | 08-18 | [[15-features/commands/approvals.md\|approvals]] |
 | Repo-Verständnis (D1) | system | done | D1 | [[15-features/system/repo-understanding.md\|repo-understanding]] |
 | Diff-Editing (D2) | system | done | D2 | [[15-features/system/diff-editing.md\|diff-editing]] |
 | Test-Runner (D3) | system | done | D3 | [[15-features/system/test-runner.md\|test-runner]] |
@@ -51,4 +56,4 @@ eintragen.
 | Memory-Hierarchie | system | done | B4 | [[15-features/system/memory.md\|Memory]] |
 | Commands (alle `/`) | system | done | A–B | [[15-features/commands/README.md\|README]] |
 
-*Stand: 2026-08-13 — Phase A ✅ · B ✅ · C1–C3 ✅ · D ✅ KOMPLETT (402 Tests); C4/C5 auf später verschoben*
+*Stand: 2026-08-18 — Phase A–D ✅ + Smart Approval (Aux LLM) + Provider Refactor (litellm→Anthropic SDK) + Streaming-Bug-Fix (578 Tests grün)*

@@ -138,6 +138,48 @@ Render-Sektionen, Pipe-Integration)
   Enter: 1× Palette öffnen (Text bleibt), 2× übernehmen+ausführen
 - Live verifiziert (PTY): `/version` → Palette → Enter → `eaccode 0.0.1`
 
+
+
+---
+
+## Update 08-18: `/approvals` + Stream-Buffer-Fix
+
+### `/approvals` Slash-Command
+
+Hermes-Quick-Switch für Mode:
+
+```
+/approvals                  # show mode (smart|manual|off)
+/approvals manual           # ask on every action
+/approvals smart            # default (auto + aux LLM)
+/approvals off              # yolo (hardline bleibt blockiert)
+```
+
+Implementiert in `_cmd_approvals` (palette.py Z. 562). Delegiert an
+`commands.run_permissions_command` mit StringIO-capture.
+
+### Streaming-Buffer-Fix (Commit `48a3dad`)
+
+Vor 08-18: `_on_token` rief direkt `print(delta, end="", flush=True)` in
+einem Worker-Thread → race in `patch_stdout` → Antwort-Anfang verschluckt.
+
+**Fix**: `_stream_buffer` akkumuliert alle Chunks im Worker-Thread, **ein**
+`self._emit(buffer)` am Ende im Main-Thread (`_agent_worker`).
+
+```python
+# Worker-Thread:
+self._stream_buffer += delta
+
+# Main-Thread (after worker):
+if self._streamed_any:
+    self._emit(self._stream_buffer)
+```
+
+Im Tests überspringbar via `EACCODE_TEST=1` (siehe `tests/conftest.py`).
+
+Siehe [[15-features/system/streaming-buffer-fix.md|Streaming-Buffer-Fix]] für Details.
+
+
 ## Verknüpft
 [[15-features/commands/README.md|README]] · [[15-features/system/skill-system.md|skill-system]] · [[15-features/system/repl.md|REPL]]
 

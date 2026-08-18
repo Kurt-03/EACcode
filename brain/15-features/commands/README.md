@@ -18,9 +18,10 @@ Implementierung, Tests). **Neue Commands → eigene Notiz + Zeile hier.**
 | `/job` | Jobs verwalten (list/add/run) | done (C2) | [[15-features/commands/job.md\|job]] |
 | `/mcp` | MCP-Server (list/add/import) | done (C3) | [[15-features/commands/mcp.md\|mcp]] |
 | `/permissions` | Modi + Regeln | done (C1) | [[15-features/commands/permissions.md\|permissions]] |
+| `/approvals` | Mode-Show/Switch (08-18 smart) | done | [[15-features/commands/approvals.md\|approvals]] |
 | `/tui`-Start | `eaccode tui` startet die TUI | done (A8) | [[15-features/commands/tui.md\|tui]] |
 
-*Stand: 2026-08-13 — 13 Commands aktiv, alle mit eigener Notiz*
+*Stand: 2026-08-18 — 14 Commands aktiv, alle mit eigener Notiz*
 
 ## Code-Graph (generiert)
 
