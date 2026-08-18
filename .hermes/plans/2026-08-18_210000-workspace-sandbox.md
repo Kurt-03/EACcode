@@ -30,13 +30,11 @@ Alle Tools die **Pfade akzeptieren** werden durch den Sandbox-Layer geschickt:
 | `browser_*` | Browser hat eigene Sandbox (URLs, nicht Pfade) |
 | `http_get`, `web_search` | URLs, keine Pfade |
 
-> **`run_command` bleibt in Stufe 1+2 nativ.** Es ist bewusst KEIN Sandbox-Target, weil:
-> - User hat das Tool explizit designed für Shell-Aufgaben
-> - Smart-Mode Aux-LLM bewertet jeden Command
-> - Hardline-Pattern (rm -rf /, sudo -S, etc.) blocken bereits
-> - Wenn User shell-comfortable ist, soll er Shell kriegen
->
-> **Stufe 3 (Docker-Container)** hat separate Container für `run_command` (Hermes-Verbatim).
+> **`run_command` ist KEIN eaccode-Tool.** Es ist nur ein Legacy-Fallback und sollte in Plan-H.minimal **nicht vorkommen**:
+> - User (Kurt) sieht es nicht als echtes Tool an — "kein richtiges Tool"
+> - Sandbox-Isolation ist für **eaccode-Tools** (write_file, file_edit, etc.)
+> - Shell-Aufgaben gehen über `run_command` (nativ, nicht sandboxed)
+> - Stufe 3 (Docker-Container) hat separate Container für `run_command` (Hermes-Verbatim) — aber nur als opt-in
 
 **Für dich:**
 ```
@@ -57,10 +55,10 @@ $ eaccode
 ### Stufe 2 — Hard-Sandbox mit Permission-Bridge (2-3 Wochen, ~1500 LOC)
 
 **Was es macht (zusätzlich zu Stufe 1):**
-- `run_command` bleibt nativ (siehe Hinweis oben)
-- Alle anderen Tools (read/write/edit/git/repo/etc.) checken via `validate_within_dir`
+- Alle Tools (read/write/edit/git/repo/etc.) checken via `validate_within_dir` mit strengeren Regeln
 - Permission-Bridge: User kann einzelne Pfade explizit aus der Sandbox **rausmappen** (`/approvals allow-path C:/...`)
 - Bei allen Tools außerhalb sandbox: explicit user-approval nötig
+- `run_command` bleibt nativ (siehe Hinweis oben)
 
 **Für dich:**
 ```
@@ -214,7 +212,7 @@ $ eaccode
 
 ## Was es **nicht** macht (Stufe 1)
 
-- **`run_command` läuft noch nativ** (echtes Filesystem, kein chroot/junction)
+- **`run_command` ist kein Sandbox-Target** (User-Wunsch — Kurt sieht es nicht als "echtes Tool")
 - **Docker wird nicht benutzt** (kein Container-Per-Task)
 - **Per-Task-Image-Selection nicht** (kein Python:3.11 vs Python:3.12)
 - **Sub-Agent-Sandbox-Isolation nicht** (Sub-Agents teilen parent's Sandbox)
