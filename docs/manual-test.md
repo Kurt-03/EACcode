@@ -341,6 +341,47 @@ Die eaccode-Architektur ist jetzt LiteLLM-frei. Anthropic-Messages-kompatible Pr
    # Erwartung: Vollständige Antwort, NICHT mitten im Satz abgeschnitten
    ```
 
+
+
+---
+
+## Wrapper-Konflikt: alte eaccode.exe (08-17)
+
+Falls `eaccode` mit "No module named 'anthropic'" fehlschlägt, **ist die falsche Binary aktiv**. Symptom:
+
+```
+$ eaccode --version
+eaccode 0.0.1
+
+$ eaccode -p "hi"
+Error: No module named 'anthropic'
+```
+
+**Ursache:** `C:\Users\kurtj\.local\bin\eaccode.exe` ist eine **alte** Wrapper-Binary, die vor dem Provider-Switch installiert wurde. Sie zeigt auf einen Python, der `anthropic` nicht installiert hat.
+
+**Fix:** Den alten Wrapper löschen, dann wird automatisch `.venv\Scripts\eaccode.exe` benutzt:
+
+```bash
+# Welche eaccode ist aktiv?
+which eaccode
+# Wenn /c/Users/kurtj/.local/bin/eaccode — alte Binary -> loeschen:
+rm /c/Users/kurtj/.local/bin/eaccode.exe
+
+# Korrekte Version benutzen
+which eaccode
+# -> /c/Projekte/EACcode V3/.venv/Scripts/eaccode
+
+eaccode --version
+# -> eaccode 0.0.1 (aber mit anthropic-SDK)
+```
+
+**Verifikation:**
+
+```bash
+eaccode -p "Say hi in 5 words"
+# Erwartung: vollstaendige Antwort, z.B. "Hi there, friend, hello!"
+```
+
 ## Fehler melden (wichtig für die Zusammenarbeit)
 
 Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:
