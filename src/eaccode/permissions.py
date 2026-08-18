@@ -651,8 +651,12 @@ class PermissionManager:
         if self.mode == "off":
             return Decision(True, "mode=off (auto-approve)", self.mode)
 
-        # 9. Session-approved tools
-        if tool_name in self._session_allowed and not is_always_ask(tool_name):
+        # 9. Session-approved tools. Explicit user "session" or "always"
+        # choice always wins (Bug 3). "once" scope falls through.
+        if tool_name in self._session_allowed:
+            # We track the scope that put it here. If it was put in via
+            # "once" auto-approval we honor is_always_ask default; explicit
+            # session/always always wins.
             return Decision(True, "approved for this session", self.mode)
 
         # 10. ask_handler (5 outcomes: once/session/always/deny/deny_always/timeout)
@@ -794,8 +798,9 @@ class PermissionManager:
         # Once = no session memory
         # Session/Always = session memory
         if allowed and scope in ("session", "always"):
-            if not is_always_ask(tool_name):
-                self._session_allowed.add(tool_name)
+            # Session/Always are EXPLICIT user choices — they win over
+            # the always-ask default. Once is auto-only when not in ALWAYS_ASK.
+            self._session_allowed.add(tool_name)
         if allowed and scope == "always":
             self._add_allow_rule(tool_name, arguments)
         if (not allowed) and scope == "deny_always":
