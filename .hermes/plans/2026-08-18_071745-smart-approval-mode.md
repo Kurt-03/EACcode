@@ -117,7 +117,7 @@ run_command('/tmp/cleanup')
 
 **Gesamt:** ~820 Zeilen, 8-12 Commits.
 
-## Hardline-Patterns (always block, ~30 patterns)
+## Hardline-Patterns (always block, 12 patterns, Hermes-Verbatim)
 
 ```python
 HARDLINE_PATTERNS = [
@@ -139,7 +139,7 @@ HARDLINE_PATTERNS = [
 ]
 ```
 
-## Dangerous-Patterns (smart aux LLM, ~50 patterns)
+## Dangerous-Patterns (smart aux LLM, 77 patterns, Hermes-Verbatim)
 
 ```python
 DANGEROUS_PATTERNS = [
@@ -229,7 +229,7 @@ smart_approval:
   # model: minimax/MiniMax-M2.7-highspeed
 ```
 
-Falls User kein `smart_approval.model` setzt → fallback auf `minimax/MiniMax-M2.5` (kleiner, schneller).
+**Default-mode:** `smart` (per User-Wunsch). `smart_approval.model` ist Phase 2. Phase 1: aux LLM = das aktive Haupt-Agent-Model (per Hermes-Muster).
 
 ## Soll-Verhalten (Konkrete Examples)
 
@@ -289,15 +289,18 @@ Current mode: smart
 Set:  /approvals [manual|smart|off]
 ```
 
-## Was ich von dir brauche (5 Fragen)
+## Bestätigte Antworten (08-18)
 
-1. **Plan freigegeben?**
-2. **Aux-LLM default-model:** `minimax/MiniMax-M2.5` (Hermes-Standard, klein + schnell) oder `minimax/MiniMax-M2.7-highspeed` (highspeed, aber Kosten)?
-3. **XML-Delimiters + Comment-Stripping als Injection-Defense** — die Hermes-Defenses übernehmen, oder reicht eine sicherere Variante (kein Stripping, sondern hashe/hashe zwischen Provider und Smart-Review)?
-4. **Soft-Time-out 5s für aux LLM** — wenn Aux LLM nicht in 5s antwortet, sollte `ESCALATE` (User fragen) als Fallback dienen. OK?
-5. **Hardline-Patterns aggressiv oder defensiv?** ~30 patterns (Hermes-Stil) oder conservativer ~15 patterns (nur catastrophic). Aggressiv = weniger false-negatives, mehr false-positives.
+1. **Plan freigegeben?** ✅
+2. **Aux-LLM default-model:** Default = **das normal selectete Model** (per-User-Setup). Für Phase 1 ist das `minimax/MiniMax-M2.5` (klein, schnell, $0.30/M In). Mehrere Modi für Smart-Approval kommen später.
+3. **XML-Delimiters + Comment-Stripping + System-Prompt-Warning** — Hermes-Defenses verbatim übernehmen. Live-verifiziert: auxiliary_client.exists in Hermes, Format ist standard.
+4. **Worker-Thread mit Timeout** — Hermes-Pattern: aux_call in eigenem Thread, Timeout 10s default (Hermes: 30s). Bei Timeout → **ESCALATE** (safe fallback), nicht hardline-block.
+5. **Hermes-Pattern-Count:** 12 Hardline + 77 Dangerous = **89 patterns** verbatim aus Hermes. Vorteil: battle-tested, in Production.
 
-**Bonus-Frage:** Wo kommt das `approvals.mode`-Setting in der Config? Vorschlag: `permissions.mode` (gleiche Stelle wie `read_only`/`allow_all`). OK so, oder willst du einen separaten `approvals` Block wie Hermes?
+**Bonus:**
+- `models.reasoning_effort` und `approvals.mode` kommen später separat. Phase 1: nur `permissions.mode` (gleiche Stelle wie `read_only`/`allow_all`).
+- **Default-mode:** `smart` (User-Vorgabe: "smart/safe-auto default machen"). User muss explizit auf `manual` oder `off` wechseln.
+- **Multi-models später:** Phase 2: `smart_approval.model` als Override, sonst default = main agent model.
 
 ## Out-of-Scope (separat, NICHT in diesem Plan)
 
