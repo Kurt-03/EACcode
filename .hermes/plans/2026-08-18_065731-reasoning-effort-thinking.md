@@ -6,14 +6,13 @@
 
 ## Diagnose (warum jetzt sichtbar)
 
-**VORHERIGE Annahme (08-17):** "MiniMax-M3 sendet Reasoning inline im text_delta" — **FALSCH**, korrigiert 08-18.
+**MiniMax-M3 XHigh sendet Reasoning-Delta NICHT** (live verifiziert am 08-18 mit echtem API-Call): 0 `thinking_delta` Events trotz korrektem `thinking.type="enabled"` + `budget_tokens` Param. Antwort: 2 chars im Text-Stream, Reasoning: 0 chars.
 
-**WAHR:** MiniMax-M3 sendet **gar kein** Reasoning weil:
-- Mein `AnthropicProvider` setzt nur den `interleaved-thinking-2025-05-14` Beta-Header
-- Aber **nicht** den `thinking.type="enabled"` + `budget_tokens` Request-Param
-- Ohne diesen Param akzeptiert der Provider den Reasoning-Mode nicht → kein Reasoning-Stream
+**Zwei Bugs sind überlagert:**
+1. Mein `AnthropicProvider` sendet den `thinking`-Param **nicht** (nur den `interleaved-thinking-2025-05-14` Beta-Header)
+2. Selbst wenn ich's sende, ignoriert MiniMax-M3 XHigh ihn (oder antwortet mit Reasoning inline im text_delta, was wir nicht als `thinking_delta` zurückbekommen)
 
-**Hermes sendet:**
+**Hermes sendet es (anthropic_adapter.py Z. 2262-2278):**
 ```python
 kwargs["thinking"] = {"type": "enabled", "budget_tokens": 8000}
 kwargs["temperature"] = 1
@@ -21,6 +20,11 @@ kwargs["max_tokens"] = max(effective_max_tokens, budget + 4096)
 ```
 
 **Mein eaccode tut das nicht.** Deshalb `reasoning=0 chars` im Live-Test.
+
+**Konsequenz:**
+- Plan baut Reasoning-Param trotzdem ein (für native Claude, Kimi, DeepSeek)
+- `reasoning_kwargs()` als Provider-Method: jeder Adapter mappt individuell
+- MiniMax-M3 wird auch nach dem Fix KEIN Reasoning-Stream liefern, aber Code ist ready für andere Provider/Modelle
 
 ## Soll-Bild
 
@@ -76,24 +80,27 @@ Plus `'none'` = off.
 | Datei | Aktion | Zeilen |
 |---|---|---|
 | `src/eaccode/config.py` | `defaults()` um `model.reasoning_effort: "medium"` ergänzen | ~5 |
-| `src/eaccode/providers/anthropic.py` | `THINKING_BUDGET` + `REASONING_EFFORT_VALUES` Konstanten, `thinking`-Param in `stream()`, `temperature=1` + `max_tokens += budget` | ~30 |
-| `src/eaccode/providers/anthropic.py` | Tests: `thinking`-Param wird durchgereicht, `temperature=1`, `max_tokens` korrekt | ~80 |
-| `src/eaccode/agent.py` | `_complete` liest `reasoning_effort` aus config, übergibt an Provider | ~15 |
+| `src/eaccode/providers/base.py` | `Provider` Protocol: `reasoning_kwargs(effort: str) -> dict | None` Methode | ~10 |
+| `src/eaccode/providers/anthropic.py` | `THINKING_BUDGET` + `REASONING_EFFORT_VALUES`, `thinking`-Param + `temperature=1` + `max_tokens` Adjustment; `reasoning_kwargs()`-Methode | ~40 |
+| `src/eaccode/agent.py` | `_complete` liest `reasoning_effort` aus config, ruft `provider.reasoning_kwargs()`, mergt in kwargs; `max_tokens` automatisch angehoben | ~25 |
 | `src/eaccode/cli.py` | Optional: `--reasoning-effort LEVEL` Flag fuer `-p` Mode | ~10 |
-| `tests/test_agent.py` | Test: Config `reasoning_effort` wird an Provider durchgereicht | ~30 |
-| `tests/test_provider_anthropic.py` | Tests: `thinking` auf "enabled", `budget_tokens` korrekt, `temperature=1` | ~60 |
-| `tests/test_provider_anthropic.py` | Tests: `reasoning_effort="none"` sendet **kein** `thinking` param | ~20 |
-| `docs/manual-test.md` | Reasoning-Block hinzufügen | ~30 |
-| `brain/15-features/system/providers.md` | Update: "fix done" | ~5 |
+| `tests/test_provider_anthropic.py` | `reasoning_kwargs()` Tests: medium/xhigh/none; `thinking.type="enabled"` + `budget_tokens`; `temperature=1`; `max_tokens`-override | ~80 |
+| `tests/test_agent.py` | Test: `reasoning_effort` aus Config wird an Provider durchgereicht; bei `none` kein Override | ~40 |
+| `docs/manual-test.md` | Reasoning-Block | ~30 |
+| `brain/15-features/system/providers.md` | Update: "fix done + was geht bei welchem Provider" | ~10 |
 
-**Gesamt:** ~285 Zeilen, 5-7 Commits.
+**Gesamt:** ~250 Zeilen, 5-7 Commits. **Provider-agnostic design**: jeder Adapter implementiert `reasoning_kwargs()` individuell. Anthropic-Familie nutzt `thinking.type` + `budget_tokens`. OpenAI-Compatible (später) nutzt `reasoning_effort` direkt. Für Provider ohne Reasoning support retourniert `reasoning_kwargs()` `None`.
 
 ## Out of Scope (separat)
 
 - **Display-Setting** `display.show_reasoning` (ob Reasoning angezeigt wird) — User-Setting, nicht jetzt
 - **Reasoning in Tool-Use-Blöcken** (Hermes-`drop_thinking_only_and_merge_users`) — Phase 2, wenn Tool-Calls stabil
-- **Adaptive Thinking** (`thinking.type="adaptive"` + `output_config.effort`) — Hermes-only, MiniMax-M3 unterstützt das laut Code nicht
-- **Reasoning-Verifikation via Live-Test** — separater Schritt am Ende
+- **Adaptive Thinking** (`thinking.type="adaptive"` + `output_config.effort`) — Hermes-only, MiniMax-M3 nicht, eaccode Phase 1 nutzt `manual`-Mode
+- **OpenAI-Reasoning** (o1, o3, gpt-5): kommt mit OpenAI-Provider-Adapter (Phase 2). `reasoning_kwargs()` für OpenAI-Familie wird `{"reasoning_effort": "..."}` mappen.
+- **Grok-Reasoning**: kommt mit xAI-Provider (Phase 2). Same Pattern.
+- **Google Gemini-Reasoning**: kommt mit Vertex/Gemini-Adapter (Phase 2). Andere Param-Name (`thinkingBudget`).
+- **Claude-4.6+ Adaptive Thinking**: Hermes-Spezialität, nicht für eaccode-Phase-1
+- **Reasoning-Health-Check** (loggen ob reasoning leer, inkrementelle bugfixes)
 
 ## Schritte (vorgeschlagene Reihenfolge)
 
@@ -124,10 +131,15 @@ User-Session: `eaccode config set model.reasoning_effort medium` → `eaccode -p
 ## Was ich von dir brauche (5 Fragen)
 
 1. **Plan freigegeben?**
-2. **Default-Level:** `medium` (Hermes-Default) oder nur `low` für eaccode-Phase-1? (Hermes hat `medium` als robusten Default.)
-3. **Layer-Status:** Bist du sicher, dass MiniMax-M3 XHigh `thinking.type="enabled"` + `budget_tokens` unterstützt? Hermes-Code geht davon aus, aber wir sollten Live-Test haben BEVOR wir das ausrollen.
-4. **CLI-Flag:** Soll `-p` Mode auch `--reasoning-effort LEVEL` bekommen? (Schneller testbar, sonst nur via config.)
-5. **Cap auf `max_tokens`:** Hermes addiert `budget_tokens + 4096` zu `max_tokens`. Bei M3 XHigh (1M context, 128k output) reichen 128k + 32k = 160k. Wenn der User `max_tokens=4096` (Default in eaccode) manuell setzt, würden wir 4096+32k=36k forcen. OK so?
+2. **Default-Level:** `medium` (Hermes-Default) oder `low` (eaccode-Phase-1 defensiv)?
+3. **Layer-Status:** Live verifiziert: MiniMax-M3 XHigh unterstützt `thinking_delta`-Stream NICHT (auch mit korrektem Param 0 Events). **Trotzdem** Param senden, weil:
+   - Andere Anthropic-Compatible-Provider (Kimi, DeepSeek) funktionieren damit
+   - Native Claude-Modelle funktionieren
+   - Bei zukünftigen M3-Versionen (oder anderen Provider) ist Code ready
+4. **CLI-Flag:** Soll `-p` den `--reasoning-effort LEVEL` bekommen? Vorteil: schneller testbar, gilt für alle Provider
+5. **Cap auf `max_tokens`:** `max_tokens = max(user_max, budget + 4096)` (Hermes-Stil). Wenn User z.B. `max_tokens=4096` manuell setzt + `xhigh` (32k budget), forcen wir 36k. OK so?
+
+**Bonus-Frage:** Bei `reasoning_effort="none"` soll der Param komplett **weg** sein (kein `thinking: {type: "disabled"}`). Bestätigt — Hermes-muster. OK?
 
 ## Out-of-Scope (separat, NICHT in diesem Plan)
 
@@ -138,9 +150,11 @@ User-Session: `eaccode config set model.reasoning_effort medium` → `eaccode -p
 
 ## Risiken
 
-- **MiniMax-M3 unterstützt `thinking` nicht** → leerer Stream, User-Wut. Mitigation: Test mit echter M3-Call vor Code-Merge.
-- **`temperature=1` Konflikt** mit anderen Modellen die temperature nicht 1 wollen. Mitigation: nur setzen wenn `thinking` enabled.
+- **MiniMax-M3 XHigh ignoriert `thinking`-Param** (live verifiziert: 0 `thinking_delta` Events). Mitigation: Reasoning bleibt leer für MiniMax-M3 — wird im UI so behandelt (Reasoning-Block ausgeblendet wenn 0 chars). Andere Provider funktionieren.
+- **`temperature=1` Konflikt** mit Modellen die temperature nicht 1 wollen. Mitigation: nur setzen wenn `reasoning_effort != "none"`.
 - **`max_tokens` override** überschreibt User-Wert. Mitigation: nur wenn `budget_tokens > 0`, dann `max(budget + 4096, user_max_tokens)`.
+- **Reasoning-ReasoningEffort !== Anthropic-Param** bei OpenAI-Compatible. Mitigation: `reasoning_kwargs()` als Provider-Method — jeder Adapter mappt individuell.
+- **Reasoning-Inhalte Leaking** über Modell-Wechsel. Mitigation: Reasoning-Content ist transport-by-Adapter, nicht im `messages`-History gespeichert (kein Leakage).
 
 ## Verwandte Pläne
 
