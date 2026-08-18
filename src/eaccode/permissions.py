@@ -425,6 +425,7 @@ class PermissionManager:
         conf: dict[str, Any] | None = None,
         ask_handler: Callable[[str, dict[str, Any]], bool] | None = None,
         smart_reviewer: Callable[[str, str], str] | None = None,
+        session_key: str = "default",
     ) -> None:
         self.conf = conf
         self.mode = "smart"
@@ -434,7 +435,9 @@ class PermissionManager:
         self.smart_reviewer = smart_reviewer
         self._ask_lock = threading.Lock()
         self._session_allowed: set[str] = set()
+        self._session_key = session_key
         self._init_from_config()
+        self._session_key = session_key
 
     def _init_from_config(self) -> None:
         source = self.conf if self.conf is not None else cfg.load_config()
@@ -728,6 +731,8 @@ class PermissionManager:
                 review_input = str(arguments)
         verdict = self.smart_reviewer(review_input, description)
         if verdict == "approve":
+            from eaccode.denial_breaker import get_denial_breaker
+            get_denial_breaker().reset(self._session_key)
             return Decision(
                 True,
                 f"smart-approved: {description}",
@@ -736,9 +741,14 @@ class PermissionManager:
                 smart_reviewed=True,
             )
         if verdict == "deny":
+            from eaccode.denial_breaker import get_denial_breaker
+            breaker = get_denial_breaker()
+            count = breaker.record(self._session_key)
+            addendum = breaker.addendum(self._session_key)
+            message = f"smart-denied: {description}{addendum}"
             return Decision(
                 False,
-                f"smart-denied: {description}",
+                message,
                 self.mode,
                 smart_reviewed=True,
             )
