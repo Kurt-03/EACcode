@@ -68,6 +68,8 @@ class StreamChunk:
 **Wichtig:** Der Agent sieht **nie** Anthropic-Events. Nur `StreamChunk`. Jeder Adapter konvertiert nativ → StreamChunk.
 
 **⚠ MiniMax-M3 Reasoning-Stream-Caveat (08-17):** MiniMax-M3 wirbt mit `reasoning=True` in models.dev, sendet aber im Anthropic-COMPAT-Format **kein** `thinking_delta`-Event. Reasoning kommt stattdessen inline im `text_delta` mit Newline-Tokens dazwischen. Hermes hat denselben Bug. Workaround: User-Prompt zwingt `<think>...</think>`-Format, dann greift `_strip_think` in palette.py.
+**Hermes Desktop Status (08-17):** Hermes Desktop **definiert** `display.show_reasoning` in `apps/desktop/src/app/settings/constants.ts` Z. 549 als Setting mit Toggle. Aber: das Setting ist **tot** — `showReasoning` taucht nirgendwo im Render-Code auf, nur in constants.ts, tests, und i18n files. TUI, REPL **und** Desktop zeigen Reasoning nicht, weil MiniMax-M3 es nicht als separates `thinking_delta` liefert. Der Toggle ist ein **Drehknopf ohne Maschine**.
+
 
 ## Implementierter Adapter
 
