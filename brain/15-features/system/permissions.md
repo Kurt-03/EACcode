@@ -157,6 +157,60 @@ eaccode permissions mode manual
 - **08-13 (C1):** Ursprüngliches 4-Modus-System (ask, allow_all, read_only, deny_all)
 - **08-18:** Hermes-kompatibel umgebaut: smart | manual | off. Hermes-Verbatim 89 patterns (12 hardline + 77 dangerous). Aux LLM mit XML-Delimiters und Comment-Stripping als Anti-Prompt-Injection.
 
+
+
+---
+
+## 08-18: Audit-Hardening Plan B
+
+### Was geändert wurde
+
+1. **`mutates`-Tag auf Tool** (`src/eaccode/agent.py`): NEU - jedes Tool deklariert
+   `mutates=True/False`. READ_ONLY_TOOLS wird automatisch abgeleitet via
+   `is_read_only_tool(tool)`. Kein Drift mehr zwischen Whitelist und
+   tatsächlichen Tools.
+
+2. **`always_ask`-Tag**: `run_command`, `browser_*`, `browser_screenshot`
+   markiert. Diese Tools werden NIE in `session_allowed` gespeichert -
+   der User muss jeden Call explizit approve-en.
+
+3. **Sensitive-Path-Check** (`_is_sensitive_path()`): Schreibt auf
+   `.ssh/`, `.git/config`, `.env`, `config.yaml`, `authorized_keys`,
+   `id_rsa` → triggert `_ask_user` mit `fallback_reason="sensitive path"`.
+
+4. **`_extract_path_arg()`**: Erkennt Pfad-Parameter unter beliebigen Namen
+   (`path`, `file_path`, `target_path`, `p`, `filepath`) plus
+   `patch_multiple`'s `edits[0].path`.
+
+5. **`_READ_ONLY_TOOL_NAMES`**: Statisches Fallback-Set für `check()`,
+   das nur `tool_name` als String hat (kein `Tool`-Objekt).
+
+### Pipeline-Reihenfolge (`check()`)
+
+```
+1. deny rule (wins)
+2. allow rule
+3. read_only mode (heuristic)
+4. Hardline pattern (run_command only)
+5. Sensitive-Path-Check (path-Arg through any tool)  ← NEU
+6. Smart-Mode Aux-LLM (run_command + dangerous)
+7. Read-only tools (heuristic + READ_ONLY_TOOL_NAMES)
+8. off mode (auto-approve)
+9. Session-allowed (NOT always-ask tools)
+10. ask_handler (with session-memory only for non-always-ask)
+```
+
+### Tests
+
+- `tests/test_permission_hardening.py` NEU - 18 Tests
+- `tests/test_tool_schemas.py` NEU - 13 Tests
+
+### Bekannte Limits
+
+- Aux-LLM-Check **weiterhin nur für `run_command`** (Plan B Phase 2)
+- Sensitive-Path-Check via regex ohne Subdirectory-Symlink-Schutz
+- Yolo-Mode (`off`) auto-approved alles außer Hardline (User-Entscheidung)
+
 ## Verwandt
 
 - `brain/15-features/system/agents.md` — Agent-Loop mit Permission-Gate

@@ -29,6 +29,9 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
   [[15-features/system/permissions.md|permissions]] + [[15-features/system/smart-approval.md|smart-approval]]
 - **ADR-0004** *(geplant)* — LiteLLM out, Anthropic SDK direkt (08-17) —
   siehe [[15-features/system/providers.md|providers]]
+- **ADR-0005** *(geplant)* — Tool-Schema-Audit + Permission-Hardening (08-18) —
+  siehe [[15-features/system/permissions.md|permissions]]
+  siehe [[15-features/system/providers.md|providers]]
 
 ## Projekt-Kurzstand (2026-08-18)
 
@@ -37,7 +40,8 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
 - **08-17:** LiteLLM raus, Anthropic-SDK rein. Catalog via models.dev.
 - **08-18:** Smart Approval (Hermes-kompatibel 3 Modi + Aux LLM, default `smart`) +
   Streaming-Bug-Fix (Buffer-Accumulator für REPL)
-- **578 Tests grün** + ruff clean; Live-Verifikationen zu jeder Phase
+- **609 Tests grün** · Plan A (Tool-Property-Descriptions + mutates-Tag) und Plan B (Permission-Hardening: sensitive-path, always_ask enforcement) sind gefixt
+- Smart-mode jetzt safe für .ssh/.env/config.yaml writes (vorher silent approved) + ruff clean; Live-Verifikationen zu jeder Phase
   (manual-test.md im Repo)
 - Agent kann heute: Skills lernen, Sessions durchsuchen, Memory kuratieren,
   Subagents parallel, **Smart Permissions**, MCP (Roblox Studio), Repo-Verständnis,
