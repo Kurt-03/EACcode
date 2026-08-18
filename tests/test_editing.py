@@ -271,3 +271,58 @@ class TestTools:
         out = tools["undo_edit"].func()
         assert "reverted" in out
         assert target.read_text(encoding="utf-8") == "x = 1\n"
+
+
+class TestSyntaxCheckNonPythonFiles:
+    """Regression test for the .py-suffix bug (Plan G v6 — 08-18).
+
+    Before fix: tempfile.NamedTemporaryFile used suffix=".py" regardless of
+    original file's extension, so syntax_check fired on .txt files and
+    rejected any non-Python text.
+    """
+
+    def test_txt_file_with_zweite_zeile_patches(self, tmp_path) -> None:
+        from eaccode.editing import apply_patch
+        target = tmp_path / "test.txt"
+        target.write_text("hello-world\n", encoding="utf-8")
+        result = apply_patch(
+            str(target),
+            old="hello-world\n",
+            new="hello-world\nzweite zeile\n",
+        )
+        assert result.ok is True, result.message
+        assert "zweite zeile" in target.read_text(encoding="utf-8")
+
+    def test_md_file_patches(self, tmp_path) -> None:
+        from eaccode.editing import apply_patch
+        target = tmp_path / "test.md"
+        target.write_text("# Header\n", encoding="utf-8")
+        result = apply_patch(
+            str(target),
+            old="# Header\n",
+            new="# Header\n\nNew section\n",
+        )
+        assert result.ok is True, result.message
+
+    def test_json_file_patches(self, tmp_path) -> None:
+        from eaccode.editing import apply_patch
+        target = tmp_path / "test.json"
+        target.write_text('{"a": 1}\n', encoding="utf-8")
+        result = apply_patch(
+            str(target),
+            old='{"a": 1}\n',
+            new='{"a": 2}\n',
+        )
+        assert result.ok is True, result.message
+
+    def test_py_file_still_validates_syntax(self, tmp_path) -> None:
+        from eaccode.editing import apply_patch
+        target = tmp_path / "test.py"
+        target.write_text("def foo():\n    return 1\n", encoding="utf-8")
+        result = apply_patch(
+            str(target),
+            old="def foo():\n    return 1\n",
+            new="def foo(:\n    return 1\n",
+        )
+        assert result.ok is False
+        assert "syntax error" in result.message.lower()

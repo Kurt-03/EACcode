@@ -176,8 +176,12 @@ def apply_patch(
             return EditResult(False, f"Error: {exc}")
     if not allow_syntax_errors:
         _session.backup(target)
+        # Use the original file's suffix so syntax_check doesn't fire on
+        # non-Python files (e.g. .txt, .md, .json). Was hardcoded ".py"
+        # which made the check fire on every edit and reject non-Python
+        # content. Plan G v6 — 08-18.
         with tempfile.NamedTemporaryFile(
-            "w", suffix=".py", delete=False, encoding="utf-8"
+            "w", suffix=target.suffix or ".py", delete=False, encoding="utf-8"
         ) as probe:
             probe.write(new_content)
             probe_name = probe.name
@@ -285,8 +289,11 @@ def edit_lines(
     if not new_content.endswith("\n") and new_content:
         new_content += "\n"
     _session.backup(target)
+    # Use original file's suffix so syntax_check only fires on .py files.
+    # Was hardcoded ".py" which made the check fire on every edit
+    # (e.g. .txt, .md, .json files). Plan G v6 — 08-18.
     with tempfile.NamedTemporaryFile(
-        "w", suffix=".py", delete=False, encoding="utf-8"
+        "w", suffix=target.suffix or ".py", delete=False, encoding="utf-8"
     ) as probe:
         probe.write(new_content)
         probe_name = probe.name
