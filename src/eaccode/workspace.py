@@ -222,16 +222,18 @@ def rewrite_path(path_str: str, workspace: Workspace) -> Path:
 
     Rules:
       - Empty string or ``.`` returns ``workspace.root``
-      - ``~`` and ``~/...`` expand to workspace root
+      - ``~`` and ``~/...`` map to workspace root (NOT to the real home)
       - Relative paths (``foo``, ``./foo``, ``../foo``) resolve against
-        the workspace root, *not* the caller's cwd. ``..``-traversal
-        that would escape the workspace raises ``WorkspaceError``.
+        the workspace root. ``..``-traversal that escapes the workspace
+        raises ``WorkspaceError``.
       - Absolute paths outside the workspace raise
         ``WorkspaceError`` (unless explicitly allowed).
-      - Exempt paths (MEMORY.md, USER.md, /skills/, .telegram-bot-config)
-        are returned as-is.
+      - Exempt paths (MEMORY.md, USER.md, /skills/) are returned as-is.
       - Symlinks are resolved via ``Path.resolve(strict=False)``. If the
         resolved target escapes the workspace, raise ``WorkspaceError``.
+      - Blocked devices (NUL, CON, /dev/null) raise
+        ``WorkspaceError`` with code ``blocked_device``.
+      - UNC paths (``\\\\server\\share``) raise ``WorkspaceError``.
     """
     if workspace.is_exempt(path_str):
         return Path(path_str).expanduser()
@@ -239,13 +241,27 @@ def rewrite_path(path_str: str, workspace: Workspace) -> Path:
     if not path_str or path_str == ".":
         return workspace.root
 
-    # Tilde expansion - inside the workspace.
+    # Tilde expansion - redirect into workspace, NOT real home.
     if path_str.startswith("~"):
-        path_str = str(Path(path_str).expanduser())
-        # If user passed an absolute home path, redirect into workspace.
-        if os.path.isabs(path_str):
-            rel = Path(path_str).relative_to(Path.home()) if path_str.startswith(str(Path.home())) else Path(path_str).name
+        home = Path.home()
+        if path_str == "~":
+            return workspace.root
+        if path_str.startswith("~/") or path_str.startswith("~\\"):
+            rel = path_str[2:]
             return (workspace.root / rel).resolve(strict=False)
+        return workspace.root  # ``~user/foo`` falls through to workspace root
+
+    # Blocked-device detection (before any resolution)
+    from eaccode.path_security import is_blocked_device, is_unc_path
+
+    if is_unc_path(path_str):
+        raise WorkspaceError(
+            code="unc_path", path=path_str, workspace=workspace.root_str
+        )
+    if is_blocked_device(path_str):
+        raise WorkspaceError(
+            code="blocked_device", path=path_str, workspace=workspace.root_str
+        )
 
     p = Path(path_str)
 
@@ -308,12 +324,22 @@ def is_path_safe_for_workspace(path: Path, workspace: Workspace) -> bool:
 # Module-level "active" workspace. Initialised lazily.
 _active_workspace: "Workspace | None" = None
 
+# Session-scoped cwd tracking (Hermes _authoritative_workspace_root analog).
+# When user `cd` somewhere, the workspace re-resolves to that path.
+_session_cwd: "Path | None" = None
+
 
 def get_active_workspace() -> "Workspace":
-    """Return the active workspace, lazily initialising the default one."""
+    """Return the active workspace, lazily initialising the default one.
+
+    Workspace root follows the session cwd when one has been recorded
+    (Hermes-style authoritative-root behaviour). Otherwise falls back
+    to ``Path.cwd()`` at first call.
+    """
     global _active_workspace
     if _active_workspace is None:
-        _active_workspace = get_default_workspace()
+        cwd = _session_cwd if _session_cwd is not None else Path.cwd()
+        _active_workspace = Workspace(root=cwd.resolve())
     return _active_workspace
 
 
@@ -323,9 +349,94 @@ def set_active_workspace(ws_obj: "Workspace") -> None:
     _active_workspace = ws_obj
 
 
+def update_session_cwd(new_cwd: "str | Path") -> None:
+    """Re-anchor the active workspace to ``new_cwd`` (e.g. after user ``cd``).
+
+    Mirrors Hermes' per-session cwd tracking - one session's ``cd``
+    can never leak into another session's resolution because the
+    variable is process-local.
+    """
+    global _session_cwd, _active_workspace
+    _session_cwd = Path(new_cwd).expanduser().resolve()
+    # Re-anchor the active workspace so the next tool call sees the new cwd.
+    if _active_workspace is not None:
+        _active_workspace.root = _session_cwd
+    else:
+        _active_workspace = Workspace(root=_session_cwd)
+
+
+def get_session_cwd() -> "Path | None":
+    """Return the recorded session cwd, or None when the user hasn't ``cd``."""
+    return _session_cwd
+
+
+def expand_tilde(path_str: str) -> str:
+    """Hermes-style ``~`` and ``~/foo`` expansion.
+
+    Returns ``path_str`` unchanged when it doesn't start with ``~``.
+    On Windows, ``~`` resolves to the user's home directory.
+    """
+    if not path_str.startswith("~"):
+        return path_str
+    home = Path.home()
+    if path_str == "~":
+        return str(home)
+    if path_str.startswith("~/"):
+        return str(home / path_str[2:])
+    if path_str.startswith("~\\"):
+        return str(home / path_str[2:])
+    return path_str
+
+
 # Alias used by /approvals - the underscore prefix is intentional so the
 # command module can grab it without colliding with the public name.
 _get_active_workspace = get_active_workspace
+
+
+# Hermes has ``_search_result_read_block_error`` + ``_filter_read_blocked_search_results``.
+# We mirror them so search results don't leak blocked paths back to the model.
+_SEARCH_BLOCK_PREFIXES = (
+    ".ssh",
+    ".aws",
+    ".gnupg",
+    ".kube",
+    ".docker",
+    ".netrc",
+    ".pgpass",
+    ".npmrc",
+    ".pypirc",
+    ".git-credentials",
+    ".anthropic_oauth.json",
+)
+
+
+def is_search_blocked_path(path: "Path | str") -> bool:
+    """True when ``path`` is a sensitive directory prefix (Hermes-style)."""
+    s = str(path).replace("\\", "/")
+    parts = s.split("/")
+    return any(p in _SEARCH_BLOCK_PREFIXES for p in parts)
+
+
+def filter_search_results(results: list[str], workspace: "Workspace") -> list[str]:
+    """Filter ``results`` so blocked paths are not leaked back to the model.
+
+    Returns the filtered list. Each entry is a ``path:line:text`` triple
+    (the format search_files emits). Entries whose path falls under
+    ``_SEARCH_BLOCK_PREFIXES`` are replaced with a sentinel so the model
+    still sees the count but not the content.
+    """
+    filtered: list[str] = []
+    blocked_count = 0
+    for entry in results:
+        # path is the first : - separated segment
+        path_part = entry.split(":", 1)[0] if ":" in entry else entry
+        if is_search_blocked_path(path_part) and not workspace.is_allowed_outside(Path(path_part)):
+            blocked_count += 1
+            continue
+        filtered.append(entry)
+    if blocked_count:
+        filtered.append(f"(filtered {blocked_count} matches in sensitive directories)")
+    return filtered
 
 
 __all__ = [
@@ -336,7 +447,12 @@ __all__ = [
     "get_default_workspace",
     "get_active_workspace",
     "set_active_workspace",
+    "update_session_cwd",
+    "get_session_cwd",
+    "expand_tilde",
     "load_workspace_from_config",
     "rewrite_path",
     "is_path_safe_for_workspace",
+    "is_search_blocked_path",
+    "filter_search_results",
 ]

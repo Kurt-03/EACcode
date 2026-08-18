@@ -8,6 +8,25 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .coverage
+
+# eaccode runtime artifacts
+.eaccode-workspace/
+*.eaccode-tmp
+pending/
+approvals.json
+
+# Plan artefacts
+.holdings/
+.hermes/scratch/
+
+# Obsidian attachments
+*.canvas
+*.excalidraw
+
+# Build cache
+.ruff_cache/
+.pytest_cache/
+
 htmlcov/
 .coverage.*
 

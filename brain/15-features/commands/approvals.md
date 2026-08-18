@@ -1,57 +1,50 @@
 ---
-name: approvals-slash-cmd
+name: approvals
 type: command
 status: done
-phase: 08-18 smart
-tags: [type/command, approvals, security]
+phase: 08-18 plan-h-v4-stufe-2
+date: 2026-08-18
+tags: [type/feature, feature/command, workspace, hermes]
 ---
 
-# Command: `/approvals` (Smart Mode Switch)
+# /approvals
 
-> **Phase:** 08-18 Smart Approval Mode
-> **Use:** Shows current approval mode; optional switch argument.
+> Manage workspace allow/deny rules (Plan H.minimal v4, Stufe 2).
 
-## Usage
-
-```
-/approvals                  # show current mode + allow/deny rules
-/approvals manual           # switch to manual (ask on every tool call)
-/approvals smart            # switch to smart (auto + aux LLM risk-assessment)
-/approvals off              # switch to off (yolo, hardline still blocks)
-/approvals read_only        # switch to read-only (blocks all mutating tools)
-```
-
-## Effective Mode
-
-Displays the **resolved** mode after alias normalization:
-
-| Config value | Alias of |
-|-------------|----------|
-| `ask` | `manual` |
-| `allow_all` | `off` |
-| `manual` | (as-is) |
-| `off` | (as-is) |
-| `smart` | (as-is) |
-| `read_only` | (as-is) |
-
-## Output
-
-Example session in smart mode:
+## Commands
 
 ```
-mode: smart (effective: smart)
-allow: []
-deny: []
+/approvals allow-path <path> [--once|--session|--always]
+/approvals deny-path <path> [--once|--session|--always]
+/approvals list
+/approvals reset
 ```
 
-## Implementation
+## Scopes
 
-`src/eaccode/palette.py:_cmd_approvals` calls
-`commands.run_permissions_command([...])` with stdout captured into a
-StringIO, then emits the result.
+| Scope | Behavior |
+|---|---|
+| `once` | One-shot, used once and discarded |
+| `session` | Lifetime of current session, lost on exit |
+| `always` | Persisted in `~/.local/share/eaccode/approvals.json` |
 
-## Verwandt
+## Glob-Pattern
 
-- `[[15-features/system/permissions|Smart Approval System]]`
-- `[[15-features/system/smart-approval|Aux LLM Risk Assessment]]`
-- `[[15-features/commands/permissions|/permissions Subcommand]]`
+`allow-paths` und `deny-paths` können Glob-Patterns enthalten (`?`, `*`, `[seq]`).
+
+## Beispiel
+
+```
+❯ /approvals allow-path C:/Users/admin/Desktop --session
+✓ Allowed C:/Users/admin/Desktop (scope: session)
+
+❯ /approvals list
+Allow-paths:
+  - C:/Users/admin/Desktop  (session)
+```
+
+## Reference
+
+- Code: `src/eaccode/commands.py::run_approvals_command`
+- Persistence: `src/eaccode/approvals_store.py`
+- Tests: `tests/test_approvals.py`

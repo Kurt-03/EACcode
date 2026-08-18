@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from eaccode import workspace as ws
+from eaccode import workspace as workspace_module
 from eaccode.workspace import (
     EXEMPT_PATH_FRAGMENTS,
     Workspace,
     WorkspaceError,
+    filter_search_results,
     get_default_workspace,
     load_workspace_from_config,
     rewrite_path,
@@ -208,3 +212,77 @@ class TestLoadFromConfig:
             {"workspace": {"allow_paths": [str(allow)]}}
         )
         assert ws_obj.allow_paths == [allow.resolve()]
+
+
+class TestSessionCwd:
+    def test_update_session_cwd(self, tmp_path, monkeypatch) -> None:
+        workspace_module._session_cwd = None
+        workspace_module._active_workspace = None
+        monkeypatch.chdir(tmp_path)
+        workspace_module.update_session_cwd(tmp_path / "subdir")
+        ws_obj = workspace_module.get_active_workspace()
+        assert ws_obj.root == (tmp_path / "subdir").resolve()
+        workspace_module._session_cwd = None
+        workspace_module._active_workspace = None
+
+    def test_get_session_cwd(self, tmp_path, monkeypatch) -> None:
+        workspace_module._session_cwd = None
+        workspace_module._active_workspace = None
+        monkeypatch.chdir(tmp_path)
+        assert workspace_module.get_session_cwd() is None
+        workspace_module.update_session_cwd(tmp_path / "other")
+        assert workspace_module.get_session_cwd() == (tmp_path / "other").resolve()
+        workspace_module._session_cwd = None
+        workspace_module._active_workspace = None
+
+
+class TestExpandTilde:
+    def test_no_tilde(self) -> None:
+        from eaccode.workspace import expand_tilde
+        assert expand_tilde("foo/bar") == "foo/bar"
+
+    def test_tilde_alone(self) -> None:
+        from eaccode.workspace import expand_tilde
+        result = expand_tilde("~")
+        assert result == str(Path.home())
+
+    def test_tilde_slash(self) -> None:
+        from eaccode.workspace import expand_tilde
+        result = expand_tilde("~/foo.txt")
+        assert result == str(Path.home() / "foo.txt")
+
+
+class TestFilterSearchResults:
+    def test_filters_blocked_paths(self) -> None:
+        from eaccode.workspace import filter_search_results
+        ws_obj = Workspace(root=Path.cwd().resolve())
+        results = [
+            "src/main.py:1:hello",
+            "/home/user/.ssh/id_rsa:1:sensitive",
+            "/home/user/.aws/credentials:1:secret",
+        ]
+        filtered = filter_search_results(results, ws_obj)
+        assert "src/main.py:1:hello" in filtered
+        assert ".ssh/id_rsa" not in str(filtered)
+        assert ".aws/credentials" not in str(filtered)
+        assert "filtered" in str(filtered).lower()
+
+    def test_keeps_normal_paths(self) -> None:
+        from eaccode.workspace import filter_search_results
+        ws_obj = Workspace(root=Path.cwd().resolve())
+        results = ["src/foo.py:1:bar", "tests/baz.py:2:qux"]
+        filtered = filter_search_results(results, ws_obj)
+        assert len(filtered) == 2
+
+    def test_allowed_paths_pass_through(self, tmp_path) -> None:
+        from eaccode.workspace import filter_search_results
+        ssh_dir = tmp_path / "ssh"
+        ssh_dir.mkdir()
+        ws_obj = Workspace(
+            root=tmp_path.resolve(),
+            allow_paths=[ssh_dir],
+        )
+        results = [f"{ssh_dir}/id_rsa:1:hi"]
+        filtered = filter_search_results(results, ws_obj)
+        # When allow-listed, the path passes through
+        assert f"{ssh_dir}/id_rsa:1:hi" in filtered
