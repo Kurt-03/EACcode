@@ -25,6 +25,25 @@ READ_CHARS = 8000
 FETCH_CHARS = 8000
 SEARCH_RESULTS = 5
 
+# Module-level workspace for tool-path rewriting. Initialised lazily;
+# tests that need a different workspace can monkey-patch this attribute.
+_workspace = None
+
+
+def _get_workspace():
+    """Return the module workspace, loading from config on first call."""
+    global _workspace
+    if _workspace is None:
+        from eaccode.workspace import load_workspace_from_config
+        _workspace = load_workspace_from_config()
+    return _workspace
+
+
+def _set_workspace(ws_obj) -> None:
+    """Override the workspace (used by tests)."""
+    global _workspace
+    _workspace = ws_obj
+
 # Safe default permission handler.
 
 
@@ -37,10 +56,16 @@ permission_handler: Callable[[str], bool] = _deny_permission
 
 def read_file(path: str, max_chars: int = READ_CHARS) -> str:
     """Read a text file, truncated to max_chars."""
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
     try:
-        content = Path(path).read_text(encoding="utf-8", errors="replace")
+        target = rewrite_path(path, _get_workspace())
+    except WorkspaceError as exc:
+        return f"Error: {exc}"
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
-        return f"Error: cannot read {path}: {exc}"
+        return f"Error: cannot read {target}: {exc}"
     if len(content) > max_chars:
         content = content[:max_chars] + f"\n...[truncated at {max_chars} chars]"
     return content
@@ -48,30 +73,43 @@ def read_file(path: str, max_chars: int = READ_CHARS) -> str:
 
 def write_file(path: str, content: str) -> str:
     """Write text to a file, creating parent directories."""
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
     try:
-        target = Path(path)
+        target = rewrite_path(path, _get_workspace())
+    except WorkspaceError as exc:
+        return f"Error: {exc}"
+    try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
     except OSError as exc:
-        return f"Error: cannot write {path}: {exc}"
-    return f"written {len(content)} chars to {path}"
+        return f"Error: cannot write {target}: {exc}"
+    return f"written {len(content)} chars to {target}"
 
 
 def list_files(path: str = ".") -> str:
     """List directory entries (directories get a trailing slash)."""
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
     try:
-        entries = sorted(Path(path).iterdir(), key=lambda p: p.name.lower())
+        target = rewrite_path(path, _get_workspace())
+    except WorkspaceError as exc:
+        return f"Error: {exc}"
+    try:
+        entries = sorted(target.iterdir(), key=lambda p: p.name.lower())
     except OSError as exc:
-        return f"Error: cannot list {path}: {exc}"
+        return f"Error: cannot list {target}: {exc}"
     lines = [f"{entry.name}/" if entry.is_dir() else entry.name for entry in entries]
     return "\n".join(lines) or "(empty)"
 
 
 def search_files(pattern: str, path: str = ".") -> str:
     """Find files under path whose text contains pattern (max 50 hits)."""
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
     matches: list[str] = []
     try:
-        root = Path(path)
+        root = rewrite_path(path, _get_workspace())
         for candidate in root.rglob("*"):
             if not candidate.is_file():
                 continue

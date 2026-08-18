@@ -27,6 +27,24 @@ MAX_UNDO = 20
 SYNTAX_MAX_CHARS = 200_000
 
 
+# Module-level workspace. Initialised lazily; tests can override.
+_workspace = None
+
+
+def _get_workspace():
+    """Return the module workspace, loading from config on first call."""
+    global _workspace
+    if _workspace is None:
+        from eaccode.workspace import load_workspace_from_config
+        _workspace = load_workspace_from_config()
+    return _workspace
+
+
+def _set_workspace(ws_obj) -> None:
+    global _workspace
+    _workspace = ws_obj
+
+
 @dataclass
 class EditResult:
     ok: bool
@@ -151,6 +169,12 @@ def apply_patch(
     replace_all: bool = False,
     allow_syntax_errors: bool = False,
 ) -> EditResult:
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
+    try:
+        target = rewrite_path(path, _get_workspace())
+    except WorkspaceError as exc:
+        return EditResult(False, f"Error: {exc}")
     """Apply one patch; fuzzy-matches old text when exact lookup fails."""
     target = Path(path)
     if not target.exists():
@@ -158,7 +182,7 @@ def apply_patch(
     try:
         content = target.read_text(encoding="utf-8")
     except OSError as exc:
-        return EditResult(False, f"Error: cannot read {path}: {exc}")
+        return EditResult(False, f"Error: cannot read {target}: {exc}")
     if not old:
         return EditResult(False, "Error: 'old' must not be empty")
     if old in content:
@@ -196,8 +220,8 @@ def apply_patch(
     try:
         target.write_text(new_content, encoding="utf-8")
     except OSError as exc:
-        return EditResult(False, f"Error: cannot write {path}: {exc}")
-    return EditResult(True, f"patched {path}")
+        return EditResult(False, f"Error: cannot write {target}: {exc}")
+    return EditResult(True, f"patched {target}")
 
 
 def apply_multiple(edits: list[dict[str, Any]], allow_syntax_errors: bool = False) -> str:

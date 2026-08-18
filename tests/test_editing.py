@@ -17,6 +17,16 @@ def work_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
+@pytest.fixture(autouse=True)
+def wire_workspace(work_dir: Path) -> None:
+    """Pin editing module workspace to work_dir."""
+    from eaccode.workspace import Workspace
+
+    editing._set_workspace(Workspace(root=work_dir.resolve()))
+    yield
+    editing._set_workspace(None)
+
+
 class TestApplyPatch:
     def test_exact_replace(self, work_dir: Path) -> None:
         target = work_dir / "a.py"

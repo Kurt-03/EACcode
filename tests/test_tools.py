@@ -1,4 +1,4 @@
-"""Tests for the built-in tools (Phase A5)."""
+"""Tests for the built-in tools (Phase A5 + Plan H.minimal v3)."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from eaccode import tools
+from eaccode.workspace import Workspace
 
 
 @pytest.fixture
@@ -18,38 +19,72 @@ def sample_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
+@pytest.fixture(autouse=True)
+def wire_workspace(sample_dir: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the tool module workspace to sample_dir for every test."""
+    ws = Workspace(root=sample_dir.resolve())
+    tools._set_workspace(ws)
+    yield
+    tools._set_workspace(None)  # reset so other tests don't leak
+
+
 class TestFiles:
     def test_read_file(self, sample_dir: Path) -> None:
-        out = tools.read_file(str(sample_dir / "alpha.txt"))
+        # Use a relative path so the workspace check passes.
+        out = tools.read_file("alpha.txt")
         assert out == "hello world\n"
 
     def test_read_missing_file_returns_error(self) -> None:
+        # Absolute path outside the workspace triggers a workspace error
+        # rather than an OSError - the workspace check happens first.
         out = tools.read_file("C:/definitely/missing/file.txt")
         assert out.startswith("Error:")
+        assert "outside workspace" in out.lower() or "cannot read" in out.lower()
+
+    def test_read_outside_workspace_blocked(self) -> None:
+        out = tools.read_file("/etc/passwd")
+        assert "Error:" in out
+        assert "outside workspace" in out.lower()
 
     def test_read_truncates(self, sample_dir: Path) -> None:
         (sample_dir / "big.txt").write_text("x" * 10_000, encoding="utf-8")
-        out = tools.read_file(str(sample_dir / "big.txt"), max_chars=100)
+        out = tools.read_file("big.txt", max_chars=100)
         assert len(out) < 200
         assert "truncated" in out
 
     def test_write_file_creates_parents(self, sample_dir: Path) -> None:
-        out = tools.write_file(str(sample_dir / "nested" / "deep" / "f.txt"), "content")
-        assert "written 7 chars" in out
-        assert (sample_dir / "nested" / "deep" / "f.txt").read_text(encoding="utf-8") == "content"
+        out = tools.write_file("nested/deep/f.txt", "content")
+        assert "written" in out or "wrote" in out
+        # Workspace is sample_dir
+        target = sample_dir / "nested" / "deep" / "f.txt"
+        assert target.read_text(encoding="utf-8") == "content"
+
+    def test_write_file_outside_workspace_blocked(self) -> None:
+        out = tools.write_file("/etc/passwd", "x")
+        assert "Error:" in out
+        assert "outside workspace" in out.lower()
+
+    def test_write_file_path_traversal_blocked(self) -> None:
+        out = tools.write_file("../escape.txt", "x")
+        assert "Error:" in out
 
     def test_list_files(self, sample_dir: Path) -> None:
-        out = tools.list_files(str(sample_dir))
+        out = tools.list_files(".")
         assert "alpha.txt" in out
         assert "sub/" in out
 
     def test_search_files_finds_pattern(self, sample_dir: Path) -> None:
-        out = tools.search_files("pattern", str(sample_dir))
+        out = tools.search_files("pattern", ".")
         assert "beta.md" in out
         assert "gamma.py" in out
 
     def test_search_no_match(self, sample_dir: Path) -> None:
-        assert tools.search_files("zzz-not-there", str(sample_dir)) == "no matches"
+        assert tools.search_files("zzz-not-there", ".") == "no matches"
+
+    def test_list_files_outside_workspace_blocked(self) -> None:
+        out = tools.list_files("/etc")
+        assert "Error:" in out
+        assert "outside workspace" in out.lower()
 
 
 class TestWeb:
