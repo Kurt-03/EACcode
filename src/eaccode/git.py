@@ -170,65 +170,157 @@ def make_git_tools() -> list[Tool]:
     return [
         Tool(
             "git_status",
-            "Show the working tree status of a git repository.",
+            "Show the working tree status of a git repository. "
+            "Returns raw git status output (modified/untracked sections). "
+            "Returns 'Error: not a git repository' when path is not inside "
+            "a git worktree.",
             _tool_git_status,
-            {"type": "object", "properties": {"path": {"type": "string"}}},
+            {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd). "
+                            "Any subdirectory is fine; git walks up to "
+                            "find the repo root."
+                        ),
+                    },
+                },
+                "required": [],
+            },
+            mutates=False,
         ),
         Tool(
             "git_diff",
-            "Show uncommitted changes (optionally as a stat summary).",
+            "Show uncommitted changes (optionally as a stat summary). "
+            "Returns unified-diff text or stat-formatted file list. "
+            "Returns 'Error: ...' on git failure.",
             _tool_git_diff,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "stat": {"type": "boolean"},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd)."
+                        ),
+                    },
+                    "stat": {
+                        "type": "boolean",
+                        "description": (
+                            "If true, show stat summary (insertions / "
+                            "deletions per file) instead of the full diff."
+                        ),
+                    },
                 },
+                "required": [],
             },
+            mutates=False,
         ),
         Tool(
             "git_log",
-            "Show the last commits (hash + subject).",
+            "Show the last commits (hash + subject). "
+            "Returns N commit lines. Returns 'Error: ...' on git failure.",
             _tool_git_log,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "limit": {"type": "integer"},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd)."
+                        ),
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": (
+                            "Maximum number of commits to return "
+                            "(default: 10)."
+                        ),
+                    },
                 },
+                "required": [],
             },
+            mutates=False,
         ),
         Tool(
             "git_commit",
-            "Stage all changes and commit with a message. Policy: run "
-            "run_tests first — never commit while tests are red.",
+            "Stage all changes (git add -A) and commit with a message. "
+            "POLICY: run run_tests first - never commit while tests are "
+            "red. Returns 'committed: <short hash> <subject>' on success. "
+            "Returns 'Error: commit message is required' on empty "
+            "message. Smart-Mode routes this through Aux-LLM review.",
             _tool_git_commit,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "message": {"type": "string"},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd)."
+                        ),
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": (
+                            "Commit message. Single-line for simple "
+                            "changes; multi-line is allowed (commit "
+                            "preserves newlines)."
+                        ),
+                    },
                 },
                 "required": ["message"],
             },
+            mutates=True,
         ),
         Tool(
             "git_branch_new",
-            "Create and switch to a new branch.",
+            "Create and switch to a new branch (git checkout -b NAME). "
+            "Returns 'branch created: <name>' on success. "
+            "Returns 'Error: branch name is required' on empty name.",
             _tool_git_branch_new,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
-                    "name": {"type": "string"},
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd)."
+                        ),
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": (
+                            "New branch name (no whitespace; follow git "
+                            "ref-format rules)."
+                        ),
+                    },
                 },
                 "required": ["name"],
             },
+            mutates=True,
         ),
         Tool(
             "git_commit_undo",
-            "Soft-reset the last commit (changes stay in the working tree).",
+            "Soft-reset the last commit (changes stay staged). "
+            "Returns 'undone: last commit reset' on success. "
+            "Returns 'Error: nothing to undo' when only one / zero commits "
+            "exist. Cannot undo pushed commits - it only rewrites local "
+            "history.",
             lambda path=".": git_commit_undo(path),
-            {"type": "object", "properties": {"path": {"type": "string"}}},
+            {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Path inside the repository (default: cwd)."
+                        ),
+                    },
+                },
+                "required": [],
+            },
+            mutates=True,
         ),
     ]

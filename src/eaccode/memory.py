@@ -359,70 +359,134 @@ def _tool_memory_apply_batch(target: str, operations: list[dict[str, Any]]) -> s
 
 def make_memory_tools() -> list[Tool]:
     """Agent tools for memory curation (B4)."""
-    schema_base = {
-        "type": "object",
-        "properties": {"target": {"type": "string", "enum": ["agent", "user"]}},
+    target_schema = {
+        "type": "string",
+        "enum": ["agent", "user"],
+        "description": (
+            "Where to write. 'agent' stores facts the agent has learned "
+            "(MEMORY.md); 'user' stores facts about the user (USER.md). "
+            "Both have separate char budgets."
+        ),
     }
     add_schema = {
-        **schema_base,
-        "properties": {**schema_base["properties"], "content": {"type": "string"}},
+        "type": "object",
+        "properties": {
+            "target": target_schema,
+            "content": {
+                "type": "string",
+                "description": (
+                    "The fact to remember. Be concise; the budget is hard "
+                    "(2200 / 1375 chars). Rejected if it looks like a "
+                    "prompt-injection ('ignore previous', 'system prompt', "
+                    "etc.)."
+                ),
+            },
+        },
         "required": ["target", "content"],
     }
     replace_schema = {
-        **schema_base,
+        "type": "object",
         "properties": {
-            **schema_base["properties"],
-            "old_text": {"type": "string"},
-            "new_content": {"type": "string"},
+            "target": target_schema,
+            "old_text": {
+                "type": "string",
+                "description": (
+                    "Substring of the entry to replace (matches exactly "
+                    "one entry, case-insensitive)."
+                ),
+            },
+            "new_content": {
+                "type": "string",
+                "description": "Replacement content for the matched entry.",
+            },
         },
         "required": ["target", "old_text", "new_content"],
     }
     remove_schema = {
-        **schema_base,
-        "properties": {**schema_base["properties"], "old_text": {"type": "string"}},
+        "type": "object",
+        "properties": {
+            "target": target_schema,
+            "old_text": {
+                "type": "string",
+                "description": (
+                    "Substring of the entry to remove (case-insensitive). "
+                    "All matching entries get removed."
+                ),
+            },
+        },
         "required": ["target", "old_text"],
     }
     batch_schema = {
-        **schema_base,
+        "type": "object",
         "properties": {
-            **schema_base["properties"],
+            "target": target_schema,
             "operations": {
                 "type": "array",
+                "description": (
+                    "Ordered list of add/replace/remove operations. Atomic: "
+                    "any error rejects the whole batch."
+                ),
                 "items": {
                     "type": "object",
                     "properties": {
-                        "action": {"type": "string", "enum": ["add", "replace", "remove"]},
-                        "content": {"type": "string"},
-                        "old_text": {"type": "string"},
+                        "action": {
+                            "type": "string",
+                            "enum": ["add", "replace", "remove"],
+                            "description": "Type of operation.",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "New content (add/replace).",
+                        },
+                        "old_text": {
+                            "type": "string",
+                            "description": "Match-substring (replace/remove).",
+                        },
                     },
                 },
             },
         },
         "required": ["target", "operations"],
     }
-    add_tool = Tool(
-        "memory_add",
-        "Add a fact to persistent memory (target: agent|user).",
-        _tool_memory_add,
-        add_schema,
-    )
-    replace_tool = Tool(
-        "memory_replace",
-        "Replace the entry containing old_text (target: agent|user).",
-        _tool_memory_replace,
-        replace_schema,
-    )
-    remove_tool = Tool(
-        "memory_remove",
-        "Remove the entry containing old_text (target: agent|user).",
-        _tool_memory_remove,
-        remove_schema,
-    )
-    batch_tool = Tool(
-        "memory_apply_batch",
-        "Apply add/replace/remove operations atomically (target: agent|user) - "
-        "use to consolidate and add in one call.",
-        _tool_memory_apply_batch,
-        batch_schema,
-    )
-    return [add_tool, replace_tool, remove_tool, batch_tool]
+    return [
+        Tool(
+            "memory_add",
+            "Add a fact to persistent memory. Returns 'ok' on success, "
+            "'Entry already exists (no duplicate added)' on dup, "
+            "'Error: ...' on injection or budget overflow. Smart-Mode "
+            "subjects agent/user memory to an Aux-LLM review.",
+            _tool_memory_add,
+            add_schema,
+            mutates=True,
+        ),
+        Tool(
+            "memory_replace",
+            "Replace the entry containing old_text with new_content. "
+            "Returns 'ok' on success, 'Error: no entry contains: <text>' "
+            "when nothing matches, or 'Error: ... matches multiple "
+            "entries' on ambiguity.",
+            _tool_memory_replace,
+            replace_schema,
+            mutates=True,
+        ),
+        Tool(
+            "memory_remove",
+            "Remove every entry containing old_text. Returns 'ok' on "
+            "success, 'Error: no entry contains: <text>' when nothing "
+            "matches.",
+            _tool_memory_remove,
+            remove_schema,
+            mutates=True,
+        ),
+        Tool(
+            "memory_apply_batch",
+            "Apply add/replace/remove operations atomically (target: "
+            "agent|user) - use to consolidate and add in one call. Returns "
+            "'ok' on success, 'Error: operation N: ...' per failed op. "
+            "Use this when the budget is full and you need to free space "
+            "before adding.",
+            _tool_memory_apply_batch,
+            batch_schema,
+            mutates=True,
+        ),
+    ]

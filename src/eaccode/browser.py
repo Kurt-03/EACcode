@@ -167,60 +167,125 @@ def make_browser_tools() -> list[Tool]:
     return [
         Tool(
             "browser_navigate",
-            "Open a URL in the shared browser; returns the page title and url.",
+            "Open a URL in the shared browser. Returns 'opened: <title> "
+            "(<url>)' on success, or 'Error: ...' on bad URL or browser "
+            "failures. POLICY: in Smart-Mode this prompts (always-ask); "
+            "navigating away can leak prior content.",
             _tool_navigate,
             {
                 "type": "object",
-                "properties": {"url": {"type": "string"}},
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": (
+                            "Full URL (http or https). The browser is "
+                            "shared across turns."
+                        ),
+                    },
+                },
                 "required": ["url"],
             },
+            mutates=True,
+            always_ask=True,
         ),
         Tool(
             "browser_click",
-            "Click an element (CSS selector) on the current page.",
+            "Click an element (CSS selector) on the current page. "
+            "Returns 'clicked: <selector>' on success, 'Error: no "
+            "element matched' when the selector is invalid, or "
+            "'Error: browser not initialized'. always-ask (mutating).",
             _tool_click,
             {
                 "type": "object",
-                "properties": {"selector": {"type": "string"}},
+                "properties": {
+                    "selector": {
+                        "type": "string",
+                        "description": (
+                            "CSS selector (e.g. 'button.submit', "
+                            "'#login')."
+                        ),
+                    },
+                },
                 "required": ["selector"],
             },
+            mutates=True,
+            always_ask=True,
         ),
         Tool(
             "browser_type",
-            "Type text into an input field (CSS selector).",
+            "Type text into an input field (CSS selector). Returns "
+            "'typed into <selector>' on success. Always-ask because it "
+            "can submit forms or trigger JS handlers.",
             _tool_type,
             {
                 "type": "object",
                 "properties": {
-                    "selector": {"type": "string"},
-                    "text": {"type": "string"},
+                    "selector": {
+                        "type": "string",
+                        "description": (
+                            "CSS selector for the input / textarea "
+                            "element."
+                        ),
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "Text to type into the field.",
+                    },
                 },
                 "required": ["selector", "text"],
             },
+            mutates=True,
+            always_ask=True,
         ),
         Tool(
             "browser_extract",
-            "Extract text from the page (default: whole body, max 5 elements).",
+            "Extract text from the page (default: whole body, max 5 "
+            "elements). Returns concatenated text lines.",
             _tool_extract,
             {
                 "type": "object",
-                "properties": {"selector": {"type": "string"}},
+                "properties": {
+                    "selector": {
+                        "type": "string",
+                        "description": (
+                            "CSS selector to limit extraction (default: "
+                            "'body')."
+                        ),
+                    },
+                },
+                "required": [],
             },
+            mutates=False,
         ),
         Tool(
             "browser_screenshot",
-            "Save a full-page screenshot to a file path.",
+            "Save a full-page screenshot to a file path. Returns "
+            "'screenshot saved: <path>' on success. Sensitive-path check "
+            "applies to `path`.",
             _tool_screenshot,
             {
                 "type": "object",
-                "properties": {"path": {"type": "string"}},
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": (
+                            "Destination file path. Parent directories "
+                            "are created automatically (write_file "
+                            "semantics)."
+                        ),
+                    },
+                },
                 "required": ["path"],
             },
+            mutates=True,
+            always_ask=True,
         ),
         Tool(
             "browser_status",
-            "Show the current url and title of the shared browser session.",
+            "Show the current url and title of the shared browser "
+            "session. Returns 'url: ...\ntitle: ...'.",
             _tool_status,
-            {"type": "object", "properties": {}},
+            {"type": "object", "properties": {}, "required": []},
+            mutates=False,
         ),
     ]

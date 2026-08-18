@@ -24,20 +24,59 @@ when the user's message matches.
 - Do NOT create skills for trivial one-off tasks.
 """
 
-SCHEMA_NAME = {"type": "object", "properties": {"name": {"type": "string"}}}
+SCHEMA_NAME = {
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Skill slug-name (lowercase, dashes for spaces).",
+        },
+    },
+    "required": ["name"],
+}
 SCHEMA_NAME_DESC = {
     "type": "object",
     "properties": {
-        "name": {"type": "string"},
-        "description": {"type": "string"},
-        "trigger": {"type": "string"},
-        "body": {"type": "string"},
+        "name": {
+            "type": "string",
+            "description": "Skill slug-name (lowercase, dashes for spaces).",
+        },
+        "description": {
+            "type": "string",
+            "description": (
+                "Short human description of when the skill applies. "
+                "Used by the palette to surface matches."
+            ),
+        },
+        "trigger": {
+            "type": "string",
+            "description": "Phrase the user can type to load the skill.",
+        },
+        "body": {
+            "type": "string",
+            "description": (
+                "Markdown body of the skill (instructions, examples). "
+                "Empty for stubs you later fill via improve_skill."
+            ),
+        },
     },
     "required": ["name", "description", "trigger"],
 }
 SCHEMA_NAME_BODY = {
     "type": "object",
-    "properties": {"name": {"type": "string"}, "body": {"type": "string"}},
+    "properties": {
+        "name": {
+            "type": "string",
+            "description": "Skill slug-name (existing).",
+        },
+        "body": {
+            "type": "string",
+            "description": (
+                "Markdown body replacement. The old body is dropped; "
+                "trigger stays."
+            ),
+        },
+    },
     "required": ["name", "body"],
 }
 
@@ -72,20 +111,30 @@ def make_learning_tools() -> list[Tool]:
     return [
         Tool(
             "create_skill",
-            "Create a reusable skill (name, description, trigger phrase, body).",
+            "Create a reusable skill. Returns 'skill <name> created "
+            "(trigger: <trigger>)' on success, 'Error: ...' on duplicate "
+            "or invalid name/empty trigger. Skills persist under "
+            "~/AppData/Local/eaccode/skills.",
             _tool_create_skill,
             SCHEMA_NAME_DESC,
+            mutates=True,
         ),
         Tool(
             "improve_skill",
-            "Replace the body of an existing skill (keep name/trigger).",
+            "Replace the body of an existing skill (trigger + name kept). "
+            "Returns 'skill <name> updated' on success, 'Error: not "
+            "found' or 'Error: parse failed' on validation failure.",
             _tool_improve_skill,
             SCHEMA_NAME_BODY,
+            mutates=True,
         ),
         Tool(
             "list_skills",
-            "List all existing skills (check before creating to avoid duplicates).",
+            "List all existing skills (markdown bullets: '- <name>: <desc> "
+            "[trigger: <trigger>]'). Returns '(no skills yet - ...)' when "
+            "empty.",
             _tool_list_skills,
             SCHEMA_NAME,
+            mutates=False,
         ),
     ]

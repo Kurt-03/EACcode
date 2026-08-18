@@ -114,19 +114,29 @@ def make_test_tools() -> list[Tool]:
     return [
         Tool(
             "run_tests",
-            "Run the pytest suite in a directory; returns pass/fail counts "
-            "and the failing test ids. Run after every code change; never "
-            "declare work done while tests are red.",
+            "Run the pytest suite in a directory. Returns 'X passed, "
+            "Y failed' plus the failing test ids and tail; 'Error: pytest "
+            "not installed' when pytest is missing. POLICY: run after "
+            "every code change; never declare work done while tests are "
+            "red. never commit (git_commit) while tests are red.",
             _tool_run_tests,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "project root (default .)"},
+                    "path": {
+                        "type": "string",
+                        "description": "Project root (default: cwd).",
+                    },
                     "test_file": {
                         "type": "string",
-                        "description": "single test file to run (optional)",
+                        "description": (
+                            "Single test file to run (default: full "
+                            "suite, e.g. 'tests/test_x.py')."
+                        ),
                     },
                 },
+                "required": [],
             },
+            mutates=False,
         ),
     ]

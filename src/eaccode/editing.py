@@ -333,10 +333,29 @@ def make_editing_tools() -> list[Tool]:
     edit_schema = {
         "type": "object",
         "properties": {
-            "path": {"type": "string"},
-            "old": {"type": "string"},
-            "new": {"type": "string"},
-            "replace_all": {"type": "boolean", "description": "replace every occurrence"},
+            "path": {
+                "type": "string",
+                "description": (
+                    "Path to the file to edit. Sensitive paths "
+                    "(.ssh/, .env, config.yaml) trigger permission "
+                    "review."
+                ),
+            },
+            "old": {
+                "type": "string",
+                "description": (
+                    "Exact text to find. Falls back to fuzzy match if "
+                    "no exact match (Python files only)."
+                ),
+            },
+            "new": {
+                "type": "string",
+                "description": "Replacement text (must match old line-count for fuzzy).",
+            },
+            "replace_all": {
+                "type": "boolean",
+                "description": "Replace every occurrence (default: false; one match).",
+            },
         },
         "required": ["path", "old", "new"],
     }
@@ -344,53 +363,83 @@ def make_editing_tools() -> list[Tool]:
         Tool(
             "file_edit",
             "Line-based edit: insert/replace/delete/append lines in a file. "
-            "Lines are 1-based; 'insert' puts text AFTER the given line "
-            "(0 = top). Python files are syntax-checked; every edit is "
-            "undoable via undo_edit.",
+            "Returns '<action>: <path> (N -> M lines)' on success, "
+            "'Error: line N out of range ...' on bad range, 'Error: "
+            "unknown action ...' on bad action name. Python files are "
+            "syntax-checked. Always undoable via undo_edit (max 20 deep).",
             _tool_file_edit,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string"},
+                    "path": {
+                        "type": "string",
+                        "description": "File path. Parent dirs auto-created.",
+                    },
                     "action": {
                         "type": "string",
                         "enum": ["insert", "replace", "delete", "append"],
+                        "description": "Type of line edit.",
                     },
-                    "line": {"type": "integer", "description": "1-based line"},
-                    "end_line": {"type": "integer", "description": "for ranges"},
-                    "text": {"type": "string", "description": "content to insert"},
+                    "line": {
+                        "type": "integer",
+                        "description": "1-based line number (insert/replace/delete).",
+                    },
+                    "end_line": {
+                        "type": "integer",
+                        "description": (
+                            "Inclusive end line for range operations "
+                            "(replace/delete). Optional."
+                        ),
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": (
+                            "Content to insert / replace with. Use \n in "
+                            "JSON-strings for multi-line content."
+                        ),
+                    },
                 },
                 "required": ["path", "action"],
             },
+            mutates=True,
         ),
         Tool(
             "patch_file",
             "Replace old text with new text in a file (exact or fuzzy match). "
-            "Python files get a syntax check before writing. On ambiguity, "
-            "add more surrounding context.",
+            "Python files syntax-check before write. Returns 'patched <path>' "
+            "on success, 'Error: <...> is ambiguous (N matches) - add more "
+            "context or set replace_all' on ambiguity, or "
+            "'Error: old text not found in file (even fuzzy)' when no match.",
             _tool_patch_file,
             edit_schema,
+            mutates=True,
         ),
         Tool(
             "patch_multiple",
             "Apply several edits across files atomically; the whole batch is "
-            "rolled back when one edit fails.",
+            "rolled back (via undo_edit stack) when one edit fails. Returns "
+            "'applied N edits' or 'Error: <reason> (all edits rolled back)'.",
             _tool_patch_multiple,
             {
                 "type": "object",
                 "properties": {
                     "edits": {
                         "type": "array",
+                        "description": "List of patch_file-style edits (atomic).",
                         "items": edit_schema,
-                    }
+                    },
                 },
                 "required": ["edits"],
             },
+            mutates=True,
         ),
         Tool(
             "undo_edit",
-            "Roll back the most recent edit (backup stack, max 20).",
+            "Roll back the most recent edit (backup stack, max 20). Returns "
+            "'undone: <path>' on success, 'Error: nothing to undo' when the "
+            "stack is empty. Mutating but not edit-creating on its own.",
             _tool_undo_edit,
-            {"type": "object", "properties": {}},
+            {"type": "object", "properties": {}, "required": []},
+            mutates=True,
         ),
     ]

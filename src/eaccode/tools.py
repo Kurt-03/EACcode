@@ -159,77 +159,226 @@ def system_info() -> str:
 BUILTIN_TOOLS: list[Tool] = [
     Tool(
         "read_file",
-        "Read a text file (truncated to 8000 chars).",
+        "Read a text file. Returns the file content as a plain string, "
+        "truncated to 8000 chars. Returns 'Error: file not readable: <path>' "
+        "when the file is missing, binary, or the path is a directory.",
         read_file,
         {
             "type": "object",
-            "properties": {"path": {"type": "string"}, "max_chars": {"type": "integer"}},
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Absolute or relative file path. Supports text files "
+                        "(utf-8, latin-1, ascii); binary files return an "
+                        "Error string."
+                    ),
+                },
+                "max_chars": {
+                    "type": "integer",
+                    "description": (
+                        "Truncate the output after this many chars "
+                        "(default: 8000). Use a smaller value to preview "
+                        "large files."
+                    ),
+                },
+            },
             "required": ["path"],
         },
+        mutates=False,
     ),
     Tool(
         "write_file",
-        "Write text to a file, creating parent directories.",
+        "Write text to a file, creating parent directories if missing. "
+        "Returns 'wrote <path>' on success, or 'Error: ...' on permission "
+        "denied, invalid path, or parent-dir creation failure. "
+        "Sensitive paths (.ssh/, .env, config.yaml) trigger a Smart-mode "
+        "review and an approval prompt.",
         write_file,
         {
             "type": "object",
-            "properties": {"path": {"type": "string"}, "content": {"type": "string"}},
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Absolute or relative path. Parent directories are "
+                        "created automatically. Overwrites the file if it "
+                        "exists."
+                    ),
+                },
+                "content": {
+                    "type": "string",
+                    "description": (
+                        "UTF-8 text to write to the file. For multi-line "
+                        "content use \n in JSON-encoding contexts."
+                    ),
+                },
+            },
             "required": ["path", "content"],
         },
+        mutates=True,
     ),
     Tool(
         "list_files",
-        "List directory entries.",
+        "List directory entries (name + type marker + size). "
+        "Returns lines of 'name\tdescription' (file/dir marker, size "
+        "in bytes for files). Empty string when the directory is empty. "
+        "Returns 'Error: ...' when the path is missing.",
         list_files,
         {
             "type": "object",
-            "properties": {"path": {"type": "string"}},
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Directory path (default: current working "
+                        "directory)."
+                    ),
+                },
+            },
         },
+        mutates=False,
     ),
     Tool(
         "search_files",
-        "Find files whose text contains a pattern.",
+        "Find files whose text contains a regex pattern via ripgrep. "
+        "Returns 'path:line: <matched line>' per match, or '(no matches)' "
+        "when nothing is found. Returns 'Error: ...' when ripgrep is not "
+        "installed or the path is missing.",
         search_files,
         {
             "type": "object",
-            "properties": {"pattern": {"type": "string"}, "path": {"type": "string"}},
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": (
+                        "regex pattern. Use Python regex syntax (groups, "
+                        "look-aheads, anchors)."
+                    ),
+                },
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Root directory to search (default: current "
+                        "working directory)."
+                    ),
+                },
+            },
             "required": ["pattern"],
         },
+        mutates=False,
     ),
     Tool(
         "run_command",
-        "Run a shell command (requires user permission).",
+        "Run a shell command via subprocess.run(shell=True). "
+        "Returns stdout+stderr combined plus '(exit N)' on non-zero exit. "
+        "Returns 'Error: permission denied ...' when blocked, "
+        "'Error: command timed out after Ns' on timeout, or "
+        "'Error: <OSError>' on missing binary / OS issues. "
+        "POLICY: Smart-mode routes dangerous commands (rm -rf, chmod 777, "
+        "curl|sh) through an Aux-LLM reviewer; Hardline patterns "
+        "(rm -rf /, sudo -S, shutdown, fork bombs) always block.",
         run_command,
         {
             "type": "object",
             "properties": {
-                "command": {"type": "string"},
-                "cwd": {"type": "string"},
-                "timeout": {"type": "integer"},
+                "command": {
+                    "type": "string",
+                    "description": (
+                        "Shell command string. Evaluated via /bin/sh on "
+                        "POSIX or cmd.exe on Windows."
+                    ),
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": (
+                        "Working directory for the subprocess "
+                        "(default: inherits caller's cwd)."
+                    ),
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": (
+                        "Subprocess timeout in seconds (default: 30). "
+                        "Returns 'Error: command timed out after Ns' "
+                        "on expiry."
+                    ),
+                },
             },
             "required": ["command"],
         },
+        mutates=True,
+        always_ask=True,
     ),
     Tool(
         "http_get",
-        "Fetch a URL and return its text content.",
+        "Fetch a URL via urllib and return the text content "
+        "(first 8000 chars by default). Returns 'Error: cannot fetch "
+        "<url>: <reason>' on network / 4xx / 5xx failures.",
         http_get,
         {
             "type": "object",
-            "properties": {"url": {"type": "string"}, "max_chars": {"type": "integer"}},
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": (
+                        "Full URL including scheme (http or https). "
+                        "Domains in allowlist-fetch are unrestricted; "
+                        "others may be filtered."
+                    ),
+                },
+                "max_chars": {
+                    "type": "integer",
+                    "description": (
+                        "Truncate the response body after this many chars "
+                        "(default: 8000)."
+                    ),
+                },
+            },
             "required": ["url"],
         },
+        mutates=False,
     ),
     Tool(
         "web_search",
-        "Search the web via DuckDuckGo; returns titles and urls.",
+        "Search the web via DuckDuckGo HTML. Returns title + url lines "
+        "(up to max_results). Returns '(no results)' or "
+        "'Error: search failed: <reason>' on DuckDuckGo rate-limit.",
         web_search,
         {
             "type": "object",
-            "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}},
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": (
+                        "Free-text search query. Use quotes for "
+                        "exact-phrase matching."
+                    ),
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": (
+                        "Maximum number of result titles to return "
+                        "(default: 5)."
+                    ),
+                },
+            },
             "required": ["query"],
         },
+        mutates=False,
     ),
-    Tool("current_time", "Current local date and time.", current_time),
-    Tool("system_info", "Operating system and hardware summary.", system_info),
+    Tool(
+        "current_time",
+        "Current local date+time. Returns ISO-style "
+        "'YYYY-MM-DD HH:MM:SS' in local timezone (system default).",
+        current_time,
+        mutates=False,
+    ),
+    Tool(
+        "system_info",
+        "Operating system and hardware summary. Returns one line: "
+        "'<System> <Release> - <Machine>' (e.g. 'Windows 11 - AMD64').",
+        system_info,
+        mutates=False,
+    ),
 ]

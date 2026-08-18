@@ -341,27 +341,54 @@ def make_session_tools() -> list[Tool]:
     return [
         Tool(
             "session_search",
-            "Search past conversations for a phrase; returns matching sessions "
-            "with snippets. Use to recall how things were done before.",
+            "Search past conversations for a phrase; returns matching "
+            "sessions with snippets (FTS5 search on the SQLite session "
+            "store). Returns '@session:<id> <snippet>' lines per match, "
+            "or '(no matches)' when nothing is found. Use the session id "
+            "with session_scroll to read full context.",
             _tool_session_search,
             {
                 "type": "object",
-                "properties": {"query": {"type": "string"}},
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Free-text search query. Supports quotes for "
+                            "phrases and prefix wildcards (terms*)."
+                        ),
+                    },
+                },
                 "required": ["query"],
             },
+            mutates=False,
         ),
         Tool(
             "session_scroll",
-            "Read the most recent messages of a session (use the session id "
-            "from session_search). Use to get full context of a past session.",
+            "Read the most recent messages of a session (use the session "
+            "id from session_search). Returns 'role: content' lines plus a "
+            "session header. Returns 'Error: session not found' when id "
+            "is invalid.",
             _tool_session_scroll,
             {
                 "type": "object",
                 "properties": {
-                    "session_id": {"type": "string"},
-                    "window": {"type": "integer"},
+                    "session_id": {
+                        "type": "string",
+                        "description": (
+                            "Session id (from a prior session_search, or "
+                            "@session:<id> reference in user input)."
+                        ),
+                    },
+                    "window": {
+                        "type": "integer",
+                        "description": (
+                            "Maximum number of messages to return, "
+                            "starting from the most recent (default: 20)."
+                        ),
+                    },
                 },
                 "required": ["session_id"],
             },
+            mutates=False,
         ),
     ]

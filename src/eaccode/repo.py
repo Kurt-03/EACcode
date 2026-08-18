@@ -273,46 +273,71 @@ def make_repo_tools() -> list[Tool]:
         Tool(
             "repo_scan",
             "Index a repository: files, sizes, tree (respects .gitignore). "
-            "Use before editing unfamiliar code.",
+            "Returns a markdown tree + per-file size list. Use before "
+            "editing unfamiliar code.",
             _tool_repo_scan,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "repo root (default .)"}
+                    "path": {
+                        "type": "string",
+                        "description": "Repo root (default: current working directory).",
+                    },
                 },
+                "required": [],
             },
+            mutates=False,
         ),
         Tool(
             "repo_search",
-            "Regex search inside a repository; returns path:line matches.",
+            "Regex search inside a repository; returns 'path:line: <match>' "
+            "lines, or '(no matches)'. Set file_types to limit scope (comma-"
+            "separated extensions starting with '.', e.g. '.py,.md').",
             _tool_repo_search,
             {
                 "type": "object",
                 "properties": {
-                    "query": {"type": "string"},
-                    "path": {"type": "string", "description": "repo root (default .)"},
+                    "query": {
+                        "type": "string",
+                        "description": "regex pattern to search for.",
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Repo root (default: cwd).",
+                    },
                     "file_types": {
                         "type": "string",
-                        "description": "comma list, e.g. .py,.md",
+                        "description": "Comma-separated extensions filter (e.g. '.py,.md').",
                     },
                 },
                 "required": ["query"],
             },
+            mutates=False,
         ),
         Tool(
             "repo_context",
-            "Bundle a module with its related tests (context pack).",
+            "Bundle a module with its related tests (context pack). "
+            "Returns concatenated source + related test-files. Useful for "
+            "LLM context when reviewing or editing a module.",
             _tool_repo_context,
             {
                 "type": "object",
                 "properties": {
-                    "path": {"type": "string", "description": "repo root (default .)"},
+                    "path": {
+                        "type": "string",
+                        "description": "Repo root (default: cwd).",
+                    },
                     "module": {
                         "type": "string",
-                        "description": "relative module path, e.g. src/x.py",
+                        "description": (
+                            "Relative module path (e.g. 'src/x.py'). "
+                            "Tests are discovered automatically (test_*.py "
+                            "matching pattern)."
+                        ),
                     },
                 },
                 "required": ["module"],
             },
+            mutates=False,
         ),
     ]
