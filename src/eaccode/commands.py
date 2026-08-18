@@ -626,13 +626,19 @@ def run_permissions_command(args: list[str], stdout: TextIO | None = None) -> in
     try:
         if command == "status":
             perm = cfg.load_config().get("permissions", {}) or {}
-            stdout.write(f"mode: {perm.get('mode', 'ask')}\n")
+            from eaccode.permissions import _MODE_ALIASES
+            raw_mode = perm.get("mode", "smart")
+            resolved = _MODE_ALIASES.get(raw_mode, raw_mode)
+            stdout.write(f"mode: {raw_mode} (effective: {resolved})\n")
             stdout.write(f"allow: {perm.get('allow', [])}\n")
             stdout.write(f"deny: {perm.get('deny', [])}\n")
             return 0
         if command == "mode":
             if len(rest) != 1:
-                stdout.write("Usage: permissions mode <ask|allow_all|read_only|deny_all>\n")
+                stdout.write(
+                    "Usage: permissions mode <manual|smart|off|read_only>\n"
+                    "Aliases: ask=manual, allow_all=off\n"
+                )
                 return 1
             permissions.write_permissions_config(mode=rest[0])
             stdout.write(f"permission mode: {rest[0]}\n")
