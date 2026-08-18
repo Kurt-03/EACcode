@@ -316,3 +316,86 @@ Total: **641 Tests grün** (vor Plan C: 609)
 - Phase 2: Per-Call-History von Permission-Verdicts
 - Phase 2: Yolo-Mode (`off` auto-approve ohne `--yolo`-Flag)
 - Phase 2: Persistent Block-Store-CLI (`eaccode permissions denied-list list/remove`)
+
+---
+
+## 08-18 (Plan D, Hermes-Sicherheits-Hardening)
+
+### Phase 1 — Sudo/Parse/Path-Fold
+
+**`src/eaccode/sudo_guard.py`** NEU — H7: pipes-password-to-sudo detection
+- 8 Regex-Patterns (sudo -S, sudo -A, sudo --stdin, sudo --askpass, echo|pipe|sudo)
+- Wired BEFORE hardline-pattern, BEFORE yolo bypass
+
+**`src/eaccode/command_normalize.py`** NEU — H4/H5/H6
+- `normalize_command_for_detection()` — whitespace + quote-cleaneup, ~-expansion
+- `_command_parser_limit_exceeded()` — too-complex commands auto-blocked
+- `_rewrite_resolved_user_home()` — `~`-Folding to `/home/<user>/`
+
+### Phase 2 — Hardcoded Paths + Sensitive Dirs
+
+**`src/eaccode/file_safety.py`** NEU — H2/H14/H15/H16
+- Hardcoded exact paths: `~/.ssh/{authorized_keys,id_rsa,...}`, `~/.env`, `~/.anthropic_oauth.json`, `~/.netrc`, etc.
+- Sensitive directory prefixes: `~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.kube`, `~/.docker`, `~/.config/{gh,gcloud}`, `/etc/sudoers.d`, `/etc/systemd`
+- `EACCODE_WRITE_SAFE_ROOT` env-var for whitelist (colon-separated)
+- `is_write_denied(path)` — main API, returns True for any match
+- Wired in `permissions.py` BEFORE prompt (unconditional block)
+
+### Phase 3 — Tirith External Binary
+
+**`src/eaccode/tirith_security.py`** NEU — H1
+- Downloads `sheeki03/tirith` v0.3.3 binary (Windows x86_64 ZIP, 9.1MB)
+- SHA-256 verification against published `checksums.txt`
+- Cosign-verification (optional, when `cosign` is on PATH)
+- JSON output: `{"action": "allow|warn|block", "findings": [{"severity", "title", "description", "remediation_hint"}], "summary": ...}`
+- Fall-open by default; `security.tirith_fail_open: false` → fail-closed (warn with synthetic finding)
+
+### Phase 4 — Cron/Gateway/Container/Misc
+
+**`src/eaccode/runtime_context.py`** NEU — H13/H20/H21/H24
+- `is_cron_context()`, `is_gateway_context()`, `is_container_context()`
+- `get_cron_approval_mode()` — `approvals.cron_mode: deny | approve`
+- `freeze_yolo_mode()` / `is_yolo_active()` — YOLO-Flag frozen at import-time
+- `KNOWN_SAFE_PATTERNS` — 9 regex patterns for always-safe commands
+- `container_can_skip_guards()` — Docker sandbox fast-path
+
+### Total Coverage
+
+| Hermes-Feature | Hermes | eaccode | Status |
+|---|---|---|---|
+| H1 Tirith Scanner | ✓ | ✓ | **PYTHON-BINARY** ✓ |
+| H2 file_safety.py | ✓ | ✓ | **VERBATIM** ✓ |
+| H4 normalize-cmd | ✓ | ✓ | ✓ |
+| H5 home-fold | ✓ | ✓ | ✓ |
+| H6 parser-limit | ✓ | ✓ | ✓ |
+| H7 sudo-stdin-guard | ✓ | ✓ | ✓ |
+| H13 cron/gateway context | ✓ | ✓ | ✓ |
+| H14 hardcoded paths | ✓ | ✓ | ✓ |
+| H15 sensitive dirs | ✓ | ✓ | ✓ |
+| H16 WRITE_SAFE_ROOT | ✓ | ✓ | ✓ |
+| H20 cron-mode config | ✓ | ✓ | ✓ |
+| H21 known-safe set | ✓ | ✓ | ✓ |
+| H24 YOLO-frozen | ✓ | ✓ | ✓ |
+
+Total: 13 of 16 must-have Hermes-Features done.
+
+### Out-of-scope (Phase D +5 — nice-to-have)
+
+| Hermes-Feature | Why deferred |
+|---|---|
+| H17 classification categories | Hermes-specific (cross-profile, sandbox-mirror) |
+| H18 read-blocked subset | Same as write-denied, can extend later |
+| H19 raise_if_read_blocked | Code-integration variant |
+| H22 two-layer pre-exec guards | Tirith + dangerous patterns combined (in-progress) |
+| H26 session-bypass | Gateway-specific |
+| H25 permanent-allowlist separation | Future refactor |
+| H11 observer hooks | No SDK consumers yet |
+| H10 format_tirith_description | Future formatting helper |
+| H12 set_hermes_interactive_context | Hermes-specific observability |
+| H3 _save_blocked_payload | Could be added with parser-limit |
+
+## Reference
+
+Plan: `.hermes/plans/2026-08-18_170452-hermes-safety-hardening.md`
+
+Hermes source: `_ref/hermes/tools/approval.py` (4553 lines), `_ref/hermes/agent/file_safety.py` (693 lines), `_ref/hermes/tools/tirith_security.py` (872 lines)

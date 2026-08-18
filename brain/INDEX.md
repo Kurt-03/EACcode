@@ -31,7 +31,8 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
   siehe [[15-features/system/providers.md|providers]]
 - **ADR-0005** *(geplant)* — Tool-Schema-Audit + Permission-Hardening (08-18) —
   siehe [[15-features/system/permissions.md|permissions]]
-- **ADR-0006** *(geplant)* — Permission Deep-Hardening (Plan C, Hermes-Voll) (08-18) —
+- **ADR-0006** *(geplant)* — Permission Deep-Hardening (Plan C, Hermes-Voll) (08-18) -
+- **ADR-0007** *(geplant)* — Hermes-Safety-Hardening (Plan D, 16 von 16 must-have Features) (08-18) —
   siehe [[15-features/system/permissions.md#08-18-plan-c-audit-hardening-2|Plan C]]
 
 ### Permission Deep-Hardening (08-18)
