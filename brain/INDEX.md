@@ -31,6 +31,15 @@ statt nur anzuhängen. Das Wiki kompiliert Wissen einmal und hält es aktuell.
   siehe [[15-features/system/providers.md|providers]]
 - **ADR-0005** *(geplant)* — Tool-Schema-Audit + Permission-Hardening (08-18) —
   siehe [[15-features/system/permissions.md|permissions]]
+- **ADR-0006** *(geplant)* — Permission Deep-Hardening (Plan C, Hermes-Voll) (08-18) —
+  siehe [[15-features/system/permissions.md#08-18-plan-c-audit-hardening-2|Plan C]]
+
+### Permission Deep-Hardening (08-18)
+
+5 Outcomes: once / session / always / deny / deny_always / timeout. Hermesische
+[[15-features/system/permissions.md|Permission-Pipeline]] mit Secret-Redaction,
+Owner-Override-Aux-LLM, persistent Deny_Always-Blocklist, Path-Symlink-Resolve,
+Exit-Code-Warnings. 641 Tests grün. Inline-Prompt-UX mit 5 Options ([y/s/a/n/A]) + Echo.
   siehe [[15-features/system/providers.md|providers]]
 
 ## Projekt-Kurzstand (2026-08-18)

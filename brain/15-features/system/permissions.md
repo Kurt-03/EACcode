@@ -217,3 +217,102 @@ eaccode permissions mode manual
 - `brain/15-features/system/smart_approval.md` — Aux-LLM-Doku (TODO)
 - `brain/15-features/system/providers.md` — Provider-Architektur
 - Plan: `.hermes/plans/2026-08-18_071745-smart-approval-mode.md`
+
+---
+
+## 08-18 (Plan C): Audit-Hardening #2
+
+### Was seit dem ersten Audit-Hardening dazukam
+
+1. **5 Outcomes** (war 2):
+   - `once / session / always / deny / deny_always / timeout`
+   - `Decision`-Dataclass erweitert um `scope`, `owner_override`, `timeout`
+
+2. **Inline-Prompt-UX** (`palette.py:_ask`)
+   - 5-Option-Menü statt `[y/N]`
+   - `[y] once / [s] session / [a] always / [n] deny / [A] deny_always`
+   - Echo der Eingabe (`y ✓`) bestätigt Annahme
+   - Header mit `Tool` + `Action` + `Risk`
+
+3. **Secret-Redaction** (`src/eaccode/redact.py`)
+   - GitHub PATs (ghp_, gho_, ghs_, ...)
+   - OpenAI (sk-...)
+   - AWS Keys (AKIA...)
+   - JWT Tokens
+   - Slack Tokens (xoxb-, ...)
+   - PEM Private Keys
+   - Bearer Tokens
+   - Sensible KEY=value patterns
+   - First-3-Char-Visible für Identifikation, Rest maskiert
+
+4. **Aux-LLM Owner-Override** (`_smart_review`)
+   - 4. Verdict: `owner_override` (statt nur 3)
+   - Aux-LLM unsicher → User bekommt nur `o` (once) oder `n` (deny)
+   - Kein Permanent-Allow wenn Aux-LLM unsicher
+
+5. **Path-Symlink-Resolve**
+   - `Path.resolve()` vor Sensitive-Check
+   - Path-Traversal (`../`) wird aufgelöst
+   - Original-Pfad + resolved-Pfad beide geprüft
+
+6. **Persistent Deny_Always** (`src/eaccode/blocked.py`)
+   - `~/.local/share/eaccode/blocked.json`
+   - Pattern-Speicherung mit ID + Reason + Timestamp
+   - Überlebt eaccode Neustart
+   - API: `add_blocked()`, `remove_blocked()`, `find_blocked()`, `list_blocked()`
+
+7. **Human-Wait-Window** (`src/eaccode/human_wait_window.py`)
+   - ContextVar `eaccode_human_wait_depth`
+   - Batch-Deadline pausiert während User-Prompts
+   - Nested windows (counter-style)
+
+8. **Exit-Code Warnings** (`tools.py:run_command`, `banner.py:status_line`)
+   - Run-Command Output: `⚠ exit=N (non-zero)` bei Fehler
+   - Status-Line: `model │ t │ chars │ ⚠ exit=N`
+
+### Pipeline-Reihenfolge (08-18 end-state)
+
+```
+1. deny rule (config.yaml)
+2. allow rule (config.yaml)
+3. persistent block list (blocked.json) ← Phase C.8
+4. read_only mode (heuristic)
+5. Hardline pattern (run_command only)
+6. Sensitive-Path-Check (path-resolve! ← Phase C.7)
+7. Smart-Mode Aux-LLM (run_command + dangerous) ← Phase C.5 owner_override
+8. Read-only tools (heuristic + READ_ONLY_TOOL_NAMES)
+9. off mode (auto-approve)
+10. Session-allowed (NOT always-ask tools)
+11. ask_handler via human_wait_window ← Phase C.3
+```
+
+### Hermes-Score
+
+| Coverage | Was |
+|---|---|
+| 5/5 (Hermes-Voll) | 5 outcomes + 5-option UX |
+| 80% | Secret-Redaction (Hermes redact kopiert) |
+| 90% | Aux-LLM Owner-Override |
+| 100% | Hardline + Sensitive-Path |
+| 80% | Persistent Deny_Always (blocklist) |
+| 70% | Deadlock-Guard (kein input()-deadlock weil ask_handler immer gesetzt in REPL) |
+| — | Was Hermes hat, eaccode (noch) nicht braucht: ACP-bridge, i18n |
+
+### Tests
+
+- `tests/test_permissions.py` — 42 Tests (Modes, Hardline, Smart, Session)
+- `tests/test_permission_hardening.py` — 18 Tests (Sensitive, Always-Ask, Smart-Mode)
+- `tests/test_tool_schemas.py` — 13 Tests (Tags, Descriptions)
+- `tests/test_redact.py` — 9 Tests (Secrets, safe-unchanged)
+- `tests/test_blocked.py` — 12 Tests (Add/Remove/Persistence/Match)
+- `tests/test_human_wait_window.py` — 5 Tests (Active/Inactive/Nested)
+
+Total: **641 Tests grün** (vor Plan C: 609)
+
+### Out-of-scope (für später)
+
+- Phase 2: Dediziertes Aux-Modell (separate Config)
+- Phase 2: `@`-pattern mit `~` rewrite + Symlink-Folding
+- Phase 2: Per-Call-History von Permission-Verdicts
+- Phase 2: Yolo-Mode (`off` auto-approve ohne `--yolo`-Flag)
+- Phase 2: Persistent Block-Store-CLI (`eaccode permissions denied-list list/remove`)
