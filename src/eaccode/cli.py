@@ -68,6 +68,27 @@ def build_agent() -> Agent:
         tools.extend(make_mcp_tools(mcp_clients))
     # C1: tell the agent its permission mode up front
     permission_manager = PermissionManager()
+    # Smart mode: register the aux LLM reviewer
+    if permission_manager.mode == "smart":
+        from eaccode.smart_approval import SmartApprovalReviewer
+
+        conf = cfg.load_config()
+        model_id = conf.get("model", {}).get("default") or ""
+        if model_id and provider_config:
+            provider_name, _, _ = model_id.partition("/")
+            from eaccode.providers import registry as provider_registry
+
+            try:
+                provider = provider_registry.get(
+                    provider_name, provider_config, model=model_id
+                )
+                permission_manager.smart_reviewer = SmartApprovalReviewer(
+                    provider, timeout=10.0
+                ).review
+            except Exception as exc:
+                # Fall back to ask mode if provider registration fails
+                print(f"Warning: smart review setup failed: {exc}")
+
     system_prompt = f"{system_prompt}{permissions_mode_hint(permission_manager.mode)}"
     return Agent(
         tools=tools,
