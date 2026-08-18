@@ -594,23 +594,50 @@ class PermissionManager:
                         )
                 except Exception:
                     pass
-            # 5b. Our generic sensitive-path check (allows prompt)
-            if self._is_sensitive_path(path_arg):
-                return self._ask_user(
-                    tool_name,
-                    arguments,
-                    fallback_reason="sensitive path",
-                    sensitive=True,
-                )
+            # 5b. Generic sensitive-path check. SKIP for read-only tools -
+            # reading /home/user/.ssh/ is fine (no mutation possible).
+            # The write-side block is already covered by file_safety above.
+            if tool_name not in _READ_ONLY_TOOL_NAMES and not _is_readonly_mcp(
+                tool_name
+            ):
+                if self._is_sensitive_path(path_arg):
+                    return self._ask_user(
+                        tool_name,
+                        arguments,
+                        fallback_reason="sensitive path",
+                        sensitive=True,
+                    )
 
-        # 6. Smart-Mode Aux-LLM for mutating, non-always-ask tools
+        # 6. Smart-Mode Aux-LLM for mutating, non-always-ask tools.
+        # Coverage: run_command + mutating path-args (write_file etc.)
+        # Phase F (smart-mode coverage):
+        # We pass tool_description + arguments (JSON-serialized) to the aux
+        # LLM so it can review any mutating action, not just bash.
+        needs_aux_review = False
+        aux_description = ""
+        aux_command_text = ""
+
         if self.mode == "smart" and tool_name == "run_command":
-            command_arg = arguments.get("command", "")
-            bare_call = command_arg if isinstance(command_arg, str) else ""
+            needs_aux_review = True
+            aux_description = "run_command"
+            aux_command_text = arguments.get("command", "")
+        elif self.mode == "smart" and tool_name in (
+            "write_file", "patch_file", "patch_multiple",
+            "file_edit", "git_commit", "git_branch_new",
+            "git_commit_undo", "create_skill", "improve_skill",
+            "memory_add", "memory_replace", "memory_remove",
+            "memory_apply_batch", "browser_screenshot",
+        ):
+            needs_aux_review = True
+            aux_description = tool_name
+            aux_command_text = call  # Already JSON-serialized call_text
+
+        if needs_aux_review:
             for regex, description in DANGEROUS_PATTERNS_COMPILED:
-                if regex.search(bare_call) or regex.search(call):
+                if regex.search(aux_command_text) or regex.search(call):
                     return self._smart_review(tool_name, arguments, description)
-            return Decision(True, "smart mode: safe command", self.mode)
+            # No dangerous pattern: auto-approve in smart mode
+            return Decision(True, "smart mode: safe action", self.mode)
 
         # 7. Read-only tools (heuristic — same as before, list of names)
         if tool_name in _READ_ONLY_TOOL_NAMES:
@@ -683,8 +710,19 @@ class PermissionManager:
         if self.smart_reviewer is None:
             # No smart reviewer registered → fall back to ask
             return self._ask_user(tool_name, arguments, fallback_reason="smart")
-        command = arguments.get("command", "")
-        verdict = self.smart_reviewer(command, description)
+        # Build the input string the aux LLM reviews. For run_command we
+        # send the command verbatim; for all other tools we send the
+        # full call_text (tool + json args) so the aux LLM sees the path,
+        # the new content, etc.
+        import json as _json
+        if tool_name == "run_command":
+            review_input = arguments.get("command", "")
+        else:
+            try:
+                review_input = _json.dumps(arguments, sort_keys=True)
+            except Exception:
+                review_input = str(arguments)
+        verdict = self.smart_reviewer(review_input, description)
         if verdict == "approve":
             return Decision(
                 True,

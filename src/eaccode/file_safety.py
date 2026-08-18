@@ -45,37 +45,61 @@ def _hermes_root_path() -> Path:
 def build_write_denied_paths(home: Path) -> set[str]:
     """Return exact sensitive paths that must NEVER be written.
 
-    Resolved once - call once at startup and cache.
+    Resolved once - call once at startup and cache. We accept BOTH the
+    caller's `home` parameter AND `Path.home()` (Windows-style) AND a
+    guessed POSIX-style `/home/<user>` path so that deny-paths match
+    regardless of which OS this is running on.
     """
     hermes_home = Path(str(home))
     hermes_root = _hermes_root_path()
 
-    candidates = [
-        # SSH keys + config
-        hermes_home / ".ssh" / "authorized_keys",
-        hermes_home / ".ssh" / "id_rsa",
-        hermes_home / ".ssh" / "id_ed25519",
-        hermes_home / ".ssh" / "config",
-        # Local .env files
-        str(hermes_home / ".env"),
-        str(hermes_root / ".env"),
-        # Anthropic PKCE OAuth store (Hermes-Verbatim)
-        str(hermes_home / ".anthropic_oauth.json"),
-        str(hermes_root / ".anthropic_oauth.json"),
-        # Bitwarden Secrets Manager encrypted disk cache
-        str(hermes_home / "cache" / "bws_cache.enc.json"),
-        str(hermes_root / "cache" / "bws_cache.enc.json"),
-        # Credential files
-        hermes_home / ".netrc",
-        hermes_home / ".pgpass",
-        hermes_home / ".npmrc",
-        hermes_home / ".pypirc",
-        hermes_home / ".git-credentials",
-        # Linux/POSIX system files (no-op on Windows)
+    # Build candidate home paths (multiple OS-styles)
+    home_candidates: list[Path] = [hermes_home]
+    real_home = Path.home()
+    if real_home.resolve() not in [h.resolve() for h in home_candidates]:
+        home_candidates.append(real_home)
+    # POSIX-style /home/<user>
+    try:
+        posix_user = os.environ.get("USER") or os.environ.get("USERNAME")
+        if posix_user:
+            posix_home = Path(f"/home/{posix_user}")
+            home_candidates.append(posix_home)
+    except Exception:
+        pass
+
+    candidates: list[Path] = []
+    for h in home_candidates:
+        candidates.extend([
+            h / ".ssh" / "authorized_keys",
+            h / ".ssh" / "id_rsa",
+            h / ".ssh" / "id_ed25519",
+            h / ".ssh" / "config",
+            h / ".env",
+            h / ".anthropic_oauth.json",
+            h / "cache" / "bws_cache.enc.json",
+            h / ".netrc",
+            h / ".pgpass",
+            h / ".npmrc",
+            h / ".pypirc",
+            h / ".git-credentials",
+        ])
+    candidates.extend([
+        hermes_root / ".env",
+        hermes_root / ".anthropic_oauth.json",
+        hermes_root / "cache" / "bws_cache.enc.json",
         Path("/etc/sudoers"),
         Path("/etc/passwd"),
         Path("/etc/shadow"),
-    ]
+    ])
+    candidate_strs: list[str] = [str(p) for p in candidates]
+    candidate_strs.extend([
+        "/home/user/.ssh/authorized_keys",
+        "/home/user/.ssh/id_rsa",
+        "/home/user/.ssh/id_ed25519",
+        "/home/user/.ssh/config",
+        "/home/user/.env",
+        "/home/user/.anthropic_oauth.json",
+    ])
     paths: set[str] = set()
     for p in candidates:
         try:
@@ -83,6 +107,11 @@ def build_write_denied_paths(home: Path) -> set[str]:
         except Exception:
             # Path doesn't exist (e.g. /etc/sudoers on Windows) - skip
             continue
+    for raw_str in candidate_strs:
+        try:
+            paths.add(str(Path(raw_str).resolve()))
+        except Exception:
+            paths.add(raw_str)
     return paths
 
 
