@@ -302,19 +302,23 @@ class TestToolCalls:
         tool_msg = next(m for m in history if m["role"] == "tool")
         assert "kaputt" in tool_msg["content"]
 
-    def test_max_turns_stops_with_message(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_max_turns_summarizes_when_possible(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # After max turns of tool calls, the agent tries one more time
+        # for a final answer (without tools).
+        # 4 responses: 3 tool-call turns, 1 final text turn.
         fake = FakeProvider(
             [
                 [_tool_call_chunk("c1", "echo", {"text": "x"}), _done()],
                 [_tool_call_chunk("c2", "echo", {"text": "y"}), _done()],
-                [_tool_call_chunk("c3", "echo", {"text": "z"}), _done()],
+                # 3rd turn: max_turns=2 means only 2 tool-call turns run
+                [_text("final summary"), _done()],  # the post-max-turns final
             ]
         )
         _patch_provider(monkeypatch, fake)
         echo = Tool(name="echo", description="echo", func=lambda text: text)
         agent = Agent(conf=_conf(), tools=[echo])
         history = agent.run([{"role": "user", "content": "x"}], max_turns=2)
-        assert "max turns" in agent.last_text(history)
+        assert "final summary" in agent.last_text(history)
 
     def test_tool_arguments_json_roundtrip(self, monkeypatch: pytest.MonkeyPatch) -> None:
         received: dict[str, Any] = {}

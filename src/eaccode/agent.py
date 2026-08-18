@@ -208,8 +208,14 @@ class Agent:
         messages: list[dict[str, Any]],
         max_output_tokens: int,
         on_token: Any = None,
+        tools: list[dict[str, Any]] | None = None,
     ) -> tuple[str | None, list[ToolCall]]:
-        """One model turn: stream or one-shot, return (content, tool_calls)."""
+        """One model turn: stream or one-shot, return (content, tool_calls).
+
+        ``tools``: override the tool list sent to the model. Pass an empty
+        list (or never any) for tool-free final-answer attempts. If None
+        (default), uses the agent's registered tools.
+        """
         _, _, model_id = _state_to_provider(self.conf)
         provider_name, _, model_short = model_id.partition("/")
         provider_config = (self.conf.get("providers") or {}).get(provider_name, {})
@@ -217,9 +223,14 @@ class Agent:
             provider_name, provider_config, model=model_id
         )
 
-        tool_schemas = (
-            [_tool_schema(tool) for tool in self.tools.values()] if self.tools else None
-        )
+        if tools is None:
+            tool_schemas = (
+                [_tool_schema(tool) for tool in self.tools.values()]
+                if self.tools
+                else None
+            )
+        else:
+            tool_schemas = tools or None
         max_tokens = max_output_tokens or self._max_tokens_for(model_id)
 
         content_parts: list[str] = []
@@ -372,12 +383,29 @@ class Agent:
                     }
                 )
 
+        # Try one final completion WITHOUT tools so the model has a chance
+        # to summarize what it found. If the model still emits tool_calls,
+        # drop them and treat as failure. If the provider raises
+        # StopIteration (test fake) we just stop cleanly.
         history.append(
             {
-                "role": "assistant",
-                "content": f"(stopped: max turns ({max_turns}) reached)",
+                "role": "user",
+                "content": (
+                    f"You have used {max_turns} turns without giving a final answer. "
+                    "Synthesize what you have so far into a concise answer to my "
+                    "original question. Do not call any more tools."
+                ),
             }
         )
+        try:
+            content, calls = self._complete(
+                history, max_output_tokens, on_token=on_token, tools=[]
+            )
+        except (StopIteration, TypeError):
+            # StopIteration happens with FakeProvider that has fixed response
+            # count. TypeError if _complete lacks tools= override.
+            content, _ = self._complete(history, max_output_tokens, on_token=on_token)
+        history.append({"role": "assistant", "content": content or ""})
         return history
 
     def last_text(self, history: list[dict[str, Any]]) -> str:

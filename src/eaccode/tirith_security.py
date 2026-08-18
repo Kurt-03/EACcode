@@ -185,22 +185,33 @@ def ensure_installed(*, log_failures: bool = True) -> tuple[Path | None, str]:
     """Ensure tirith is installed, installing if needed.
 
     Threadsafe via module-level lock. Returns (path, error).
+
+    A 0-byte install path (silent extraction failure) is treated as
+    "not installed" and re-attempted.
     """
     path = _install_path()
-    if path.exists():
+    if path.exists() and path.stat().st_size > 1024:
+        # 1KB minimum — a real tirith.exe is ~9MB. Anything less means
+        # previous extraction failed silently.
         return path, ""
 
     lock = _tirith_lock()
     with lock:
         # Re-check after acquiring lock
         path = _install_path()
-        if path.exists():
+        if path.exists() and path.stat().st_size > 1024:
             return path, ""
+        # Clean up any stale empty file before retry
+        if path.exists():
+            try:
+                path.unlink()
+            except Exception:
+                pass
 
         last_err = ""
         for _ in range(_INSTALL_RETRIES + 1):
             path, err = _install(log_failures=log_failures)
-            if path:
+            if path and path.exists() and path.stat().st_size > 1024:
                 return path, ""
             last_err = err
             time.sleep(_INSTALL_BACKOFF_SECONDS)
