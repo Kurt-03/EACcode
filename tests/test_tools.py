@@ -52,27 +52,6 @@ class TestFiles:
         assert tools.search_files("zzz-not-there", str(sample_dir)) == "no matches"
 
 
-class TestTerminal:
-    def test_denied_by_default(self) -> None:
-        assert "permission denied" in tools.run_command("echo hi")
-
-    def test_allowed_runs_command(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(tools, "permission_handler", lambda cmd: True)
-        out = tools.run_command("echo hello")
-        assert "hello" in out
-
-    def test_handler_receives_command(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        seen: list[str] = []
-        monkeypatch.setattr(tools, "permission_handler", lambda cmd: seen.append(cmd) or True)
-        tools.run_command("echo x")
-        assert seen == ["echo x"]
-
-    def test_timeout_reported(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(tools, "permission_handler", lambda cmd: True)
-        out = tools.run_command("echo hi", timeout=0)
-        assert "timed out" in out or "Error" in out
-
-
 class TestWeb:
     def test_http_get(self, monkeypatch: pytest.MonkeyPatch) -> None:
         class FakeResponse:
@@ -170,7 +149,6 @@ class TestCatalog:
             "write_file",
             "list_files",
             "search_files",
-            "run_command",
             "http_get",
             "web_search",
             "current_time",
@@ -182,40 +160,6 @@ class TestCatalog:
             assert tool.description
             assert tool.parameters is not None
 
-
-class TestRunCommandExitCode:
-    """Phase B.1: non-zero exit produces visible warning."""
-
-    def test_exit_code_in_output(self) -> None:
-        """When the command exits non-zero, output shows ⚠ exit=N."""
-        from eaccode import tools
-        from eaccode.permissions import PermissionManager
-
-        old_handler = tools.permission_handler
-        try:
-            manager = PermissionManager()
-            manager.ask_handler = lambda n, a: True
-            tools.permission_handler = lambda cmd: True
-
-            # Use `exit 1` as the command (POSIX-bash)
-            result = tools.run_command("bash -c " + chr(34) + "exit 1" + chr(34), timeout=5)
-            assert "⚠ exit=1" in result
-            assert "non-zero" in result
-        finally:
-            tools.permission_handler = old_handler
-
-    def test_success_no_warning(self) -> None:
-        """When the command succeeds, no warning is added."""
-        from eaccode import tools
-
-        old_handler = tools.permission_handler
-        try:
-            tools.permission_handler = lambda cmd: True
-            result = tools.run_command("echo hello", timeout=5)
-            assert "hello" in result
-            assert "⚠ exit=" not in result
-        finally:
-            tools.permission_handler = old_handler
 
 
 class TestStatusLine:

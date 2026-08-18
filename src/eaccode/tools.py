@@ -18,16 +18,14 @@ from pathlib import Path
 
 from eaccode.agent import Tool
 
-# Set by the agent loop while a run_command call is executing: the loop's
-# permission gate already decided, so run_command skips its own prompt.
-_loop_permission_checked = threading.local()
+# Module-level permission handler. Tools that need user confirmation
+# look this up by name (no run_command in this build; reserved for future).
 
 READ_CHARS = 8000
 FETCH_CHARS = 8000
 SEARCH_RESULTS = 5
 
-# Terminal permission gate. The REPL/TUI wires an interactive prompt here
-# (Phase A7); the safe default is to deny.
+# Safe default permission handler.
 
 
 def _deny_permission(command: str) -> bool:
@@ -88,33 +86,6 @@ def search_files(pattern: str, path: str = ".") -> str:
     except OSError as exc:
         return f"Error: {exc}"
     return "\n".join(matches) or "no matches"
-
-
-def run_command(command: str, cwd: str | None = None, timeout: int = 30) -> str:
-    """Run a shell command; gated by the permission handler."""
-    if not getattr(_loop_permission_checked, "value", False) and not permission_handler(
-        command
-    ):
-        return f"Error: permission denied for command: {command}"
-    try:
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except subprocess.TimeoutExpired:
-        return f"Error: command timed out after {timeout}s"
-    except OSError as exc:
-        return f"Error: {exc}"
-    output = ((result.stdout or "") + (result.stderr or "")).strip()
-    if result.returncode != 0:
-        # Phase B.1: surface exit-code via warning prefix that the
-        # status_line picks up. Format: "⚠ exit=N: <output>"
-        output = f"{output}\n⚠ exit={result.returncode} (non-zero)".strip()
-    return output or "(no output)"
 
 
 def http_get(url: str, max_chars: int = FETCH_CHARS) -> str:
@@ -269,48 +240,6 @@ BUILTIN_TOOLS: list[Tool] = [
             "required": ["pattern"],
         },
         mutates=False,
-    ),
-    Tool(
-        "run_command",
-        "Run a shell command via subprocess.run(shell=True). "
-        "Returns stdout+stderr combined plus '(exit N)' on non-zero exit. "
-        "Returns 'Error: permission denied ...' when blocked, "
-        "'Error: command timed out after Ns' on timeout, or "
-        "'Error: <OSError>' on missing binary / OS issues. "
-        "POLICY: Smart-mode routes dangerous commands (rm -rf, chmod 777, "
-        "curl|sh) through an Aux-LLM reviewer; Hardline patterns "
-        "(rm -rf /, sudo -S, shutdown, fork bombs) always block.",
-        run_command,
-        {
-            "type": "object",
-            "properties": {
-                "command": {
-                    "type": "string",
-                    "description": (
-                        "Shell command string. Evaluated via /bin/sh on "
-                        "POSIX or cmd.exe on Windows."
-                    ),
-                },
-                "cwd": {
-                    "type": "string",
-                    "description": (
-                        "Working directory for the subprocess "
-                        "(default: inherits caller's cwd)."
-                    ),
-                },
-                "timeout": {
-                    "type": "integer",
-                    "description": (
-                        "Subprocess timeout in seconds (default: 30). "
-                        "Returns 'Error: command timed out after Ns' "
-                        "on expiry."
-                    ),
-                },
-            },
-            "required": ["command"],
-        },
-        mutates=True,
-        always_ask=True,
     ),
     Tool(
         "http_get",

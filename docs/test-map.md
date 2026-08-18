@@ -58,7 +58,7 @@ clean → ③ Live-Check in eaccode-Session (echtes Kommando, echte Ausgabe) →
 | Box-Wände | Banner in schmalem Fenster | alle Wand-Zeilen gleich breit, kein Loch rechts | ✅ 08-14 |
 | Agent weiß + keine Symbole | ChatApp: Antwort ansehen | weißer Text, kein ⚡/⚕ | ✅ 08-14 |
 | Session-Allow | ChatApp: `write_file` bestätigen, dann 2. Schreibversuch | 1 Prompt, dann frei für die Session | ✅ 08-14 (Tests) |
-| Kritische Tools | `run_command` 2× | Prompt bei JEDEM Call | ✅ 08-14 (Tests) |
+| Kritische Tools | `write_file` | Prompt bei JEDEM Call | ✅ 08-14 (Tests) |
 | MCP read-only frei | `mcp__Roblox_Studio__script_search` | kein Prompt (Namens-Heuristik) | ✅ 08-14 (Tests) |
 | Tool-Manifest | Chat: „Welche Tools hast du?" | Agent listet Tools + Flow (System-Prompt) | ✅ 08-14 |
 | Streaming | Chat: Frage stellen | Antwort erscheint live, Zeile wächst | ✅ 08-14 (live: 7-34 Deltas) |

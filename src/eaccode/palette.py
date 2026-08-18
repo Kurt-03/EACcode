@@ -679,13 +679,6 @@ class ChatApp:
         self._emit("(unrecognized input — default deny)")
         return ("deny", False)
 
-    def _wire_permission(self) -> None:
-        """Wire the inline ask into the tool wrapper (run_command gate)."""
-        with contextlib.suppress(Exception):
-            from eaccode import tools
-
-            tools.permission_handler = lambda command: self._ask(command)
-
     def _wire_agent_gate(self, agent: Any) -> None:
         """Wire the inline ask into the agent's permission manager."""
         manager = getattr(agent, "permission_manager", None)
@@ -940,7 +933,6 @@ class ChatApp:
         # Print the divider (dashed line) before the prompt so the input
         # area is visually separated from the scrollback above.
         self._emit(self._divider())
-        self._wire_permission()
         app = self.build_application()
         from prompt_toolkit.patch_stdout import patch_stdout
 

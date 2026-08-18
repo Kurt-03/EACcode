@@ -19,7 +19,6 @@ class TestSystemPrompt:
             "patch_file",
             "file_edit",
             "patch_multiple",
-            "run_command",
             "create_skill",
         ):
             assert tool_name in DEFAULT_SYSTEM_PROMPT, (
@@ -33,8 +32,9 @@ class TestSystemPrompt:
                 f"system prompt is missing mention of {builtin!r}"
             )
 
-    def test_tells_model_to_use_run_command_for_shell_stuff(self) -> None:
-        assert "run_command" in DEFAULT_SYSTEM_PROMPT
+    def test_no_run_command_in_prompt(self) -> None:
+        # run_command was removed in Plan H.minimal v3
+        assert "run_command" not in DEFAULT_SYSTEM_PROMPT
         # It must be called "the ONE tool that runs shell commands"
         assert "ONE" in DEFAULT_SYSTEM_PROMPT or "only" in DEFAULT_SYSTEM_PROMPT.lower()
 

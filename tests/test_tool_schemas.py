@@ -48,11 +48,6 @@ class TestTags:
             assert hasattr(tool, "mutates"), f"{tool.name} missing mutates"
             assert isinstance(tool.mutates, bool), f"{tool.name}: mutates must be bool"
 
-    def test_run_command_is_mutating_and_always_ask(self) -> None:
-        run = next(t for t in _all_tools() if t.name == "run_command")
-        assert run.mutates is True
-        assert run.always_ask is True
-
     def test_write_file_is_mutating(self) -> None:
         wf = next(t for t in _all_tools() if t.name == "write_file")
         assert wf.mutates is True
@@ -85,9 +80,6 @@ class TestDescriptions:
 
 
 class TestRequiredFields:
-    def test_run_command_requires_command(self) -> None:
-        rc = next(t for t in _all_tools() if t.name == "run_command")
-        assert rc.parameters.get("required") == ["command"]
 
     def test_write_file_requires_path_and_content(self) -> None:
         wf = next(t for t in _all_tools() if t.name == "write_file")
@@ -99,9 +91,6 @@ class TestRequiredFields:
         s = next(t for t in _all_tools() if t.name == "session_search")
         assert "query" in s.parameters.get("required", [])
 
-    def test_run_command_requires_command(self) -> None:
-        rc = next(t for t in _all_tools() if t.name == "run_command")
-        assert rc.parameters.get("required") == ["command"]
 
 
 class TestBrowserTools:

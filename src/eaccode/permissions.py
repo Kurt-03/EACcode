@@ -722,8 +722,9 @@ class PermissionManager:
         # full call_text (tool + json args) so the aux LLM sees the path,
         # the new content, etc.
         import json as _json
-        if tool_name == "run_command":
-            review_input = arguments.get("command", "")
+        # run_command removed in Plan H.minimal v3
+        if False:  # disabled
+            review_input = ''
         else:
             try:
                 review_input = _json.dumps(arguments, sort_keys=True)

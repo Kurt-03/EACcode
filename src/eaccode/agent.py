@@ -41,22 +41,20 @@ DEFAULT_SYSTEM_PROMPT = (
     "  - To search inside files: use `search_files` or `repo_search` "
     "(NOT `grep`, `rg`, or `find /...`)\n"
     "  - To search across the repo: use `repo_scan` (NOT `find .`)\n"
-    "  - To run a build / tests / install / git / npm / cargo / etc.: "
-    "use `run_command` - this is the ONE tool that runs shell commands. "
-    "Pick `run_command` for things like `pytest`, `git status`, `npm "
-    "install`, `cargo build`, `make`, `python x.py`.\n"
-    "  - For interactive shells (cd, pwd, ls, del via cmd.exe): use "
-    "`run_command` with the full command line.\n"
-    "  - To create reusable skill files: use `create_skill` / "
-    "`improve_skill` (NOT vi/creating files in /skills/)\n"
+    "  - For shell commands (build, tests, install, git, npm, cargo): "
+"execute them in YOUR OWN TERMINAL and report results back to eaccode. "
+"eaccode does NOT run shell commands for you.\n"
+"  - For interactive shells (cd, pwd, ls, del via cmd.exe): "
+"execute them yourself in your terminal.\n"
+    "`create_skill` / `improve_skill` (NOT vi/creating files in /skills/)\n"
     "  - To store/recall facts: use `memory_add`/`memory_remove` "
     "(NOT writing to MEMORY.md directly)\n\n"
     "## Workflow patterns\n"
     "- For 'show me X file': call `read_file(path=\"<full-or-relative-path>\")`\n"
     "- For 'list dir contents' or 'what is on my desktop': call "
     "`list_files(path=\"<path>\")`\n"
-    "- For 'delete these files': call `run_command(command=\"<quoted-shell-command>\")` "
-    "(the agent loop will gate it through the permission system)\n"
+    "- For 'delete these files': execute 'rm <files>' or 'del <files>' in your "
+    "own terminal, then confirm to eaccode.\n"
     "- For 'edit line 12 of file X': use `file_edit` or "
     "`patch_file` - both are undoable via `undo_edit`\n"
     "- For 'apply these N edits': prefer `patch_multiple` (atomic, "
@@ -276,18 +274,7 @@ class Agent:
             if not decision.allow:
                 return f"Error: permission denied ({decision.reason})"
         try:
-            if call.name == "run_command":
-                # run_command has its own interactive gate; the loop already
-                # decided, so tell it to skip the second prompt.
-                from eaccode import tools as tools_mod  # lazy: avoids import cycle
-
-                tools_mod._loop_permission_checked = True
-                try:
-                    result = tool.func(**call.arguments)
-                finally:
-                    tools_mod._loop_permission_checked = False
-            else:
-                result = tool.func(**call.arguments)
+            result = tool.func(**call.arguments)
         except Exception as exc:  # tool bugs must not kill the loop
             return f"Error: tool {call.name} failed: {exc}"
         return str(result)

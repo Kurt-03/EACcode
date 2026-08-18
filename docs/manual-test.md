@@ -56,8 +56,6 @@ Wie du nach jedem Schritt selbst prüfst, dass eaccode wirklich funktioniert.
 | read_file | `Lies test.txt` | Inhalt |
 | list_files | `Was liegt in <ordner>?` | Dateiliste |
 | search_files | `Suche in <ordner> nach "<muster>"` | Pfade |
-| run_command (erlauben) | `Führe echo hallo aus` | `Allow: … [y/N]` → `y` → `hallo` |
-| run_command (verweigern) | `Führe dir /b aus` | `n` → `permission denied` |
 | http_get | `Lade https://example.com und fasse zusammen` | Zusammenfassung |
 | web_search | `Suche im Web: Wetter Berlin heute` | Titel + Links |
 
@@ -264,7 +262,7 @@ Voraussetzung: echtes Terminal (Windows-Terminal oder CMD), Breite ≥ 80.
 | Enter 1× | `/mem` + Enter | Palette schließt, `/memory` in Buffer, `❯ /memory\|` |
 | Enter 2× | dann nochmal Enter | `eaccode 0.0.1` (oder Usage), 1 LZ + Linie, `❯` |
 | Slash-Command-Output | `/version` + Enter | `eaccode 0.0.1`, Linie, `❯` |
-| Permission (kein Spacer) | `rm -rf /test` + Enter | `Allow: run_command … [y/N]` **ohne** 1 LZ davor, direkt `❯` |
+| Permission (kein Spacer) | `rm -rf /test` + Enter | Permission-Prompt ohne 1 LZ davor |
 | Permission y | `y` | `[user] y` (oder direkter Run), Statusline, Linie, `❯` |
 | Stream-Verhalten | normaler Chat | Chunks streamen live in Scrollback, `❯` bleibt unten (patch_stdout) |
 | Ctrl+C | Ctrl+C | `bye`, Exit 0 |
