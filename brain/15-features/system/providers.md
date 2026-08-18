@@ -67,8 +67,9 @@ class StreamChunk:
 
 **Wichtig:** Der Agent sieht **nie** Anthropic-Events. Nur `StreamChunk`. Jeder Adapter konvertiert nativ → StreamChunk.
 
-**⚠ MiniMax-M3 Reasoning-Stream-Caveat (08-17):** MiniMax-M3 wirbt mit `reasoning=True` in models.dev, sendet aber im Anthropic-COMPAT-Format **kein** `thinking_delta`-Event. Reasoning kommt stattdessen inline im `text_delta` mit Newline-Tokens dazwischen. Hermes hat denselben Bug. Workaround: User-Prompt zwingt `<think>...</think>`-Format, dann greift `_strip_think` in palette.py.
-**Hermes Desktop Status (08-17):** Hermes Desktop **definiert** `display.show_reasoning` in `apps/desktop/src/app/settings/constants.ts` Z. 549 als Setting mit Toggle. Aber: das Setting ist **tot** — `showReasoning` taucht nirgendwo im Render-Code auf, nur in constants.ts, tests, und i18n files. TUI, REPL **und** Desktop zeigen Reasoning nicht, weil MiniMax-M3 es nicht als separates `thinking_delta` liefert. Der Toggle ist ein **Drehknopf ohne Maschine**.
+**⚠ MiniMax-M3 Reasoning-Stream-Caveat (08-17):** MiniMax-M3 sendet DOCH `thinking_delta`-Events im Stream, aber **nur** wenn `thinking.type="enabled"` + `budget_tokens` Param im API-Request mitgeschickt wird. **Hermes Desktop** (siehe Screenshot 08-18) hat ein Model-Settings-Panel mit **Thinking** Toggle + **Effort** (Minimal/Low/Medium/High/Extra High/Max/Ultra). Hermes `anthropic_adapter.py` mappt das auf `thinking: {type: "enabled", budget_tokens: 4000-32000}`. **Mein eaccode sendet aktuell keinen `thinking`-Param** — daher kein Reasoning-Stream. Fix-Plan: `reasoning_effort` aus Config lesen (default: medium), wenn != "none" dann `thinking.type="enabled"` + `budget_tokens` senden. Plus: `temperature=1` und `max_tokens >= budget + 4096` (Hermes-Muster). Levels: minimal=4000, low=4000, medium=8000, high=16000, xhigh=32000, max=32000, ultra=32000.
+
+**Hermes Desktop Status (08-18):** Hermes Desktop **definiert** `display.show_reasoning` als Setting, aber das ist **eine andere Achse** — steuert nur Anzeige, nicht ob Reasoning überhaupt gefragt wird. Die Reasoning-Levels (Minimal bis Ultra) sind **eine andere Konfig** (Model-Settings statt Display-Settings) und wirken via `delegation.reasoning_effort` (Out of Scope für eaccode Phase 1).
 
 
 ## Implementierter Adapter
