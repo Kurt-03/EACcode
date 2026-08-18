@@ -510,6 +510,9 @@ class PermissionManager:
         for rule in self.allow_rules:
             if re.search(rule, call, re.IGNORECASE):
                 return Decision(True, f"allowed by rule: {rule}", self.mode)
+        # Phase C.8: persistent deny_always blocks (Hermes-Verbatim)
+        if self._check_blocked_persistent(call):
+            return Decision(False, "denied: persistent block list match", self.mode)
 
         # 3. read_only mode
         if self.mode == "read_only":
@@ -766,8 +769,13 @@ class PermissionManager:
             pass
 
     def _add_deny_rule(self, tool_name: str, arguments: dict[str, Any], reason: str) -> None:
-        import re as _re  # noqa
-        import json as _json  # noqa
+        """Persist a deny rule (called on 'A' / deny_always).
+
+        Two locations:
+          1. `permissions.deny` in config.yaml (legacy per-config-rule)
+          2. blocked.py store on disk (Phase C.8 persistent list)
+        """
+        import re as _re
 
         call = self.call_text(tool_name, arguments)
         try:
@@ -777,6 +785,23 @@ class PermissionManager:
                 self._save_rules()
         except Exception:
             pass
+
+        # Persistent block list (Hermes-Verbatim):
+        try:
+            from eaccode.blocked import add_blocked as _add_blocked
+
+            _add_blocked(call[:200], reason or "permanent deny", tool_name)
+        except Exception:
+            pass
+
+    def _check_blocked_persistent(self, call_text: str) -> bool:
+        """True when call_text matches a pattern in blocked.json (Hermes-Verbatim)."""
+        try:
+            from eaccode.blocked import find_blocked as _find_blocked
+
+            return _find_blocked(call_text) is not None
+        except Exception:
+            return False
 
     def _save_rules(self) -> None:
         """Persist updated allow/deny rules to config.yaml."""
