@@ -74,8 +74,9 @@ def build_agent() -> Agent:
 
         conf = cfg.load_config()
         model_id = conf.get("model", {}).get("default") or ""
+        provider_name, _, _ = model_id.partition("/")
+        provider_config = (conf.get("providers") or {}).get(provider_name, {})
         if model_id and provider_config:
-            provider_name, _, _ = model_id.partition("/")
             from eaccode.providers import registry as provider_registry
 
             try:
