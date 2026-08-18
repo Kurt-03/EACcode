@@ -1,3 +1,12 @@
+---
+name: permissions-system
+type: system
+status: done
+phase: C1 + 08-18 smart
+date: 2026-08-13 (C1), 2026-08-18 (smart mode)
+tags: [type/feature, feature/system, permissions, security]
+---
+
 # Permissions-System (Smart Mode)
 
 **Modul:** `src/eaccode/permissions.py`
@@ -142,6 +151,11 @@ eaccode permissions mode manual
 # allow: []
 # deny: []
 ```
+
+## History
+
+- **08-13 (C1):** Ursprüngliches 4-Modus-System (ask, allow_all, read_only, deny_all)
+- **08-18:** Hermes-kompatibel umgebaut: smart | manual | off. Hermes-Verbatim 89 patterns (12 hardline + 77 dangerous). Aux LLM mit XML-Delimiters und Comment-Stripping als Anti-Prompt-Injection.
 
 ## Verwandt
 
