@@ -42,12 +42,26 @@ class AgentError(Exception):
 
 @dataclass
 class Tool:
-    """A callable tool exposed to the model."""
+    """A callable tool exposed to the model.
+
+    Tags (planned 08-18 hardens by audit):
+      - mutates: True if the tool changes persistent state.
+        READ_ONLY_TOOLS detection uses this tag directly.
+      - always_ask: True if every call must prompt (even after the user
+        has approved the same tool earlier in this session).
+      - returns: short human-readable description of the success output
+        and the Error-prefix failure string. Anthropic SDK reads the
+        Tool description only, so the returns docstring has to live there
+        OR be passed via description suffix.
+    """
 
     name: str
     description: str
     func: Callable[..., Any]
     parameters: dict[str, Any] = field(default_factory=dict)
+    mutates: bool = False
+    always_ask: bool = False
+    returns: str = ""
 
 
 def _tool_schema(tool: Tool) -> dict[str, Any]:
