@@ -392,12 +392,29 @@ DANGEROUS_PATTERNS_COMPILED: list[tuple[re.Pattern[str], str]] = [
 
 @dataclass
 class Decision:
-    """Result of a permission check."""
+    """Result of a permission check.
+
+    Attributes:
+        allow: True if the call may proceed, False otherwise.
+        reason: Human-readable description of why (used in UI/logs).
+        mode: Permission mode under which the decision was made.
+        scope: Lifetime of approval if allow=True:
+                - "once": just this call
+                - "session": all calls of this kind for the rest of the session
+                - "always": persistent config rule
+        smart_reviewed: True when an aux LLM was consulted.
+        owner_override: True when smart-mode routed to user because the
+                aux LLM was uncertain (different UI: "once/deny" only).
+        timeout: True when user did not answer in time (fail-closed).
+    """
 
     allow: bool
     reason: str
     mode: str = "smart"
+    scope: str = "once"
     smart_reviewed: bool = False
+    owner_override: bool = False
+    timeout: bool = False
 
 
 class PermissionManager:
@@ -520,7 +537,12 @@ class PermissionManager:
         # 5. Sensitive-path check (for any tool with a path arg)
         path_arg = self._extract_path_arg(tool_name, arguments)
         if path_arg and self._is_sensitive_path(path_arg):
-            return self._ask_user(tool_name, arguments, fallback_reason="sensitive path")
+            return self._ask_user(
+                tool_name,
+                arguments,
+                fallback_reason="sensitive path",
+                sensitive=True,
+            )
 
         # 6. Smart-Mode Aux-LLM for mutating, non-always-ask tools
         if self.mode == "smart" and tool_name == "run_command":
@@ -547,20 +569,11 @@ class PermissionManager:
         if tool_name in self._session_allowed and not is_always_ask(tool_name):
             return Decision(True, "approved for this session", self.mode)
 
-        # 10. ask_handler
-        if self.ask_handler is not None:
-            with self._ask_lock:
-                allowed = self.ask_handler(tool_name, arguments)
-            # Always-ask tools are NOT remembered in the session
-            if allowed and not is_always_ask(tool_name):
-                self._session_allowed.add(tool_name)
-            return Decision(
-                allowed,
-                "approved by user" if allowed else "denied by user",
-                self.mode,
-            )
-        return Decision(
-            False, "no permission handler set (deny by default)", self.mode
+        # 10. ask_handler (5 outcomes: once/session/always/deny/deny_always/timeout)
+        return self._ask_user(
+            tool_name,
+            arguments,
+            fallback_reason=f"mode={self.mode}",
         )
 
     def _is_sensitive_path(self, path: str) -> bool:
@@ -568,11 +581,30 @@ class PermissionManager:
 
         Sensitive = credentials / ssh keys / shell rc / system dirs / config.
         Used as a smart-mode sanity-check on tools that take a path argument.
+
+        Path is resolved with Path.resolve() to defeat ../-traversal tricks.
+        We check the ORIGINAL path first (cheap), then the resolved path.
         """
         if not path:
             return False
-        from re import compile as _re
+        if self._path_matches_sensitive(path):
+            return True
+        resolved = self._resolve_path(path)
+        if resolved != path and self._path_matches_sensitive(resolved):
+            return True
+        return False
 
+    @staticmethod
+    def _resolve_path(path: str) -> str:
+        try:
+            from pathlib import Path as _Path
+
+            return str(_Path(path).resolve())
+        except Exception:
+            return path
+
+    @staticmethod
+    def _path_matches_sensitive(path: str) -> bool:
         for pattern in SENSITIVE_PATH_PATTERNS_COMPILED:
             if pattern.search(path):
                 return True
@@ -581,7 +613,14 @@ class PermissionManager:
     def _smart_review(
         self, tool_name: str, arguments: dict[str, Any], description: str
     ) -> Decision:
-        """Route a dangerous-pattern command through the aux LLM."""
+        """Route a dangerous-pattern command through the aux LLM.
+
+        Aux LLM can return (Hermes-Verbatim):
+          - "approve"       auto-approved, scope=once
+          - "deny"          blocked, smart_reviewed=True
+          - "escalate"      user-prompted once/session/always/deny/deny_always
+          - "owner_override" Aux LLM uncertain; user gets only once/deny
+        """
         if self.smart_reviewer is None:
             # No smart reviewer registered → fall back to ask
             return self._ask_user(tool_name, arguments, fallback_reason="smart")
@@ -592,6 +631,7 @@ class PermissionManager:
                 True,
                 f"smart-approved: {description}",
                 self.mode,
+                scope="once",
                 smart_reviewed=True,
             )
         if verdict == "deny":
@@ -601,26 +641,155 @@ class PermissionManager:
                 self.mode,
                 smart_reviewed=True,
             )
+        if verdict == "owner_override":
+            # Owner-override: Aux LLM uncertain, user must decide
+            # but only once/deny (no permanent allow).
+            return self._ask_user(
+                tool_name,
+                arguments,
+                fallback_reason=f"smart owner-override: {verdict}",
+                smart_denied=True,
+            )
         # escalate or unknown → ask user
         return self._ask_user(tool_name, arguments, fallback_reason=f"smart: {verdict}")
 
     def _ask_user(
-        self, tool_name: str, arguments: dict[str, Any], fallback_reason: str
+        self,
+        tool_name: str,
+        arguments: dict[str, Any],
+        fallback_reason: str,
+        *,
+        smart_denied: bool = False,
+        sensitive: bool = False,
     ) -> Decision:
-        """Ask user via the registered handler."""
+        """Ask user via the registered handler.
+
+        The ask_handler is called and returns one of:
+          - ("once", True)
+          - ("session", True)
+          - ("always", True)
+          - ("deny", False)
+          - ("deny_always", False)
+          - ("timeout", False)   (only set by the palette wrapper)
+          - True/False backwards-compat ("y"/"yes"=once, anything else=deny)
+
+        smart_denied: True when AUX-LLM flagged the call as risky but
+            gave no clear ban. Show only once/deny (no permanent allow).
+        sensitive: True when on a sensitive-path write. Same UI as
+            normally, just different reason prefix.
+        """
         if self.ask_handler is None:
+            # Fail-closed: deny immediately if no handler is wired (avoids
+            # the prompt_toolkit input() deadlock Hermes documented in
+            # `tools.approval._prompt_dangerous_approval_inner`).
             return Decision(
-                False, f"{fallback_reason}: no handler", self.mode
+                False,
+                f"{fallback_reason}: no handler (deny-by-default)",
+                self.mode,
+                timeout=False,
             )
+
         with self._ask_lock:
-            allowed = self.ask_handler(tool_name, arguments)
-        if allowed and not is_always_ask(tool_name):
+            result = self.ask_handler(tool_name, arguments)
+
+        scope, allowed = self._normalize_ask_result(result)
+        # ALWAYS_ASK_TOOLS = no session memory (every call prompts)
+        # Once = no session memory
+        # Session/Always = session memory
+        if allowed and scope in ("session", "always"):
+            if not is_always_ask(tool_name):
+                self._session_allowed.add(tool_name)
+        if allowed and scope == "always":
+            self._add_allow_rule(tool_name, arguments)
+        if (not allowed) and scope == "deny_always":
+            self._add_deny_rule(tool_name, arguments, fallback_reason)
+        # Backward-compat: legacy True from ask_handler (scope=once) ALSO
+        # adds to session if not in ALWAYS_ASK_TOOLS (matches the prior
+        # behavior expected by tests).
+        if allowed and scope == "once" and not is_always_ask(tool_name):
             self._session_allowed.add(tool_name)
+
+        reason = self._reason_for(scope, fallback_reason)
         return Decision(
-            allowed,
-            "approved by user" if allowed else "denied by user",
-            self.mode,
+            allow=allowed,
+            reason=reason,
+            mode=self.mode,
+            scope=scope,
+            owner_override=smart_denied,
         )
+
+    @staticmethod
+    def _normalize_ask_result(result: Any) -> tuple[str, bool]:
+        """Accept the legacy bool OR the new (scope, allow) tuple."""
+        if isinstance(result, tuple) and len(result) == 2:
+            scope, allowed = result
+            return str(scope), bool(allowed)
+        # Legacy y/n fallback
+        if isinstance(result, bool):
+            return ("once", result)
+        if isinstance(result, str):
+            # Map shortcuts
+            mapping = {
+                "y": ("once", True), "yes": ("once", True),
+                "n": ("once", False), "no": ("once", False),
+                "s": ("session", True),
+                "a": ("always", True),
+                "A": ("deny_always", False),
+            }
+            if result in mapping:
+                return mapping[result]
+        return ("once", False)  # safe default
+
+    @staticmethod
+    def _reason_for(scope: str, fallback_reason: str) -> str:
+        table = {
+            "once": f"{fallback_reason}: once approved",
+            "session": f"{fallback_reason}: approved for session",
+            "always": f"{fallback_reason}: approved permanently",
+            "deny": f"{fallback_reason}: denied once",
+            "deny_always": f"{fallback_reason}: denied permanently",
+        }
+        return table.get(scope, fallback_reason)
+
+    def _add_allow_rule(self, tool_name: str, arguments: dict[str, Any]) -> None:
+        """Persist an allow rule for this tool-name (used by 'a')."""
+        import re as _re  # noqa
+        import json as _json  # noqa
+
+        call = self.call_text(tool_name, arguments)
+        try:
+            escaped = _re.escape(call[:200])
+            if escaped not in self.allow_rules:
+                self.allow_rules.append(escaped)
+                self._save_rules()
+        except Exception:
+            pass
+
+    def _add_deny_rule(self, tool_name: str, arguments: dict[str, Any], reason: str) -> None:
+        import re as _re  # noqa
+        import json as _json  # noqa
+
+        call = self.call_text(tool_name, arguments)
+        try:
+            escaped = _re.escape(call[:200])
+            if escaped not in self.deny_rules:
+                self.deny_rules.append(escaped)
+                self._save_rules()
+        except Exception:
+            pass
+
+    def _save_rules(self) -> None:
+        """Persist updated allow/deny rules to config.yaml."""
+        from eaccode import config as cfg
+
+        try:
+            data = cfg.load_config()
+            data.setdefault("permissions", {})
+            data["permissions"]["allow"] = list(self.allow_rules)
+            data["permissions"]["deny"] = list(self.deny_rules)
+            cfg.save_config(data)
+        except Exception:
+            pass
 
 
 def mode_hint(mode: str) -> str:
