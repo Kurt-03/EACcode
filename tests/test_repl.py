@@ -192,7 +192,10 @@ class TestChat:
         stdin = io.StringIO("hallo\n/exit\n")
         stdout = io.StringIO()
         assert run_repl(stdin, stdout, agent=agent) == 0
-        assert "eaccode> hallo zurück" in stdout.getvalue()
+        # Plan M: text is streamed via on_chunk (12-char sub-chunks).
+        # No "eaccode> " prefix in verbose mode anymore.
+        out = stdout.getvalue()
+        assert "hallo zurück" in out
         assert agent.calls[0][-1] == {"role": "user", "content": "hallo"}
 
     def test_conversation_history_kept(self, isolated_config: Path) -> None:

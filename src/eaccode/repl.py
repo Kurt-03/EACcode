@@ -148,17 +148,26 @@ def _handle_chat(
     text_parts: list[str] = []
 
     def on_chunk(chunk) -> None:
-        """Plan K K.3: stream text tokens live when verbose=True."""
+        """Plan K K.3 + Plan M: live-stream text + tool events.
+
+        Same logic as CLI: text chunks are split into 12-char sub-chunks
+        with 60ms delay so user perceives streaming even when provider
+        sends the answer as one event.
+        """
         if chunk.kind == "text" and chunk.content:
             text_parts.append(chunk.content)
             if verbose:
-                # Live-stream the text tokens as they arrive.
-                stdout.write(chunk.content)
-                stdout.flush()
+                from eaccode.agent import _split_for_pseudo_stream
+                import time as _t
+                for piece in _split_for_pseudo_stream(chunk.content, chunk_size=12):
+                    stdout.write(piece)
+                    stdout.flush()
+                    _t.sleep(0.06)
             return
         if chunk.kind == "done":
             return
         # Tool events only render when verbose.
+        from eaccode.render import render_chunk
         rendered = render_chunk(chunk, verbose=verbose)
         if rendered:
             stdout.write(rendered)
@@ -177,12 +186,11 @@ def _handle_chat(
     # If verbose streaming already emitted text, skip the final summary;
     # otherwise print it (legacy behaviour when no chunks arrived).
     if verbose:
-        # Verbose mode already showed tool events. Print the actual text.
-        answer = "".join(text_parts).strip() or agent.last_text(history)
-        stdout.write(f"\neaccode> {answer}\n")
+        # Tool events and text already streamed via on_chunk - no need to reprint.
+        # Print a single "done" line for visual closure.
+        stdout.write("\n")
     else:
         # Default: just show a short summary like read X / wrote Y.
-        # Tool details are hidden unless the user runs again with --verbose.
         summary = _summarize_actions(history)
         if summary:
             stdout.write(f"eaccode> {summary}\n")
