@@ -38,10 +38,20 @@ class FakeAgent:
         self.calls: list[list[dict[str, str]]] = []
         self.system_prompt = "system"
 
-    def run(self, messages: list[dict[str, str]]) -> list[dict[str, Any]]:
+    def run(self, messages: list[dict[str, str]], **kwargs: Any) -> list[dict[str, Any]]:
+        """Accept Plan-K kwargs (on_chunk, on_token, session_key, etc.).
+
+        When on_chunk is provided, we feed it a synthetic text + done
+        chunk so renderers that listen for streaming still get data.
+        """
         if self.fail:
             raise RuntimeError("agent exploded")
         self.calls.append(list(messages))
+        on_chunk = kwargs.get("on_chunk")
+        if on_chunk is not None:
+            from eaccode.providers.base import StreamChunk
+            on_chunk(StreamChunk(kind="text", content=self.reply))
+            on_chunk(StreamChunk(kind="done", stop_reason="end_turn"))
         return (
             [{"role": "system", "content": self.system_prompt}]
             + list(messages)

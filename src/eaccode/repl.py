@@ -127,20 +127,62 @@ def _handle_chat(
     stdout: TextIO,
     chat_history: list[dict[str, Any]],
     session_id: str | None = None,
+    verbose: bool = False,
 ) -> None:
-    """Send one user message to the agent and print the final answer."""
+    """Send one user message to the agent and print the final answer.
+
+    Plan K K.3: with --verbose (or always, for the REPL), tool calls are
+    streamed inline (icon + name + args + timing) so the user sees
+    progress instead of waiting for the final answer.
+    """
+    from eaccode.render import render_chunk
+
     messages = list(chat_history) + [{"role": "user", "content": text}]
     with contextlib.suppress(Exception):
         linked = _resolve_session_links(text)
         if linked:
             messages = list(chat_history) + linked + [{"role": "user", "content": text}]
+
+    # Buffer chunks so we can still print the final answer cleanly.
+    text_parts: list[str] = []
+
+    def on_chunk(chunk) -> None:
+        """Plan K K.3: stream text tokens live when verbose=True."""
+        if chunk.kind == "text" and chunk.content:
+            text_parts.append(chunk.content)
+            if verbose:
+                # Live-stream the text tokens as they arrive.
+                stdout.write(chunk.content)
+                stdout.flush()
+            return
+        if chunk.kind == "done":
+            return
+        # Tool events only render when verbose.
+        rendered = render_chunk(chunk, verbose=verbose)
+        if rendered:
+            stdout.write(rendered)
+            stdout.flush()
+
     try:
-        history = agent.run(messages)
+        history = agent.run(messages, on_chunk=on_chunk)
     except Exception as exc:  # agent failures must not kill the REPL
         stdout.write(f"Error: {exc}\n")
         return
-    answer = agent.last_text(history)
-    stdout.write(f"eaccode> {answer}\n")
+    # If verbose streaming already emitted text, skip the final summary;
+    # otherwise print it (legacy behaviour when no chunks arrived).
+    if verbose:
+        # Verbose mode already showed tool events. Print the actual text.
+        answer = "".join(text_parts).strip() or agent.last_text(history)
+        stdout.write(f"\neaccode> {answer}\n")
+    else:
+        # Default: just show a short summary like read X / wrote Y.
+        # Tool details are hidden unless the user runs again with --verbose.
+        summary = _summarize_actions(history)
+        if summary:
+            stdout.write(f"eaccode> {summary}\n")
+        answer = agent.last_text(history)
+        if answer:
+            stdout.write(f"{answer}\n")
     if session_id:
         with contextlib.suppress(Exception):
             # persist ONLY the new messages of this round — including tool
@@ -279,7 +321,7 @@ def _run_stream_repl(
                 if session_id and not chat_history:
                     with contextlib.suppress(Exception):
                         store.set_title(session_id, line)
-                _handle_chat(line, active, stdout, chat_history, session_id)
+                _handle_chat(line, active, stdout, chat_history, session_id, verbose=True)
     except KeyboardInterrupt:
         stdout.write("\nbye\n")
         return 0

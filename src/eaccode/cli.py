@@ -139,6 +139,13 @@ def _run_once(
         chunks.append(chunk)
         if not verbose:
             return
+        if chunk.kind == "text" and chunk.content:
+            # Live-stream text tokens as they arrive.
+            stdout.write(chunk.content)
+            stdout.flush()
+            return
+        if chunk.kind == "done":
+            return
         rendered = render_chunk(chunk, verbose=True)
         if rendered:
             stdout.write(rendered)

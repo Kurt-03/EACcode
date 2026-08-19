@@ -265,6 +265,7 @@ class Agent:
         messages: list[dict[str, Any]],
         max_output_tokens: int,
         on_token: Any = None,
+        on_chunk: Any | None = None,
         tools: list[dict[str, Any]] | None = None,
     ) -> tuple[str | None, list[ToolCall]]:
         """One model turn: stream or one-shot, return (content, tool_calls).
@@ -303,10 +304,14 @@ class Agent:
                 content_parts.append(chunk.content)
                 if on_token is not None:
                     _safe_on_token(on_token, chunk)
+                if on_chunk is not None:
+                    on_chunk(chunk)
             elif chunk.kind == "reasoning" and chunk.content:
                 reasoning_parts.append(chunk.content)
                 if on_token is not None:
                     _safe_on_token(on_token, chunk)
+                if on_chunk is not None:
+                    on_chunk(chunk)
             elif chunk.kind == "tool_call" and chunk.tool_call is not None:
                 # The provider adapter should deliver at most one tool_call
                 # per tool_use block; we use the id as the dedup key.
@@ -434,7 +439,9 @@ class Agent:
             if on_token is not None:
                 on_token("")  # round marker: UI opens a fresh log line
             content, calls = self._complete(
-                history, max_output_tokens, on_token=on_token
+                history, max_output_tokens,
+                on_token=on_token,
+                on_chunk=on_chunk,
             )
             if not calls:
                 history.append({"role": "assistant", "content": content or ""})

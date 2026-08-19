@@ -615,6 +615,7 @@ class ChatApp:
             "make_session_tools",
             "make_test_tools",
             "make_browser_tools",
+            "make_editing_tools",
         ):
             try:
                 for tool in getattr(_tools_mod, make)():
