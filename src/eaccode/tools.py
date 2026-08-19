@@ -64,8 +64,21 @@ def _set_loop_permission_checked(value: bool) -> None:
 permission_handler: Callable[[str], bool] = _deny_permission
 
 
-def read_file(path: str, max_chars: int = READ_CHARS) -> str:
-    """Read a text file, truncated to max_chars."""
+def read_file(
+    path: str,
+    max_chars: int = READ_CHARS,
+    offset: int = 0,
+    limit: int | None = None,
+) -> str:
+    """Read a text file, optionally paged with ``offset`` / ``limit``.
+
+    - ``offset``: skip the first N lines before reading.
+    - ``limit``: stop after N lines.
+    - ``max_chars``: hard cap on total characters returned.
+
+    Use this for large files: read offset/limit segments instead of
+    blowing the context window.
+    """
     from eaccode.workspace import WorkspaceError, rewrite_path
 
     try:
@@ -73,12 +86,18 @@ def read_file(path: str, max_chars: int = READ_CHARS) -> str:
     except WorkspaceError as exc:
         return f"Error: {exc}"
     try:
-        content = target.read_text(encoding="utf-8", errors="replace")
+        text = target.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         return f"Error: cannot read {target}: {exc}"
-    if len(content) > max_chars:
-        content = content[:max_chars] + f"\n...[truncated at {max_chars} chars]"
-    return content
+
+    lines = text.splitlines(keepends=True)
+    start = max(0, offset)
+    end = start + limit if limit is not None else len(lines)
+    paged = "".join(lines[start:end])
+
+    if len(paged) > max_chars:
+        paged = paged[:max_chars] + f"\n...[truncated at {max_chars} chars; offset={offset}, total_lines={len(lines)}]"
+    return paged
 
 
 def write_file(path: str, content: str) -> str:

@@ -21,6 +21,8 @@ from eaccode import config as cfg
 from eaccode import models_dev, permissions, skills
 from eaccode.providers import base as provider_base
 from eaccode.providers import registry as provider_registry
+from eaccode import compaction as compactor
+from eaccode import token_counter
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are eaccode, a self-improving generalist agent running locally "
@@ -302,6 +304,50 @@ class Agent:
         except Exception as exc:  # tool bugs must not kill the loop
             return f"Error: tool {call.name} failed: {exc}"
         return str(result)
+
+    def _context_window_for(self, model_id: str) -> int:
+        """Return the model's context window in tokens. Fallback 32k."""
+        try:
+            provider_name, _, model_short = model_id.partition("/")
+            from eaccode.models_dev import get_max_input_tokens
+            return get_max_input_tokens(provider_name, model_short) or 32_000
+        except Exception:
+            return 32_000
+
+    def _maybe_compact(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Compact history if it exceeds 80% of the model's context window."""
+        try:
+            _, _, model_id = _state_to_provider(self.conf)
+            window = self._context_window_for(model_id)
+        except Exception:
+            window = 32_000
+
+        tool_defs = []
+        for tool in self.tools.values():
+            tool_defs.append({
+                "name": tool.name,
+                "description": tool.description,
+                "input_schema": tool.parameters,
+            })
+
+        if not compactor.should_compact(messages, tool_defs, window, threshold=0.8):
+            return messages
+
+        to_compact, to_keep = compactor.select_compaction_window(messages, keep_recent=4)
+        if not to_compact:
+            return messages
+
+        transcript = compactor.format_messages_for_summary(to_compact)
+        summary_prompt = compactor.summarize_prompt(transcript)
+        try:
+            content, _ = self._complete(summary_prompt, max_output_tokens=512, tools=[])
+            if not content:
+                return messages
+            summary_msg = compactor.make_summary_message(content)
+        except Exception:
+            return messages
+
+        return [summary_msg] + to_keep
 
     def run(
         self,
