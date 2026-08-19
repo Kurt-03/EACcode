@@ -200,6 +200,65 @@ def _shorten_args_for_display(args: dict[str, object], max_len: int = 80) -> dic
             out[k] = s[: max_len - 3] + "..."
     return out
 
+
+
+def _split_for_pseudo_stream(text: str, chunk_size: int = 24) -> list[str]:
+    """Split text into chunks that respect word boundaries.
+
+    Yields chunks of roughly `chunk_size` chars. The last chunk may be
+    shorter. Newlines force a chunk break so we don't sleep mid-line.
+    """
+    if not text:
+        return []
+    chunks: list[str] = []
+    i = 0
+    while i < len(text):
+        end = min(i + chunk_size, len(text))
+        # Don't split mid-word: back off to the last space if any
+        if end < len(text) and not text[end].isspace():
+            back = end
+            while back > i and not text[back].isspace():
+                back -= 1
+            if back > i:
+                end = back + 1  # include the space
+        chunks.append(text[i:end])
+        i = end
+    return chunks
+
+
+def _pseudo_stream_text(
+    text: str,
+    on_chunk: "Callable | None",
+    chunk_size: int = 24,
+    delay_s: float = 0.025,
+    min_total_ms: int = 0,
+) -> str:
+    """Yield ``text`` in sub-chunks via ``on_chunk``.
+
+    Returns the (unchanged) text. Used by REPL/CLI so the user perceives live
+    streaming even when providers (or mini fake providers in tests) return
+    the whole answer in one block.
+
+    If ``min_total_ms > 0`` and the actual emit would finish faster than
+    that, we sleep the remaining time at the end. This guarantees the user
+    sees the chunks instead of a 50-char flash that's gone in 100ms.
+    """
+    if on_chunk is None or not text:
+        return text
+    import time as _t
+    t0 = _t.monotonic()
+    for piece in _split_for_pseudo_stream(text, chunk_size=chunk_size):
+        on_chunk(StreamChunk(kind="text", content=piece))
+        _t.sleep(delay_s)
+    on_chunk(StreamChunk(kind="done", stop_reason="end_turn"))
+    if min_total_ms > 0:
+        elapsed_ms = (_t.monotonic() - t0) * 1000
+        remaining = max(0, min_total_ms - int(elapsed_ms))
+        if remaining > 0:
+            _t.sleep(remaining / 1000.0)
+    return text
+
+
 class Agent:
     """A minimal ReAct agent: model <-> tools until a final answer."""
 

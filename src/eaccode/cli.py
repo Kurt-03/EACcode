@@ -140,9 +140,16 @@ def _run_once(
         if not verbose:
             return
         if chunk.kind == "text" and chunk.content:
-            # Live-stream text tokens as they arrive.
-            stdout.write(chunk.content)
-            stdout.flush()
+            # Plan M: split text-chunks internally so user perceives streaming.
+            # Real providers (especially MiniMax) often send the whole answer
+            # as one chunk. We re-emit that text in smaller sub-chunks with
+            # a delay so the user actually sees the text appear.
+            from eaccode.agent import _split_for_pseudo_stream
+            import time as _t
+            for piece in _split_for_pseudo_stream(chunk.content, chunk_size=12):
+                stdout.write(piece)
+                stdout.flush()
+                _t.sleep(0.06)
             return
         if chunk.kind == "done":
             return
@@ -152,7 +159,7 @@ def _run_once(
             stdout.flush()
 
     try:
-        from eaccode.agent import MAX_TURNS, MAX_OUTPUT_TOKENS
+        from eaccode.agent import MAX_TURNS, MAX_OUTPUT_TOKENS, _pseudo_stream_text
         history = agent.run(
             [{"role": "user", "content": prompt}],
             max_turns=max_turns if max_turns is not None else MAX_TURNS,
@@ -167,8 +174,17 @@ def _run_once(
         stdout.write(f"Error: {exc}\n{traceback.format_exc()}\n")
         return 1
     if not verbose:
-        # Non-verbose: print just the final text (legacy behaviour).
         stdout.write(f"{agent.last_text(history)}\n")
+    else:
+        # Plan M: pseudo-stream the final text if the provider did not.
+        # The provider's on_chunk hook fires on every text delta. When the
+        # provider doesn't yield text chunks (sync one-shot, fake providers
+        # in tests, etc.), text_so_far is empty and we emit the answer in
+        # tiny chunks with a small delay.
+        final_text = agent.last_text(history)
+        text_so_far = "".join(c.content for c in chunks if c.kind == "text")
+        if final_text and not text_so_far:
+            _pseudo_stream_text(final_text, on_chunk=on_chunk)
     return 0
 
 

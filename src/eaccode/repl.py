@@ -131,11 +131,12 @@ def _handle_chat(
 ) -> None:
     """Send one user message to the agent and print the final answer.
 
-    Plan K K.3: with --verbose (or always, for the REPL), tool calls are
-    streamed inline (icon + name + args + timing) so the user sees
-    progress instead of waiting for the final answer.
+    Plan K K.3 + Plan M: tool calls + final text are pseudo-streamed
+    (sub-chunks with sleep) so the user perceives live streaming even
+    though the providers are synchronous.
     """
     from eaccode.render import render_chunk
+    from eaccode.agent import _pseudo_stream_text
 
     messages = list(chat_history) + [{"role": "user", "content": text}]
     with contextlib.suppress(Exception):
@@ -168,6 +169,11 @@ def _handle_chat(
     except Exception as exc:  # agent failures must not kill the REPL
         stdout.write(f"Error: {exc}\n")
         return
+    # Pseudo-stream the final text if the provider didn't stream it.
+    if verbose and not text_parts:
+        final_text = agent.last_text(history)
+        if final_text:
+            _pseudo_stream_text(final_text, on_chunk=on_chunk)
     # If verbose streaming already emitted text, skip the final summary;
     # otherwise print it (legacy behaviour when no chunks arrived).
     if verbose:
