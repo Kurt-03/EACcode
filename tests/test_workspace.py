@@ -216,24 +216,20 @@ class TestLoadFromConfig:
 
 class TestSessionCwd:
     def test_update_session_cwd(self, tmp_path, monkeypatch) -> None:
-        workspace_module._session_cwd = None
-        workspace_module._active_workspace = None
+        workspace_module.clear_session_state()
         monkeypatch.chdir(tmp_path)
         workspace_module.update_session_cwd(tmp_path / "subdir")
         ws_obj = workspace_module.get_active_workspace()
         assert ws_obj.root == (tmp_path / "subdir").resolve()
-        workspace_module._session_cwd = None
-        workspace_module._active_workspace = None
+        workspace_module.clear_session_state()
 
     def test_get_session_cwd(self, tmp_path, monkeypatch) -> None:
-        workspace_module._session_cwd = None
-        workspace_module._active_workspace = None
+        workspace_module.clear_session_state()
         monkeypatch.chdir(tmp_path)
         assert workspace_module.get_session_cwd() is None
         workspace_module.update_session_cwd(tmp_path / "other")
         assert workspace_module.get_session_cwd() == (tmp_path / "other").resolve()
-        workspace_module._session_cwd = None
-        workspace_module._active_workspace = None
+        workspace_module.clear_session_state()
 
 
 class TestExpandTilde:
@@ -286,3 +282,60 @@ class TestFilterSearchResults:
         filtered = filter_search_results(results, ws_obj)
         # When allow-listed, the path passes through
         assert f"{ssh_dir}/id_rsa:1:hi" in filtered
+
+
+class TestSessionKeyIsolation:
+    """Two sessions must NOT see each other's state (Plan J thread-safety)."""
+
+    def test_two_sessions_have_independent_workspaces(self) -> None:
+        from eaccode.workspace import (
+            Workspace,
+            clear_session_state,
+            get_active_workspace,
+            set_active_workspace,
+        )
+        clear_session_state("alice")
+        clear_session_state("bob")
+        set_active_workspace(Workspace(root=Path("/tmp/alice").resolve()), "alice")
+        set_active_workspace(Workspace(root=Path("/tmp/bob").resolve()), "bob")
+        assert get_active_workspace("alice").root != get_active_workspace("bob").root
+        clear_session_state("alice")
+        clear_session_state("bob")
+
+    def test_two_sessions_have_independent_cwd(self) -> None:
+        from eaccode.workspace import (
+            clear_session_state,
+            get_session_cwd,
+            update_session_cwd,
+        )
+        clear_session_state("alice")
+        clear_session_state("bob")
+        update_session_cwd("/tmp/alice", "alice")
+        update_session_cwd("/tmp/bob", "bob")
+        assert get_session_cwd("alice") != get_session_cwd("bob")
+        clear_session_state("alice")
+        clear_session_state("bob")
+
+    def test_clear_session_state_only_clears_one(self) -> None:
+        from eaccode.workspace import (
+            clear_session_state,
+            get_session_cwd,
+            update_session_cwd,
+        )
+        update_session_cwd("/tmp/a", "alice")
+        update_session_cwd("/tmp/b", "bob")
+        clear_session_state("alice")
+        assert get_session_cwd("alice") is None
+        assert get_session_cwd("bob") is not None
+        clear_session_state("bob")
+
+    def test_default_key_when_none(self) -> None:
+        from eaccode.workspace import (
+            clear_session_state,
+            get_session_cwd,
+            update_session_cwd,
+        )
+        clear_session_state()
+        update_session_cwd("/tmp/x")  # uses default key
+        assert get_session_cwd() is not None
+        clear_session_state()

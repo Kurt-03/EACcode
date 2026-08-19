@@ -321,57 +321,85 @@ def is_path_safe_for_workspace(path: Path, workspace: Workspace) -> bool:
         return False
 
 
-# Module-level "active" workspace. Initialised lazily.
-_active_workspace: "Workspace | None" = None
-
-# Session-scoped cwd tracking (Hermes _authoritative_workspace_root analog).
-# When user `cd` somewhere, the workspace re-resolves to that path.
-_session_cwd: "Path | None" = None
-
-
-def get_active_workspace() -> "Workspace":
-    """Return the active workspace, lazily initialising the default one.
-
-    Workspace root follows the session cwd when one has been recorded
-    (Hermes-style authoritative-root behaviour). Otherwise falls back
-    to ``Path.cwd()`` at first call.
-    """
-    global _active_workspace
-    if _active_workspace is None:
-        cwd = _session_cwd if _session_cwd is not None else Path.cwd()
-        _active_workspace = Workspace(root=cwd.resolve())
-    return _active_workspace
-
-
-def set_active_workspace(ws_obj: "Workspace") -> None:
-    """Override the active workspace (used by tests and runtime config)."""
-    global _active_workspace
-    _active_workspace = ws_obj
-
-
-# Module-level lock guarding updates to _session_cwd + _active_workspace.
-# The lock is per-instance, NOT per-workspace - we still serialise global
-# mutations. This prevents the race where two concurrent tool calls
-# update _active_workspace.root to different paths.
+# Session-scoped state dicts (Hermes _authoritative_workspace_root analog).
+# All state is keyed by ``session_key`` so concurrent sessions don't
+# collide. Tests that don't care about isolation can pass the default
+# key (None) and behaviour matches the legacy module-global layout.
 import threading as _threading
 
+_active_workspaces: dict[str, "Workspace"] = {}
+_session_cwds: dict[str, "Path"] = {}
 _session_lock = _threading.RLock()
 
+DEFAULT_SESSION_KEY = "default"
 
-def update_session_cwd(new_cwd: "str | Path") -> None:
-    """Re-anchor the active workspace to ``new_cwd`` (thread-safe)."""
-    global _session_cwd, _active_workspace
+
+def _key(session_key: "str | None") -> str:
+    """Resolve a session_key to the dict lookup key."""
+    return str(session_key or DEFAULT_SESSION_KEY)
+
+
+def get_active_workspace(session_key: "str | None" = None) -> "Workspace":
+    """Return the active workspace for ``session_key``.
+
+    Lazily initialises the default one. Workspace root follows the
+    session cwd when one has been recorded (Hermes-style authoritative
+    root). Otherwise falls back to ``Path.cwd()`` at first call.
+    """
+    key = _key(session_key)
     with _session_lock:
-        _session_cwd = Path(new_cwd).expanduser().resolve()
-        if _active_workspace is not None:
-            _active_workspace.root = _session_cwd
+        ws = _active_workspaces.get(key)
+        if ws is None:
+            cwd = _session_cwds.get(key) or Path.cwd()
+            ws = Workspace(root=cwd.resolve())
+            _active_workspaces[key] = ws
+        return ws
+
+
+def set_active_workspace(ws_obj: "Workspace", session_key: "str | None" = None) -> None:
+    """Override the active workspace for ``session_key`` (tests, runtime config)."""
+    key = _key(session_key)
+    with _session_lock:
+        _active_workspaces[key] = ws_obj
+
+
+def update_session_cwd(
+    new_cwd: "str | Path",
+    session_key: "str | None" = None,
+) -> None:
+    """Re-anchor the active workspace to ``new_cwd`` for ``session_key``.
+
+    Thread-safe: all reads/writes are guarded by ``_session_lock``.
+    """
+    key = _key(session_key)
+    resolved = Path(new_cwd).expanduser().resolve()
+    with _session_lock:
+        _session_cwds[key] = resolved
+        existing = _active_workspaces.get(key)
+        if existing is not None:
+            existing.root = resolved
         else:
-            _active_workspace = Workspace(root=_session_cwd)
+            _active_workspaces[key] = Workspace(root=resolved)
 
 
-def get_session_cwd() -> "Path | None":
-    """Return the recorded session cwd, or None when the user hasn't ``cd``."""
-    return _session_cwd
+def get_session_cwd(session_key: "str | None" = None) -> "Path | None":
+    """Return the recorded cwd for ``session_key``, or None when unset."""
+    key = _key(session_key)
+    with _session_lock:
+        return _session_cwds.get(key)
+
+
+def clear_session_state(session_key: "str | None" = None) -> None:
+    """Drop the workspace + cwd record for ``session_key`` (teardown)."""
+    key = _key(session_key)
+    with _session_lock:
+        _active_workspaces.pop(key, None)
+        _session_cwds.pop(key, None)
+
+
+# Alias used by /approvals - the underscore prefix is intentional so the
+# command module can grab it without colliding with the public name.
+_get_active_workspace = get_active_workspace
 
 
 def expand_tilde(path_str: str) -> str:

@@ -17,11 +17,9 @@ os.environ.setdefault("EACCODE_TEST", "1")
 def _reset_workspace_state():
     """Reset workspace session state between every test."""
     from eaccode import workspace as _ws
-    _ws._session_cwd = None
-    _ws._active_workspace = None
+    _ws.clear_session_state()
     yield
-    _ws._session_cwd = None
-    _ws._active_workspace = None
+    _ws.clear_session_state()
 
 
 @pytest.fixture(autouse=True)
