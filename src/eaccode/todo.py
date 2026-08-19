@@ -45,6 +45,15 @@ def todo_file(session_id: str) -> Path:
 
 _write_lock = threading.Lock()
 
+# Per-session state (Plan J thread-safety).
+_active_sessions: dict[str, str] = {}
+DEFAULT_TODO_SESSION_KEY = "default"
+
+
+def _todo_key(session_id: str | None) -> str:
+    """Resolve a session_id for the dict lookup."""
+    return str(session_id or DEFAULT_TODO_SESSION_KEY)
+
 
 def read_todos(session_id: str) -> list[TodoItem]:
     """Return the persisted todo list, or empty list when none."""
@@ -100,29 +109,30 @@ def clear_todos(session_id: str) -> None:
         path.unlink()
 
 
-# Module-level active session so tools can find the right file without
-# the model having to pass session_id on every call.
-_active_session: Optional[str] = None
+# -- Tool-call functions (callable by Agent) --------------------------------
+
+def _resolve_active_session(session_id: str | None) -> str | None:
+    """Return the explicit session_id, else the per-thread active one."""
+    if session_id:
+        return session_id
+    return _active_sessions.get(_todo_key(None))
 
 
 def set_active_session(session_id: Optional[str]) -> None:
-    """Set the session-id used by todo_read/todo_write."""
-    global _active_session
-    _active_session = session_id
+    """Set the session-id used by todo_read/todo_write (for this thread)."""
+    _active_sessions[_todo_key(None)] = session_id
 
 
 def get_active_session() -> Optional[str]:
-    return _active_session
+    return _active_sessions.get(_todo_key(None))
 
-
-# -- Tool-call functions (callable by Agent) --------------------------------
 
 def todo_write(items: list[dict], session_id: str | None = None) -> str:
     """Replace the current todo list.
 
     Each item: ``{"id": ..., "content": ..., "status": ..., "note": ...}``
     """
-    sid = session_id or _active_session
+    sid = session_id or _active_sessions.get(_todo_key(None))
     if not sid:
         return "Error: no active session"
     parsed: list[TodoItem] = []
@@ -144,7 +154,7 @@ def todo_write(items: list[dict], session_id: str | None = None) -> str:
 
 def todo_read(session_id: str | None = None) -> str:
     """Return the current todo list as a formatted string."""
-    sid = session_id or _active_session
+    sid = session_id or _active_sessions.get(_todo_key(None))
     if not sid:
         return "Error: no active session"
     items = read_todos(sid)

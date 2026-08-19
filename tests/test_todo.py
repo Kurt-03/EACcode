@@ -99,3 +99,16 @@ class TestStatusValidation:
         for status in TODO_STATUSES:
             it = TodoItem(id="1", content="x", status=status)
             assert it.status == status
+
+class TestSessionIsolation:
+    """Two sessions must not see each other's todos (Plan J thread-safety)."""
+
+    def test_two_sessions_have_independent_lists(self, tmp_path, monkeypatch) -> None:
+        from eaccode import todo as todo_mod
+        monkeypatch.setattr(todo_mod, "todo_file", lambda sid: tmp_path / f"{sid}.json")
+        todo_mod.todo_write([{"id": "1", "content": "alice-task", "status": "pending"}], session_id="alice")
+        todo_mod.todo_write([{"id": "2", "content": "bob-task", "status": "pending"}], session_id="bob")
+        alice = todo_mod.read_todos("alice")
+        bob = todo_mod.read_todos("bob")
+        assert len(alice) == 1 and alice[0].content == "alice-task"
+        assert len(bob) == 1 and bob[0].content == "bob-task"
