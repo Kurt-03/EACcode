@@ -102,3 +102,16 @@ class TestSnapshotLifecycle:
         save_snapshot("s1", "/b.py", "b")
         assert clear_snapshots("s1") == 2
         assert list_snapshots("s1") == []
+
+class TestSessionIsolation:
+    """Two sessions must not see each other's undo snapshots."""
+
+    def test_two_sessions_have_independent_snapshots(self, tmp_path, monkeypatch) -> None:
+        from eaccode import undo as undo_mod
+        monkeypatch.setattr(undo_mod, "undo_dir", lambda s: tmp_path / s)
+        undo_mod.save_snapshot("alice", "/repo/a.py", "alice-old")
+        undo_mod.save_snapshot("bob", "/repo/b.py", "bob-old")
+        alice = undo_mod.list_snapshots("alice")
+        bob = undo_mod.list_snapshots("bob")
+        assert len(alice) == 1 and alice[0].path == "/repo/a.py"
+        assert len(bob) == 1 and bob[0].path == "/repo/b.py"

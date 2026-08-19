@@ -131,7 +131,9 @@ def list_snapshots(session_id: str, path: str | None = None) -> list[UndoSnapsho
     if not d.exists():
         return []
     out: list[UndoSnapshot] = []
-    for f in sorted(d.glob("*.json"), reverse=True):
+    with _WRITE_LOCK:
+        snapshot_files = sorted(d.glob("*.json"), reverse=True)
+    for f in snapshot_files:
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -148,21 +150,18 @@ def list_snapshots(session_id: str, path: str | None = None) -> list[UndoSnapsho
 
 
 def restore_snapshot(snap: UndoSnapshot) -> bool:
-    """Restore the file from ``snap.old_content``.
-
-    Returns True if restored. If the original was None (file was new),
-    the restored file is deleted (or not re-created).
-    """
-    target = Path(snap.path)
-    if snap.old_content is None:
-        # Original was non-existent: deleting is the "restore"
-        if target.exists():
-            target.unlink()
-            return True
-        return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(snap.old_content, encoding="utf-8")
-    return True
+    """Restore the file from ``snap.old_content`` (thread-safe)."""
+    with _WRITE_LOCK:
+        target = Path(snap.path)
+        if snap.old_content is None:
+            # Original was non-existent: deleting is the "restore"
+            if target.exists():
+                target.unlink()
+                return True
+            return False
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(snap.old_content, encoding="utf-8")
+        return True
 
 
 def discard_snapshot(snap: UndoSnapshot) -> bool:

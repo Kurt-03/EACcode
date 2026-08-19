@@ -464,15 +464,18 @@ class PermissionManager:
 
     def session_allow(self, tool_name: str) -> None:
         """Remember an approval for the rest of this process session."""
-        self._session_allowed.add(tool_name)
+        with self._ask_lock:
+            self._session_allowed.add(tool_name)
 
     def session_clear(self) -> None:
         """Forget all session approvals."""
-        self._session_allowed.clear()
+        with self._ask_lock:
+            self._session_allowed.clear()
 
     def session_allowed(self) -> list[str]:
         """Currently session-approved tool names (sorted)."""
-        return sorted(self._session_allowed)
+        with self._ask_lock:
+            return sorted(self._session_allowed)
 
     def _extract_path_arg(self, tool_name: str, arguments: dict[str, Any]) -> str:
         """Find a filesystem path in arguments, regardless of param name."""
@@ -656,7 +659,9 @@ class PermissionManager:
 
         # 9. Session-approved tools. Explicit user "session" or "always"
         # choice always wins (Bug 3). "once" scope falls through.
-        if tool_name in self._session_allowed:
+        with self._ask_lock:
+            already_allowed = tool_name in self._session_allowed
+        if already_allowed:
             # We track the scope that put it here. If it was put in via
             # "once" auto-approval we honor is_always_ask default; explicit
             # session/always always wins.
