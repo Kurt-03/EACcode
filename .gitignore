@@ -43,3 +43,12 @@ Thumbs.db
 
 # Obsidian vault (local app state, not project content)
 brain/.obsidian/
+
+# Local debug screenshots
+_cmd*.png
+
+# Local test artifacts
+test-xyz.py
+PERMISSION_AUDIT.md
+tests/test_pipeline_trace.py
+nested/
