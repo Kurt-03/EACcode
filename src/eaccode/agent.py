@@ -510,21 +510,18 @@ class Agent:
                     on_token=None,
                     on_chunk=on_chunk,
                 )
-            except (StopIteration, StopAsyncIteration, TypeError) as exc:
-                # TypeError - signature mismatch in some provider impls.
-                # StopIteration/StopAsyncIteration - fixed-length fakes.
-                if isinstance(exc, TypeError):
-                    try:
-                        content, calls = await self._complete_async(
-                            history, max_output_tokens, on_chunk=on_chunk,
-                        )
-                    except (StopIteration, StopAsyncIteration, TypeError):
-                        content, calls = "", []
-                else:
-                    content, calls = "", []
+            except (StopIteration, StopAsyncIteration):
+                # Fixed-length fakes in tests - treat as no-completion
+                content, calls = "", []
             except Exception as exc:
-                import sys as _sys
-                print(f"_complete_async failed: {exc}", file=_sys.stderr)
+                # Emit error via on_chunk so the user sees it in the stream
+                if on_chunk is not None:
+                    try:
+                        from eaccode.providers.base import StreamChunk
+                        on_chunk(StreamChunk(kind="error", content=str(exc)))
+                    except Exception:
+                        pass
+                history.append({"role": "assistant", "content": f"(error: {exc})"})
                 return history
 
             if not calls:

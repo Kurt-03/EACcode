@@ -174,7 +174,8 @@ def _handle_chat(
             stdout.flush()
 
     try:
-        history = agent.run(messages, on_chunk=on_chunk)
+        import asyncio
+        history = asyncio.run(agent.run_async(messages, on_chunk=on_chunk))
     except Exception as exc:  # agent failures must not kill the REPL
         stdout.write(f"Error: {exc}\n")
         return

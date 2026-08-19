@@ -38,6 +38,10 @@ class FakeAgent:
         self.calls: list[list[dict[str, str]]] = []
         self.system_prompt = "system"
 
+    async def run_async(self, messages: list[dict[str, str]], **kwargs: Any) -> list[dict[str, Any]]:
+        """Async version of run(). Match what the real Agent does."""
+        return self.run(messages, **kwargs)
+
     def run(self, messages: list[dict[str, str]], **kwargs: Any) -> list[dict[str, Any]]:
         """Accept Plan-K kwargs (on_chunk, on_token, session_key, etc.).
 
