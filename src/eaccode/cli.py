@@ -107,15 +107,44 @@ def build_agent(
     )
 
 
-def _run_once(prompt: str, stdout: TextIO, max_turns: int | None = None, max_output_tokens: int | None = None) -> int:
-    """Non-interactive mode: one user message, print the answer."""
+def _run_once(
+    prompt: str,
+    stdout: TextIO,
+    max_turns: int | None = None,
+    max_output_tokens: int | None = None,
+    verbose: bool = False,
+) -> int:
+    """Non-interactive mode: one user message, print the answer.
+
+    With ``verbose=True`` (via ``--verbose``), tool calls and tool
+    results are printed inline as they happen (Plan K K.3).
+    """
+    from eaccode.render import render_chunk
+
     agent = build_agent()
+    chunks: list = []
+
+    def on_chunk(chunk) -> None:
+        chunks.append(chunk)
+        if not verbose:
+            return
+        rendered = render_chunk(chunk, verbose=True)
+        if rendered:
+            stdout.write(rendered)
+            stdout.flush()
+
     try:
-        history = agent.run([{"role": "user", "content": prompt}])
+        history = agent.run(
+            [{"role": "user", "content": prompt}],
+            max_turns=max_turns,
+            on_chunk=on_chunk,
+        )
     except Exception as exc:
         stdout.write(f"Error: {exc}\n")
         return 1
-    stdout.write(f"{agent.last_text(history)}\n")
+    if not verbose:
+        # Non-verbose: print just the final text (legacy behaviour).
+        stdout.write(f"{agent.last_text(history)}\n")
     return 0
 
 
@@ -149,12 +178,18 @@ def main(
         ap.add_argument("prompt", nargs="+")
         ap.add_argument("--max-turns", type=int, default=None)
         ap.add_argument("--max-tokens", type=int, default=None)
+        ap.add_argument(
+            "--verbose", "-v",
+            action="store_true",
+            help="Stream tool calls inline as they happen.",
+        )
         parsed = ap.parse_args(argv[1:])
         prompt = " ".join(parsed.prompt)
         raise SystemExit(_run_once(
             prompt, stdout,
             max_turns=parsed.max_turns,
             max_output_tokens=parsed.max_tokens,
+            verbose=parsed.verbose,
         ))
     if first == "tui":
         from eaccode.tui import EaccodeApp
