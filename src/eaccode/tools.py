@@ -51,6 +51,16 @@ def _deny_permission(command: str) -> bool:
     return False
 
 
+# Thread-local flag set by the agent loop. When a tool wants to skip its
+# own prompt (because the loop already decided), it sets this to True.
+_loop_permission_checked = threading.local()
+
+
+def _set_loop_permission_checked(value: bool) -> None:
+    """Set the thread-local flag (used by tests)."""
+    _loop_permission_checked.value = value
+
+
 permission_handler: Callable[[str], bool] = _deny_permission
 
 
@@ -167,6 +177,80 @@ def system_info() -> str:
     return f"{platform.system()} {platform.release()} - {platform.machine()}"
 
 
+def run_command(command: str, cwd: str | None = None, timeout: int = 60) -> str:
+    """Run a shell command; gated by the permission handler.
+
+    When ``EACCODE_RUN_IN_CONTAINER=1`` and Docker is available, the
+    command runs inside a fresh container instead of the host shell.
+    """
+    import os as _os
+    from eaccode.workspace import WorkspaceError, rewrite_path
+
+    target_cwd_str = cwd or str(_get_workspace().root)
+    try:
+        target_cwd = rewrite_path(target_cwd_str, _get_workspace())
+    except WorkspaceError as exc:
+        return f"Error: {exc}"
+    target_cwd = str(target_cwd)
+
+    is_container = _os.environ.get("EACCODE_RUN_IN_CONTAINER") == "1"
+
+    # Permission gate (skipped when loop already approved).
+    if not getattr(_loop_permission_checked, "value", False):
+        if not permission_handler(command):
+            return f"Error: permission denied for: {command[:80]}"
+
+    if is_container:
+        try:
+            from eaccode.container import (
+                is_docker_available,
+                start_container,
+                exec_in_container,
+                stop_container,
+                ContainerConfig,
+            )
+        except ImportError:
+            return "Error: container module unavailable"
+        if not is_docker_available():
+            return "Error: EACCODE_RUN_IN_CONTAINER=1 but docker not available"
+        try:
+            cfg = ContainerConfig(workspace=Path(target_cwd))
+            handle = start_container(cfg)
+        except (RuntimeError, OSError) as exc:
+            return f"Error: container start failed: {exc}"
+        try:
+            code, output = exec_in_container(handle, ["sh", "-c", command])
+        except OSError as exc:
+            stop_container(handle)
+            return f"Error: container exec failed: {exc}"
+        finally:
+            stop_container(handle)
+        output = (output or "").strip()
+        if code != 0:
+            output = f"{output}\n(exit {code})"
+        return output or "(no output)"
+
+    # Native execution.
+    import subprocess as _sp
+    try:
+        result = _sp.run(
+            command,
+            shell=True,
+            cwd=target_cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except _sp.TimeoutExpired:
+        return f"Error: command timed out after {timeout}s"
+    except OSError as exc:
+        return f"Error: {exc}"
+    output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        output = f"{output}\n(exit {result.returncode})"
+    return output or "(no output)"
+
+
 BUILTIN_TOOLS: list[Tool] = [
     Tool(
         "read_file",
@@ -278,6 +362,49 @@ BUILTIN_TOOLS: list[Tool] = [
             "required": ["pattern"],
         },
         mutates=False,
+    ),
+    Tool(
+        "run_command",
+        "Run a shell command via subprocess.run(shell=True). "
+        "Returns stdout+stderr combined plus '(exit N)' on non-zero exit. "
+        "Returns 'Error: permission denied ...' when blocked, "
+        "'Error: command timed out after Ns' on timeout, or "
+        "'Error: <OSError>' on missing binary / OS issues. "
+        "POLICY: Smart-mode routes dangerous commands (rm -rf, chmod 777, "
+        "curl|sh) through an Aux-LLM reviewer; Hardline patterns "
+        "(rm -rf /, sudo -S, shutdown, fork bombs) always block. "
+        "Set EACCODE_RUN_IN_CONTAINER=1 to run inside a Docker container.",
+        run_command,
+        {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": (
+                        "Shell command string. Evaluated via /bin/sh on "
+                        "POSIX or cmd.exe on Windows."
+                    ),
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": (
+                        "Working directory for the subprocess "
+                        "(default: workspace root)."
+                    ),
+                },
+                "timeout": {
+                    "type": "integer",
+                    "description": (
+                        "Subprocess timeout in seconds (default: 60). "
+                        "Returns 'Error: command timed out after Ns' "
+                        "on expiry."
+                    ),
+                },
+            },
+            "required": ["command"],
+        },
+        mutates=True,
+        always_ask=True,
     ),
     Tool(
         "http_get",
