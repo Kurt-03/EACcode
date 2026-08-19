@@ -349,20 +349,24 @@ def set_active_workspace(ws_obj: "Workspace") -> None:
     _active_workspace = ws_obj
 
 
-def update_session_cwd(new_cwd: "str | Path") -> None:
-    """Re-anchor the active workspace to ``new_cwd`` (e.g. after user ``cd``).
+# Module-level lock guarding updates to _session_cwd + _active_workspace.
+# The lock is per-instance, NOT per-workspace - we still serialise global
+# mutations. This prevents the race where two concurrent tool calls
+# update _active_workspace.root to different paths.
+import threading as _threading
 
-    Mirrors Hermes' per-session cwd tracking - one session's ``cd``
-    can never leak into another session's resolution because the
-    variable is process-local.
-    """
+_session_lock = _threading.RLock()
+
+
+def update_session_cwd(new_cwd: "str | Path") -> None:
+    """Re-anchor the active workspace to ``new_cwd`` (thread-safe)."""
     global _session_cwd, _active_workspace
-    _session_cwd = Path(new_cwd).expanduser().resolve()
-    # Re-anchor the active workspace so the next tool call sees the new cwd.
-    if _active_workspace is not None:
-        _active_workspace.root = _session_cwd
-    else:
-        _active_workspace = Workspace(root=_session_cwd)
+    with _session_lock:
+        _session_cwd = Path(new_cwd).expanduser().resolve()
+        if _active_workspace is not None:
+            _active_workspace.root = _session_cwd
+        else:
+            _active_workspace = Workspace(root=_session_cwd)
 
 
 def get_session_cwd() -> "Path | None":
