@@ -564,3 +564,19 @@ BUILTIN_TOOLS: list[Tool] = [
         mutates=False,
     ),
 ]
+
+
+
+def sorted_for_manifest(tools: list[Tool] | None = None) -> list[Tool]:
+    """Plan L L.4: sort tools so read-only come first in the manifest.
+
+    Model is more likely to pick the right tool when read-only tools
+    (high use, low risk) appear before mutating tools in the list.
+    Order:
+      1. read-only (sort by name)
+      2. mutating (sort by name)
+    """
+    tools = tools if tools is not None else BUILTIN_TOOLS
+    readonly = sorted((t for t in tools if not t.mutates), key=lambda t: t.name)
+    mutating = sorted((t for t in tools if t.mutates), key=lambda t: t.name)
+    return readonly + mutating

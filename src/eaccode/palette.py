@@ -603,25 +603,30 @@ class ChatApp:
         import json as _json
         from eaccode import tools as _tools_mod
 
+        # Plan L: import the tool-makers directly so (unknown) gets resolved.
+        # Lazy import - many eaccode.tool modules are optional.
+        def _safe_make(name: str):
+            try:
+                mod = __import__(f"eaccode.{name}", fromlist=["make_x"])
+                attr = next(
+                    (a for a in dir(mod) if a.startswith("make_") and a.endswith("_tools")),
+                    None,
+                )
+                if attr is None:
+                    return []
+                return getattr(mod, attr)()
+            except Exception:
+                return []
+
         known_names = {
             tool.name for tool in _tools_mod.BUILTIN_TOOLS
         }
-        for make in (
-            "make_editing_tools",
-            "make_learning_tools",
-            "make_memory_tools",
-            "make_repo_tools",
-            "make_git_tools",
-            "make_session_tools",
-            "make_test_tools",
-            "make_browser_tools",
-            "make_editing_tools",
+        for module_name in (
+            "editing", "repo", "git", "session", "browser",
+            "learning", "memory",
         ):
-            try:
-                for tool in getattr(_tools_mod, make)():
-                    known_names.add(tool.name)
-            except Exception:
-                pass
+            for tool in _safe_make(module_name):
+                known_names.add(tool.name)
 
         preview = {"tool": "(unknown)", "action": "", "risk": ""}
         space = prompt.find(" ")
