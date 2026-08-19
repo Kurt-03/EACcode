@@ -250,6 +250,31 @@ HARDLINE_PATTERNS_COMPILED: list[tuple[re.Pattern[str], str]] = [
     for pattern, description in HARDLINE_PATTERNS
 ]
 
+# Allowlist: these commands are safe in dev contexts. They are matched
+# BEFORE the dangerous-pattern check so legitimate dev workflows
+# (running tests, type-checking, calling a Python script the user
+# wrote) don't get blocked by smart-mode review.
+SAFE_DEV_COMMANDS: list[tuple[str, str]] = [
+    # Run tests / type-checkers
+    (r'^(./)?node_modules/\.bin/(tsc|jest|vitest|eslint|prettier|mocha|nyc)\b',
+     "local dev-tool binary"),
+    (r'^\bpytest\b', "run pytest"),
+    (r'^\bruff\b', "run ruff"),
+    (r'^\bmypy\b', "run mypy"),
+    (r'^\bnode\s+[\w./-]+\.js\b', "run node script"),
+    (r'^\b(python|python3)\s+[\w./-]+\.py\b', "run a python script"),
+    (r'^\bgit\b', "git command"),
+    (r'^\b(make|cmake|cargo|go|rustc)\b', "build tool"),
+    (r'^\b(echo|ls|cat|pwd|head|tail|wc|grep|rg|find|tree|stat|file)\b',
+     "read-only shell utility"),
+]
+
+
+SAFE_DEV_COMMANDS_COMPILED: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(pattern, _RE_FLAGS), description)
+    for pattern, description in SAFE_DEV_COMMANDS
+]
+
 # ---------------------------------------------------------------------------
 # Dangerous patterns (77 from Hermes, routed through aux LLM in smart mode)
 # ---------------------------------------------------------------------------
@@ -564,6 +589,26 @@ class PermissionManager:
                     f"sudo-stdin blocked: {sudo_guess_desc}",
                     self.mode,
                 )
+
+        # 4a. Safe-dev-command allowlist (Plan I follow-up):
+        # matches BEFORE the hardline/dangerous patterns so legitimate
+        # dev workflows (pytest, ./node_modules/.bin/tsc, python script.py)
+        # don't get blocked.
+        if tool_name == "run_command":
+            command_arg = arguments.get("command", "")
+            bare_call = command_arg if isinstance(command_arg, str) else ""
+            for regex, description in SAFE_DEV_COMMANDS_COMPILED:
+                if regex.search(bare_call):
+                    # Auto-approve safe dev commands; reset denial-breaker
+                    # so an earlier deny doesn't poison subsequent ones.
+                    from eaccode.denial_breaker import get_denial_breaker
+                    get_denial_breaker().reset(self._session_key)
+                    return Decision(
+                        True,
+                        f"safe-dev allowlist: {description}",
+                        self.mode,
+                        scope="session",
+                    )
 
         # 4. Hardline (only run_command, same as before)
         if tool_name == "run_command":

@@ -107,7 +107,7 @@ def build_agent(
     )
 
 
-def _run_once(prompt: str, stdout: TextIO) -> int:
+def _run_once(prompt: str, stdout: TextIO, max_turns: int | None = None, max_output_tokens: int | None = None) -> int:
     """Non-interactive mode: one user message, print the answer."""
     agent = build_agent()
     try:

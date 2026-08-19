@@ -78,6 +78,13 @@ def read_file(
 
     Use this for large files: read offset/limit segments instead of
     blowing the context window.
+
+    **Truncation safety**: when content is truncated, the result
+    begins with an explicit marker so callers (especially ``file_edit``)
+    can detect that the returned text is incomplete. NEVER pass a
+    truncated chunk as ``old_string`` to ``file_edit`` - use
+    ``repo_search`` first to find the exact line numbers, then read
+    the precise offset/limit window.
     """
     from eaccode.workspace import WorkspaceError, rewrite_path
 
@@ -91,12 +98,30 @@ def read_file(
         return f"Error: cannot read {target}: {exc}"
 
     lines = text.splitlines(keepends=True)
+    total_lines = len(lines)
     start = max(0, offset)
-    end = start + limit if limit is not None else len(lines)
+    end = start + limit if limit is not None else total_lines
     paged = "".join(lines[start:end])
 
+    truncated = False
     if len(paged) > max_chars:
-        paged = paged[:max_chars] + f"\n...[truncated at {max_chars} chars; offset={offset}, total_lines={len(lines)}]"
+        paged = paged[:max_chars]
+        truncated = True
+
+    if truncated:
+        # CRITICAL: tell the model the result is incomplete so it
+        # does NOT pass this chunk to file_edit as old_string.
+        return (
+            f"--- WARNING: CONTENT TRUNCATED ---\n"
+            f"This file is {total_lines} lines total. "
+            f"You asked for offset={offset}, limit={limit}. "
+            f"Only the first {max_chars} chars are shown.\n"
+            f"DO NOT use this truncated text as old_string in file_edit! "
+            f"Re-read with explicit offset/limit that covers your target.\n"
+            f"--- BEGIN TRUNCATED CONTENT ---\n"
+            f"{paged}\n"
+            f"--- END (truncated) ---"
+        )
     return paged
 
 

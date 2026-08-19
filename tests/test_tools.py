@@ -49,8 +49,17 @@ class TestFiles:
     def test_read_truncates(self, sample_dir: Path) -> None:
         (sample_dir / "big.txt").write_text("x" * 10_000, encoding="utf-8")
         out = tools.read_file("big.txt", max_chars=100)
-        assert len(out) < 200
-        assert "truncated" in out
+        # New behaviour: explicit WARNING marker so file_edit refuses
+        # to use this as old_string.
+        assert "WARNING: CONTENT TRUNCATED" in out
+        assert "x" in out  # but actual content is there
+
+    def test_read_small_file_unchanged(self, sample_dir: Path) -> None:
+        """No truncation marker when file fits in max_chars."""
+        (sample_dir / "small.txt").write_text("hello", encoding="utf-8")
+        out = tools.read_file("small.txt")
+        assert "WARNING" not in out
+        assert "hello" in out
 
     def test_write_file_creates_parents(self, sample_dir: Path) -> None:
         out = tools.write_file("nested/deep/f.txt", "content")

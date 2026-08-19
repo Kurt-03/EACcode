@@ -347,6 +347,20 @@ def _tool_file_edit(
 
 
 def _tool_patch_file(path: str, old: str, new: str) -> str:
+    # SAFETY: refuse to patch when the old string is a known truncated
+    # chunk. Otherwise file_edit can silently delete large parts of the
+    # file because its old_string doesn't match the real file content.
+    if "--- WARNING: CONTENT TRUNCATED ---" in old:
+        return (
+            "Error: refusing to patch with a truncated old_string. "
+            "Re-read the file with a precise offset/limit window that "
+            "covers your target line range, then retry."
+        )
+    if "--- BEGIN TRUNCATED CONTENT ---" in old or "--- END (truncated) ---" in old:
+        return (
+            "Error: refusing to patch with a truncated old_string. "
+            "Re-read with offset/limit to capture the exact content."
+        )
     result = apply_patch(path, old, new)
     return result.message
 
