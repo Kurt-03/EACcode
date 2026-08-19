@@ -67,8 +67,12 @@ DEFAULT_SYSTEM_PROMPT = (
     "consistently, includes undo, and respects the permission gate."
 )
 
-MAX_TURNS = 8
-MAX_OUTPUT_TOKENS = 1024
+# Defaults - all of these are overridable via config.yaml or Agent(...)
+DEFAULT_MAX_TURNS = 50
+DEFAULT_MAX_OUTPUT_TOKENS = 4096
+# Legacy names - kept for back-compat with any external callers
+MAX_TURNS = DEFAULT_MAX_TURNS
+MAX_OUTPUT_TOKENS = DEFAULT_MAX_OUTPUT_TOKENS
 
 
 # Re-export for back-compat with tests/internal callers
@@ -184,6 +188,8 @@ class Agent:
         use_skills: bool = True,
         memory_nudge_interval: int = 10,
         permission_manager: permissions.PermissionManager | None = None,
+        max_turns: int | None = None,
+        max_output_tokens: int | None = None,
     ) -> None:
         self.conf = conf or cfg.load_config()
         self.system_prompt = system_prompt
@@ -194,15 +200,30 @@ class Agent:
         self.memory_nudge_interval = memory_nudge_interval
         self.permission_manager = permission_manager
         self._memory_runs = 0
+        # Configurable budgets (Plan I P0.3):
+        # - explicit kwarg wins
+        # - then config.yaml ``agent.max_turns`` / ``agent.max_output_tokens``
+        # - then DEFAULT_MAX_TURNS / DEFAULT_MAX_OUTPUT_TOKENS
+        agent_cfg = self.conf.get("agent") or {}
+        self.max_turns = (
+            max_turns
+            if max_turns is not None
+            else agent_cfg.get("max_turns", DEFAULT_MAX_TURNS)
+        )
+        self.max_output_tokens = (
+            max_output_tokens
+            if max_output_tokens is not None
+            else agent_cfg.get("max_output_tokens", DEFAULT_MAX_OUTPUT_TOKENS)
+        )
 
     def _max_tokens_for(self, model_id: str) -> int:
-        """Pick max_tokens from models.dev, fall back to MAX_OUTPUT_TOKENS."""
+        """Pick max_tokens from models.dev, fall back to self.max_output_tokens."""
         provider_name, _, model_short = model_id.partition("/")
         try:
             md = models_dev.get_max_output_tokens(provider_name, model_short)
         except Exception:
             md = 0
-        return md or MAX_OUTPUT_TOKENS
+        return md or self.max_output_tokens
 
     def _complete(
         self,

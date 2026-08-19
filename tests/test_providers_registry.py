@@ -44,16 +44,18 @@ class TestFamilyDetection:
         for name in ("anthropic", "minimax", "minimax-oauth", "minimax-cn"):
             assert registry.detect_family(name, {}) == "anthropic"
 
-    def test_unsupported_family_for_unknown_provider(self) -> None:
+    def test_openai_routes_to_openai_compat_family(self) -> None:
+        """openai with /v1 base_url -> openai_compat family (Plan I P0.2)."""
         assert registry.detect_family(
             "openai",
             {"base_url": "https://api.openai.com/v1"},
-        ) == "unsupported"
+        ) == "openai_compat"
 
-    def test_unsupported_family_for_ollama(self) -> None:
+    def test_ollama_name_routes_to_openai_compat_family(self) -> None:
+        """Ollama (without explicit /v1 in base_url) -> openai_compat by name."""
         assert registry.detect_family(
             "ollama", {"base_url": "http://localhost:11434"}
-        ) == "unsupported"
+        ) == "openai_compat"
 
 
 class TestApiKeyResolution:
@@ -102,13 +104,14 @@ class TestRegistryGet:
             )
         assert isinstance(provider, AnthropicProvider)
 
-    def test_unsupported_provider_raises(self) -> None:
-        with pytest.raises(NotImplementedError) as exc_info:
-            registry.get(
-                "openai",
-                {"base_url": "https://api.openai.com/v1", "api_key": "sk-fake"},
-            )
-        assert "openai" in str(exc_info.value).lower()
+    def test_openai_provider_resolves(self) -> None:
+        """OpenAI provider now resolves via OpenAICompatProvider."""
+        provider = registry.get(
+            "openai",
+            {"base_url": "https://api.openai.com/v1", "api_key": "sk-fake"},
+        )
+        from eaccode.providers.openai_compat import OpenAICompatProvider
+        assert isinstance(provider, OpenAICompatProvider)
 
     def test_caches_by_provider_name_base_url_api_key(self) -> None:
         """Same provider name + base_url + api_key returns the same instance."""

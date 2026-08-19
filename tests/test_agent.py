@@ -15,7 +15,7 @@ import pytest
 
 from eaccode import config as cfg
 from eaccode import permissions
-from eaccode.agent import Agent, Tool, ToolCall
+from eaccode.agent import Agent, Tool, ToolCall, DEFAULT_MAX_OUTPUT_TOKENS, DEFAULT_MAX_TURNS
 from eaccode.providers import registry as provider_registry
 from eaccode.providers.base import StreamChunk
 
@@ -180,7 +180,8 @@ class TestMaxTokens:
 
         monkeypatch.setattr(models_dev, "get_max_output_tokens", lambda *a, **kw: 0)
         agent = Agent(conf=_conf())
-        assert agent._max_tokens_for("anthropic/unknown") == 1024
+        from eaccode.agent import DEFAULT_MAX_OUTPUT_TOKENS
+        assert agent._max_tokens_for("anthropic/unknown") == DEFAULT_MAX_OUTPUT_TOKENS
 
 
 # ---------------------------------------------------------------------------

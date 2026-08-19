@@ -40,7 +40,11 @@ DESCRIPTION = (
 )
 
 
-def build_agent() -> Agent:
+def build_agent(
+    conf=None,
+    max_turns: int | None = None,
+    max_output_tokens: int | None = None,
+) -> Agent:
     """Build the agent with built-in tools, learning loop and memory injection."""
     system_prompt = f"{DEFAULT_SYSTEM_PROMPT}\n\n{LEARNING_PROMPT}"
     memory_block = injection_text()
@@ -91,10 +95,15 @@ def build_agent() -> Agent:
                 print(f"Warning: smart review setup failed: {exc}")
 
     system_prompt = f"{system_prompt}{permissions_mode_hint(permission_manager.mode)}"
+    if conf is None:
+        conf = cfg.load_config()
     return Agent(
         tools=tools,
         system_prompt=system_prompt,
         permission_manager=permission_manager,
+        conf=conf,
+        max_turns=max_turns,
+        max_output_tokens=max_output_tokens,
     )
 
 
@@ -132,9 +141,21 @@ def main(
         raise SystemExit(0)
     if first in ("-p", "--prompt"):
         if len(argv) < 2:
-            stdout.write("Usage: eaccode -p <prompt>\n")
+            stdout.write("Usage: eaccode -p <prompt> [--max-turns N] [--max-tokens N]\n")
             raise SystemExit(2)
-        raise SystemExit(_run_once(" ".join(argv[1:]), stdout))
+        # Parse optional --max-turns / --max-tokens from the remaining args
+        import argparse as _ap
+        ap = _ap.ArgumentParser(prog="eaccode -p", add_help=False)
+        ap.add_argument("prompt", nargs="+")
+        ap.add_argument("--max-turns", type=int, default=None)
+        ap.add_argument("--max-tokens", type=int, default=None)
+        parsed = ap.parse_args(argv[1:])
+        prompt = " ".join(parsed.prompt)
+        raise SystemExit(_run_once(
+            prompt, stdout,
+            max_turns=parsed.max_turns,
+            max_output_tokens=parsed.max_tokens,
+        ))
     if first == "tui":
         from eaccode.tui import EaccodeApp
 
