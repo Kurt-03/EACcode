@@ -27,15 +27,25 @@ class ToolCall:
 
 @dataclass
 class StreamChunk:
-    """One normalized event from any provider.
+    """One normalized event from any provider (Plan K: extended).
 
     kind:
       - "text":       regular answer content (delta.text)
       - "reasoning":  reasoning content (delta.thinking / delta.reasoning_content)
-      - "tool_call":  a tool invocation, possibly partial (id may be empty
-                       if the assistant has not yet sent input)
+      - "tool_call":  a tool invocation from the model, possibly partial
+                       (id may be empty if the assistant has not yet sent input)
+      - "tool_start": a tool call is about to execute (Plan K)
+      - "tool_end":   tool execution finished successfully (Plan K)
+      - "tool_error": tool execution raised an exception (Plan K)
       - "usage":      token counts (input_tokens, output_tokens)
       - "done":       stream end
+
+    Tool-event fields (tool_start/tool_end/tool_error):
+      - tool_name:    str   name of the tool
+      - tool_args:    dict  short preview of args (already truncated)
+      - tool_result:  str   short preview of result
+      - tool_duration_ms: int  how long the call took
+      - tool_error:   str   error message for tool_error chunks
     """
 
     kind: str
@@ -43,6 +53,12 @@ class StreamChunk:
     tool_call: ToolCall | None = None
     usage: dict[str, int] = field(default_factory=dict)
     stop_reason: str = ""
+    # Plan K: tool lifecycle
+    tool_name: str = ""
+    tool_args: dict[str, object] = field(default_factory=dict)
+    tool_result: str = ""
+    tool_duration_ms: int = 0
+    tool_error: str = ""
 
 
 class Provider(Protocol):

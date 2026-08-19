@@ -11,6 +11,8 @@ loop never sees Anthropic-specific events.
 
 from __future__ import annotations
 
+import time
+
 import json
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -78,7 +80,7 @@ MAX_OUTPUT_TOKENS = DEFAULT_MAX_OUTPUT_TOKENS
 
 
 # Re-export for back-compat with tests/internal callers
-from eaccode.providers.base import ToolCall  # noqa: E402,F401
+from eaccode.providers.base import StreamChunk, ToolCall  # noqa: E402,F401
 
 
 class AgentError(Exception):
@@ -178,6 +180,31 @@ def _model_chain(conf: dict[str, Any]) -> list[str]:
     chain.extend(model.get("fallback") or [])
     return chain
 
+
+
+
+def _shorten_for_display(value: object, max_len: int = 120) -> str:
+    """Format a value for terminal display, truncated and stringified."""
+    s = str(value)
+    if len(s) > max_len:
+        return s[: max_len - 3] + "..."
+    return s
+
+
+def _shorten_args_for_display(args: dict[str, object], max_len: int = 80) -> dict[str, object]:
+    """Truncate each arg's value for safe display (Plan K K.2).
+
+    Preserves the original type when the stringified value fits;
+    only stringifies-and-truncates when over the limit.
+    """
+    out: dict[str, object] = {}
+    for k, v in args.items():
+        s = str(v)
+        if len(s) <= max_len:
+            out[k] = v  # keep original type
+        else:
+            out[k] = s[: max_len - 3] + "..."
+    return out
 
 class Agent:
     """A minimal ReAct agent: model <-> tools until a final answer."""
@@ -426,12 +453,44 @@ class Agent:
             # Parallel tool execution: independent calls of one turn run
             # concurrently (subagents and long-running tools benefit).
             # Capped so a turn with many calls cannot spawn unbounded threads.
+            # Plan K K.2: emit tool_start before each call, tool_end after.
+            # Wrap _execute_tool to capture timing + result + error.
+            def _invoke_with_events(call: ToolCall) -> str:
+                if on_chunk is not None:
+                    on_chunk(StreamChunk(
+                        kind="tool_start",
+                        tool_name=call.name,
+                        tool_args=_shorten_args_for_display(call.arguments),
+                    ))
+                start = time.monotonic()
+                try:
+                    result = self._execute_tool(call)
+                except Exception as exc:
+                    duration_ms = int((time.monotonic() - start) * 1000)
+                    if on_chunk is not None:
+                        on_chunk(StreamChunk(
+                            kind="tool_error",
+                            tool_name=call.name,
+                            tool_error=str(exc),
+                            tool_duration_ms=duration_ms,
+                        ))
+                    return f"Error: tool {call.name} failed: {exc}"
+                duration_ms = int((time.monotonic() - start) * 1000)
+                if on_chunk is not None:
+                    on_chunk(StreamChunk(
+                        kind="tool_end",
+                        tool_name=call.name,
+                        tool_result=_shorten_for_display(result, max_len=200),
+                        tool_duration_ms=duration_ms,
+                    ))
+                return result
+
             if len(calls) > 1:
                 workers = min(len(calls), 6)
                 with ThreadPoolExecutor(max_workers=workers) as pool:
-                    results = list(pool.map(self._execute_tool, calls))
+                    results = list(pool.map(_invoke_with_events, calls))
             else:
-                results = [self._execute_tool(calls[0])]
+                results = [_invoke_with_events(calls[0])]
             for call, content in zip(calls, results, strict=True):
                 history.append(
                     {
