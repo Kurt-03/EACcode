@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Iterator
+from collections.abc import AsyncIterator
 from typing import Any
 
 from eaccode.providers.base import StreamChunk, ToolCall
@@ -201,6 +202,215 @@ class AnthropicProvider:
         if default_headers:
             kwargs["default_headers"] = default_headers
         self._client = anthropic.Anthropic(**kwargs)
+        # Save for async client construction
+        self._client_kwargs = dict(kwargs)
+
+    async def stream_async(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        cancel_event: Any | None = None,
+        extra: dict[str, Any] | None = None,
+        model: str | None = None,  # accepted but ignored - uses self._model
+        **kwargs: Any,
+    ) -> AsyncIterator[StreamChunk]:
+        """Async variant: yields chunks from AsyncAnthropic streaming API."""
+        # Lazy import; only needed if user calls stream_async
+        import anthropic as _anthropic
+
+        kwargs = self._build_request_kwargs(
+            messages,
+            system=system,
+            tools=tools,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            extra=extra,
+        )
+
+        pending_tool_calls: dict[int, dict[str, Any]] = {}
+
+        async with self._async_client.messages.stream(**kwargs) as stream:
+            async for event in stream:
+                if cancel_event is not None and getattr(
+                    cancel_event, "is_set", lambda: False
+                )():
+                    break
+                event_type = getattr(event, "type", None)
+                if event_type == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if block is not None and getattr(block, "type", None) == "tool_use":
+                        index = getattr(event, "index", 0)
+                        pending_tool_calls[index] = {
+                            "id": getattr(block, "id", "") or "",
+                            "name": getattr(block, "name", "") or "",
+                            "input_json": "",
+                        }
+                elif event_type == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if delta is None:
+                        continue
+                    delta_type = getattr(delta, "type", None)
+                    if delta_type == "text_delta":
+                        text = getattr(delta, "text", "")
+                        if text:
+                            yield StreamChunk(kind="text", content=text)
+                    elif delta_type == "thinking_delta":
+                        thinking = getattr(delta, "thinking", "")
+                        if thinking:
+                            yield StreamChunk(kind="reasoning", content=thinking)
+                    elif delta_type == "input_json_delta":
+                        pd = getattr(delta, "partial_json", "")
+                        idx = getattr(event, "index", 0)
+                        if idx in pending_tool_calls and pd:
+                            pending_tool_calls[idx]["input_json"] += pd
+                elif event_type == "content_block_stop":
+                    idx = getattr(event, "index", 0)
+                    if idx in pending_tool_calls:
+                        block_data = pending_tool_calls.pop(idx)
+                        import json as _json
+                        try:
+                            args = _json.loads(block_data["input_json"] or "{}")
+                        except (ValueError, TypeError):
+                            args = {}
+                        yield StreamChunk(
+                            kind="tool_call",
+                            tool_call=ToolCall(
+                                id=block_data["id"],
+                                name=block_data["name"],
+                                arguments=args,
+                            ),
+                        )
+            # Flush any pending tool calls (rare edge case)
+            for _idx, block_data in list(pending_tool_calls.items()):
+                import json as _json
+                try:
+                    args = _json.loads(block_data["input_json"] or "{}")
+                except (ValueError, TypeError):
+                    args = {}
+                yield StreamChunk(
+                    kind="tool_call",
+                    tool_call=ToolCall(
+                        id=block_data["id"],
+                        name=block_data["name"],
+                        arguments=args,
+                    ),
+                )
+        yield StreamChunk(kind="done", stop_reason="end_turn")
+
+    def _build_request_kwargs(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        system_parts, cleaned_messages = _convert_messages_to_anthropic(messages)
+        if system is not None:
+            system_parts = [system]
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": cleaned_messages,
+            "max_tokens": max_tokens if max_tokens is not None else 4096,
+        }
+        if system_parts:
+            kwargs["system"] = "\n\n".join(system_parts)
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if tools:
+            kwargs["tools"] = _convert_tools_to_anthropic(tools)
+        if extra:
+            kwargs.update(extra)
+        return kwargs
+
+    @property
+    def _async_client(self):
+        """Lazy async client."""
+        if not hasattr(self, "_async_client_cache"):
+            import anthropic as _anthropic
+            kwargs = dict(self._client_kwargs)
+            self._async_client_cache = _anthropic.AsyncAnthropic(**kwargs)
+        return self._async_client_cache
+
+    def _make_stream(self, messages: list[dict[str, Any]], *, system, tools, max_tokens, temperature, cancel_event, extra) -> Any:
+        """Sync iterator (existing behavior)."""
+        kwargs = self._build_request_kwargs(
+            messages,
+            system=system, tools=tools,
+            max_tokens=max_tokens, temperature=temperature, extra=extra,
+        )
+        pending_tool_calls: dict[int, dict[str, Any]] = {}
+
+        with self._client.messages.stream(**kwargs) as stream:
+            for event in stream:
+                if cancel_event is not None and getattr(cancel_event, "is_set", lambda: False)():
+                    break
+                event_type = getattr(event, "type", None)
+                if event_type == "content_block_start":
+                    block = getattr(event, "content_block", None)
+                    if block is not None and getattr(block, "type", None) == "tool_use":
+                        index = getattr(event, "index", 0)
+                        pending_tool_calls[index] = {
+                            "id": getattr(block, "id", "") or "",
+                            "name": getattr(block, "name", "") or "",
+                            "input_json": "",
+                        }
+                elif event_type == "content_block_delta":
+                    delta = getattr(event, "delta", None)
+                    if delta is None:
+                        continue
+                    delta_type = getattr(delta, "type", None)
+                    if delta_type == "text_delta":
+                        text = getattr(delta, "text", "")
+                        if text:
+                            yield StreamChunk(kind="text", content=text)
+                    elif delta_type == "thinking_delta":
+                        thinking = getattr(delta, "thinking", "")
+                        if thinking:
+                            yield StreamChunk(kind="reasoning", content=thinking)
+                    elif delta_type == "input_json_delta":
+                        pd = getattr(delta, "partial_json", "")
+                        idx = getattr(event, "index", 0)
+                        if idx in pending_tool_calls and pd:
+                            pending_tool_calls[idx]["input_json"] += pd
+                elif event_type == "content_block_stop":
+                    idx = getattr(event, "index", 0)
+                    if idx in pending_tool_calls:
+                        block_data = pending_tool_calls.pop(idx)
+                        import json as _json
+                        try:
+                            args = _json.loads(block_data["input_json"] or "{}")
+                        except (ValueError, TypeError):
+                            args = {}
+                        yield StreamChunk(
+                            kind="tool_call",
+                            tool_call=ToolCall(
+                                id=block_data["id"],
+                                name=block_data["name"],
+                                arguments=args,
+                            ),
+                        )
+            for _idx, block_data in list(pending_tool_calls.items()):
+                import json as _json
+                try:
+                    args = _json.loads(block_data["input_json"] or "{}")
+                except (ValueError, TypeError):
+                    args = {}
+                yield StreamChunk(
+                    kind="tool_call",
+                    tool_call=ToolCall(
+                        id=block_data["id"],
+                        name=block_data["name"],
+                        arguments=args,
+                    ),
+                )
+        yield StreamChunk(kind="done", stop_reason="end_turn")
 
     def stream(
         self,

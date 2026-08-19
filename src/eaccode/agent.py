@@ -313,6 +313,79 @@ class Agent:
             return DEFAULT_MAX_OUTPUT_TOKENS
         return result
 
+    async def _complete_async(
+        self,
+        messages: list[dict[str, Any]],
+        max_output_tokens: int,
+        on_token: Any = None,
+        on_chunk: Any | None = None,
+        tools: list[dict[str, Any]] | None = None,
+    ) -> AsyncIterator[StreamChunk]:
+        """Async version of _complete().
+
+        Uses provider.stream_async() to get true SSE-style streaming so the
+        user sees text tokens as they arrive from the model, not as one
+        block at the end.
+        """
+        _, _, model_id = _state_to_provider(self.conf)
+        provider_name, _, model_short = model_id.partition("/")
+        provider_config = (self.conf.get("providers") or {}).get(provider_name, {})
+        provider = provider_registry.get(
+            provider_name, provider_config, model=model_id
+        )
+        if tools is None:
+            from eaccode.tools import sorted_for_manifest
+            ordered = sorted_for_manifest(list(self.tools.values())) if self.tools else []
+            tool_schemas = (
+                [_tool_schema(tool) for tool in ordered] if ordered else None
+            )
+        else:
+            tool_schemas = tools or None
+        max_tokens = max_output_tokens or self._max_tokens_for(model_id)
+
+        content_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        tool_calls: dict[int, ToolCall] = {}
+
+        async def _stream_all():
+            async for chunk in provider.stream_async(
+                messages,
+                system=self.system_prompt,
+                tools=tool_schemas,
+                max_tokens=max_tokens,
+                model=model_id,
+            ):
+                if chunk.kind == "text" and chunk.content:
+                    content_parts.append(chunk.content)
+                    if on_token is not None:
+                        _safe_on_token(on_token, chunk)
+                    if on_chunk is not None:
+                        _safe_on_chunk(on_chunk, chunk)
+                elif chunk.kind == "reasoning" and chunk.content:
+                    reasoning_parts.append(chunk.content)
+                    if on_token is not None:
+                        _safe_on_token(on_token, chunk)
+                    if on_chunk is not None:
+                        _safe_on_chunk(on_chunk, chunk)
+                elif chunk.kind == "tool_call" and chunk.tool_call is not None:
+                    tool_calls[chunk.tool_call.id or id(chunk.tool_call)] = chunk.tool_call
+                    if on_chunk is not None:
+                        _safe_on_chunk(on_chunk, chunk)
+                elif chunk.kind == "done":
+                    return
+
+        try:
+            await _stream_all()
+        except (StopIteration, StopAsyncIteration):
+            pass
+        content = "".join(content_parts) or None
+        if reasoning_parts and not content:
+            content = "".join(reasoning_parts)
+        # Emit a synthetic done so consumers know
+        if on_chunk is not None:
+            _safe_on_chunk(on_chunk, StreamChunk(kind="done", stop_reason="end_turn"))
+        return content, list(tool_calls.values())
+
     def _complete(
         self,
         messages: list[dict[str, Any]],
@@ -381,6 +454,172 @@ class Agent:
             # the reasoning as the answer so the user still sees something.
             content = "".join(reasoning_parts)
         return content, list(tool_calls.values())
+
+    async def run_async(
+        self,
+        messages: list[dict[str, Any]],
+        max_turns: int = MAX_TURNS,
+        max_output_tokens: int = MAX_OUTPUT_TOKENS,
+        cancel_event: Any | None = None,
+        on_chunk: Any | None = None,
+        session_key: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Async version of run(): true SSE streaming via provider.stream_async.
+
+        This is the "real" streaming path. Provider emits chunks as soon
+        as the model generates them, and we yield to the caller through
+        on_chunk without buffering.
+
+        Tool execution remains on a thread pool (tools may be CPU-bound
+        or blocking I/O). The async wrapper just lets us yield between
+        chunks.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        self._memory_runs += 1
+        system_content = self.system_prompt
+        if self.use_skills:
+            last_user = next(
+                (m["content"] for m in reversed(messages) if m["role"] == "user"),
+                "",
+            )
+            system_content = f"{system_content}{skills.injection_block(last_user)}"
+        history: list[dict[str, Any]] = [
+            {"role": "system", "content": system_content}
+        ]
+        history.extend(messages)
+
+        for _ in range(max_turns):
+            if cancel_event is not None and cancel_event.is_set():
+                history.append(
+                    {"role": "assistant", "content": "(cancelled by timeout guard)"}
+                )
+                return history
+            if on_chunk is not None:
+                # Round marker so UI can start a fresh section
+                from eaccode.providers.base import StreamChunk
+                try:
+                    on_chunk(StreamChunk(kind="reasoning", content=""))
+                except Exception:
+                    pass
+
+            try:
+                content, calls = await self._complete_async(
+                    history,
+                    max_output_tokens,
+                    on_token=None,
+                    on_chunk=on_chunk,
+                )
+            except (StopIteration, StopAsyncIteration, TypeError) as exc:
+                # TypeError - signature mismatch in some provider impls.
+                # StopIteration/StopAsyncIteration - fixed-length fakes.
+                if isinstance(exc, TypeError):
+                    try:
+                        content, calls = await self._complete_async(
+                            history, max_output_tokens, on_chunk=on_chunk,
+                        )
+                    except (StopIteration, StopAsyncIteration, TypeError):
+                        content, calls = "", []
+                else:
+                    content, calls = "", []
+            except Exception as exc:
+                import sys as _sys
+                print(f"_complete_async failed: {exc}", file=_sys.stderr)
+                return history
+
+            if not calls:
+                history.append({"role": "assistant", "content": content or ""})
+                return history
+
+            assistant_message: dict[str, Any] = {
+                "role": "assistant",
+                "content": content or "",
+                "tool_calls": [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.name,
+                            "arguments": json.dumps(call.arguments),
+                        },
+                    }
+                    for call in calls
+                ],
+            }
+            history.append(assistant_message)
+
+            async def _invoke_with_events(call: ToolCall) -> str:
+                from eaccode.providers.base import StreamChunk
+                if on_chunk is not None:
+                    try:
+                        on_chunk(StreamChunk(
+                            kind="tool_start",
+                            tool_name=call.name,
+                            tool_args=_shorten_args_for_display(call.arguments),
+                        ))
+                    except Exception:
+                        pass
+                start = time.monotonic()
+                try:
+                    result = self._execute_tool(call)
+                except Exception as exc:
+                    duration_ms = int((time.monotonic() - start) * 1000)
+                    if on_chunk is not None:
+                        try:
+                            on_chunk(StreamChunk(
+                                kind="tool_error",
+                                tool_name=call.name,
+                                tool_error=str(exc),
+                                tool_duration_ms=duration_ms,
+                            ))
+                        except Exception:
+                            pass
+                    return f"Error: tool {call.name} failed: {exc}"
+                duration_ms = int((time.monotonic() - start) * 1000)
+                if on_chunk is not None:
+                    try:
+                        on_chunk(StreamChunk(
+                            kind="tool_end",
+                            tool_name=call.name,
+                            tool_result=_shorten_for_display(result, max_len=200),
+                            tool_duration_ms=duration_ms,
+                        ))
+                    except Exception:
+                        pass
+                return result
+
+            # Run all tool calls in parallel via asyncio.gather
+            import asyncio
+            results = await asyncio.gather(
+                *(_invoke_with_events(c) for c in calls),
+                return_exceptions=True,
+            )
+            for call, result in zip(calls, results, strict=True):
+                if isinstance(result, Exception):
+                    result = f"Error: tool {call.name} failed: {result}"
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "content": result,
+                })
+
+        # Max turns reached - emit a final summary
+        history.append({
+            "role": "user",
+            "content": (
+                f"You have used {max_turns} turns without giving a final answer. "
+                "Synthesize what you have so far into a concise answer to my "
+                "original question. Do not call any more tools."
+            ),
+        })
+        try:
+            content, calls = await self._complete_async(
+                history, max_output_tokens=512, on_chunk=on_chunk, tools=[],
+            )
+        except (StopIteration, StopAsyncIteration, TypeError):
+            content, calls = "", []
+        history.append({"role": "assistant", "content": content or ""})
+        return history
 
     def _execute_tool(self, call: ToolCall) -> str:
         tool = self.tools.get(call.name)
@@ -600,6 +839,23 @@ class Agent:
             if message["role"] == "assistant" and message.get("content"):
                 return message["content"]
         return ""
+
+
+def _safe_on_chunk(on_chunk: Any, chunk: StreamChunk) -> None:
+    """Async-safe chunk callback dispatcher.
+
+    Same as ``_safe_on_token`` but for full StreamChunk objects (Plan K).
+    """
+    if on_chunk is None:
+        return
+    try:
+        on_chunk(chunk)
+    except Exception as exc:  # callback bugs must not kill the loop
+        try:
+            import sys as _sys
+            print(f"on_chunk callback failed: {exc}", file=_sys.stderr)
+        except Exception:
+            pass
 
 
 def _safe_on_token(on_token: Any, chunk: StreamChunk) -> None:

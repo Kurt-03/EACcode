@@ -22,6 +22,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections.abc import AsyncIterator
 from typing import Any, Iterator
 
 from eaccode.providers.base import Provider, StreamChunk, ToolCall
@@ -160,6 +161,124 @@ class OpenAICompatProvider(Provider):
             )
 
         yield StreamChunk(kind="done", stop_reason=finish_reason)
+
+    async def stream_async(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        system: str = "",
+        model: str,
+        max_tokens: int = 4096,
+        tools: list[dict[str, Any]] | None = None,
+        temperature: float = 0.7,
+    ) -> AsyncIterator[StreamChunk]:
+        """Async variant of stream(): uses httpx.AsyncClient + aiter_lines."""
+        import httpx
+        import json as _json
+
+        url = f"{self.base_url}/chat/completions"
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "stream": True,
+        }
+        out_messages: list[dict[str, Any]] = []
+        if system:
+            out_messages.append({"role": "system", "content": system})
+        for m in messages:
+            role = m.get("role")
+            content = m.get("content", "")
+            if role == "tool":
+                out_messages.append({
+                    "role": "tool",
+                    "tool_call_id": m.get("tool_call_id", ""),
+                    "content": content,
+                })
+            elif role == "assistant" and m.get("tool_calls"):
+                tc_payload = []
+                for tc in m["tool_calls"]:
+                    tc_payload.append({
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": tc["function"]["name"],
+                            "arguments": tc["function"]["arguments"],
+                        },
+                    })
+                out_messages.append({
+                    "role": "assistant",
+                    "content": content or "",
+                    "tool_calls": tc_payload,
+                })
+            else:
+                out_messages.append({"role": role, "content": content})
+        payload["messages"] = out_messages
+        if tools:
+            payload["tools"] = _to_openai_tools(tools)
+
+        headers = {
+            "Authorization": f"Bearer {self._resolve_key(self.config)}",
+            "Content-Type": "application/json",
+        }
+
+        pending_tool_calls: dict[int, dict[str, Any]] = {}
+        finish_reason = ""
+
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
+            async with client.stream("POST", url, headers=headers, json=payload) as response:
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data: "):
+                        data = line[len("data: "):]
+                        if data.strip() == "[DONE]":
+                            break
+                        try:
+                            obj = _json.loads(data)
+                        except _json.JSONDecodeError:
+                            continue
+                        choices = obj.get("choices", [])
+                        if not choices:
+                            continue
+                        ch = choices[0]
+                        finish_reason = ch.get("finish_reason", finish_reason) or finish_reason
+                        delta = ch.get("delta", {})
+                        text = delta.get("content") or ""
+                        if text:
+                            yield StreamChunk(kind="text", content=text)
+                        for tc in delta.get("tool_calls") or []:
+                            idx = tc.get("index", 0)
+                            if idx not in pending_tool_calls:
+                                pending_tool_calls[idx] = {
+                                    "id": tc.get("id", "") or "",
+                                    "name": (tc.get("function") or {}).get("name", "") or "",
+                                    "arguments": "",
+                                }
+                            if tc.get("id"):
+                                pending_tool_calls[idx]["id"] = tc["id"]
+                            fn = tc.get("function") or {}
+                            if fn.get("name"):
+                                pending_tool_calls[idx]["name"] = fn["name"]
+                            if fn.get("arguments"):
+                                pending_tool_calls[idx]["arguments"] += fn["arguments"]
+
+            # Flush pending tool calls
+            for _idx, tc in pending_tool_calls.items():
+                import json as _json
+                try:
+                    args = _json.loads(tc["arguments"] or "{}")
+                except _json.JSONDecodeError:
+                    args = {}
+                yield StreamChunk(
+                    kind="tool_call",
+                    tool_call=ToolCall(
+                        id=tc["id"] or "",
+                        name=tc["name"],
+                        arguments=args,
+                    ),
+                )
+        yield StreamChunk(kind="done", stop_reason=finish_reason or "end_turn")
 
 
 def _to_openai_tools(anthropic_tools: list[dict[str, Any]]) -> list[dict[str, Any]]:

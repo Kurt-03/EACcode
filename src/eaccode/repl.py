@@ -239,6 +239,19 @@ def _wire_permission_prompt(
         return answer.strip().lower() in ("y", "yes")
 
     def ask_tool(name: str, arguments: dict[str, Any]) -> bool:
+        """Permission-gate callback for run_command and other mutating tools.
+
+        For run_command with safe-dev commands (npm/test, pytest, etc.),
+        auto-allow without user prompt. For everything else, ask the user.
+        """
+        if name == "run_command":
+            cmd = arguments.get("command", "")
+            if isinstance(cmd, str):
+                from eaccode.permissions import SAFE_DEV_COMMANDS_COMPILED
+                for regex, desc in SAFE_DEV_COMMANDS_COMPILED:
+                    if regex.search(cmd):
+                        # Safe-dev command: auto-allow
+                        return True
         return ask(f"{name} {arguments}")
 
     from eaccode import tools
