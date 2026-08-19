@@ -444,3 +444,80 @@ Wenn ein Check fehlschlägt, schick mir **genau diese drei Dinge**:
 3. Erwartung vs. tatsächliches Ergebnis
 
 Damit kann ich reproduzieren und fixen — ohne Ratespiel.
+
+
+## Live-Test: tropico-clone (08-18)
+
+Cwd: `C:/Users/kurtj/Desktop/test1/test 35/tropico-clone`
+
+### Test 1: eaccode kann list_files
+
+```
+$ eaccode -p "list the files in src/core/"
+```
+
+**Erwartet:** Model ruft `list_files` und zeigt Camera.ts, Game.ts, GamePersistence.ts, GameState.ts, InputController.ts, SaveLoad.ts.
+
+### Test 2: read_file mit offset/limit
+
+```
+$ eaccode -p "lies src/core/Game.ts zwischen zeile 245 und 280"
+```
+
+**Erwartet:** Model ruft `read_file(path, offset, limit)`. Output zeigt Zeilen 245-280.
+
+### Test 3: TypeScript-Check (smart-mode allowlist)
+
+```
+$ eaccode -p "run ./node_modules/.bin/tsc --noEmit 2>&1 | head -30"
+```
+
+**Erwartet:** Smart-Mode **auto-approves** weil `./node_modules/.bin/tsc` in SAFE_DEV_COMMANDS-Liste. Output zeigt tsc-Fehler oder "no errors".
+
+### Test 4: Sandbox-Block für gefährlichen Code
+
+```
+$ eaccode -p "run rm -rf /etc"
+```
+
+**Erwartet:** Hardline-Block: "rm recursive delete of /etc". NIEMALS ausgeführt.
+
+### Test 5: /approvals allow-path
+
+```
+$ eaccode -p "/approvals allow-path C:/Users/admin/Desktop --session"
+```
+
+**Erwartet:** "Allowed C:/Users/admin/Desktop (scope: session)". Model kennt jetzt den Befehl aus dem System-Prompt.
+
+### Test 6: Truncation-Warning
+
+Wenn du eine große Datei (>8000 chars) liest, soll der Output so aussehen:
+
+```
+--- WARNING: CONTENT TRUNCATED ---
+This file is 200 lines total. You asked for offset=0, limit=None.
+Only the first 8000 chars are shown.
+DO NOT use this truncated text as old_string in file_edit!
+--- BEGIN TRUNCATED CONTENT ---
+...
+--- END (truncated) ---
+```
+
+**Test:** Versuche dann `file_edit` mit dem truncated text → muss mit "refusing to patch with a truncated old_string" fehlschlagen.
+
+### Was schief gehen kann
+
+- **Smart-Mode blockt Befehle zu paranoid**: Bug 2 fix sollte das meiste abdecken, aber wenn etwas blocked wird das du brauchst, gib Bescheid.
+- **file_edit truncated silently**: Bug 1 fix sollte das verhindern, aber `offset`/`limit` IMMER explizit setzen für große Files.
+- **tropico-clone Game.ts ist 380 Zeilen statt 387**: Das ist **vor diesem Fix** passiert. Live-Test 08-18 hat 7 Zeilen zerstört. **Manuell wiederherstellen** (oder Backup finden).
+
+### Wie du einen Bug melden kannst
+
+```
+$ eaccode -p "Befehl der schief geht"  # Capture output
+$ eaccode --version                    # Welche Version?
+$ git log --oneline -5                 # Welche Commits sind live?
+```
+
+Plus: Was hast du erwartet vs. was ist passiert.
