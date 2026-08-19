@@ -56,9 +56,12 @@ def _deny_permission(command: str) -> bool:
 _loop_permission_checked = threading.local()
 
 
-def _set_loop_permission_checked(value: bool) -> None:
-    """Set the thread-local flag (used by tests)."""
+def set_loop_permission_checked(value: bool) -> None:
+    """Set the thread-local flag (Plan K fix: public so cli.py can call it)."""
     _loop_permission_checked.value = value
+
+# Backward-compat alias
+_set_loop_permission_checked = set_loop_permission_checked
 
 
 permission_handler: Callable[[str], bool] = _deny_permission

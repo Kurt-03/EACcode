@@ -246,13 +246,19 @@ class Agent:
         )
 
     def _max_tokens_for(self, model_id: str) -> int:
-        """Pick max_tokens from models.dev, fall back to self.max_output_tokens."""
+        """Pick max_tokens from models.dev, fall back to self.max_output_tokens.
+
+        Always returns a positive int (never None) so range(int) works.
+        """
         provider_name, _, model_short = model_id.partition("/")
         try:
             md = models_dev.get_max_output_tokens(provider_name, model_short)
         except Exception:
             md = 0
-        return md or self.max_output_tokens
+        result = md or self.max_output_tokens or DEFAULT_MAX_OUTPUT_TOKENS
+        if not isinstance(result, int) or result <= 0:
+            return DEFAULT_MAX_OUTPUT_TOKENS
+        return result
 
     def _complete(
         self,

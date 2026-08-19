@@ -122,6 +122,17 @@ def _run_once(
     from eaccode.render import render_chunk
 
     agent = build_agent()
+    # Wire tools.permission_handler to the agent's PermissionManager so
+    # run_command's secondary check passes for safe-dev commands.
+    # (repl.py does the same at startup.)
+    from eaccode import tools
+    pm = agent.permission_manager
+    def ask(cmd: str) -> bool:
+        d = pm.check("run_command", {"command": cmd})
+        return d.allow
+
+    tools.set_loop_permission_checked(False)
+    tools.permission_handler = ask
     chunks: list = []
 
     def on_chunk(chunk) -> None:
@@ -134,13 +145,19 @@ def _run_once(
             stdout.flush()
 
     try:
+        from eaccode.agent import MAX_TURNS, MAX_OUTPUT_TOKENS
         history = agent.run(
             [{"role": "user", "content": prompt}],
-            max_turns=max_turns,
+            max_turns=max_turns if max_turns is not None else MAX_TURNS,
+            max_output_tokens=(
+                max_output_tokens if max_output_tokens is not None
+                else MAX_OUTPUT_TOKENS
+            ),
             on_chunk=on_chunk,
         )
     except Exception as exc:
-        stdout.write(f"Error: {exc}\n")
+        import traceback
+        stdout.write(f"Error: {exc}\n{traceback.format_exc()}\n")
         return 1
     if not verbose:
         # Non-verbose: print just the final text (legacy behaviour).
