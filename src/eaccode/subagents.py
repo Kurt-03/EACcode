@@ -9,6 +9,7 @@ once; the rest wait on a semaphore.
 from __future__ import annotations
 
 import threading
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -51,13 +52,20 @@ class SubagentPool:
         tool_map: list[Tool],
         context: str = "",
         timeout: float = SUBAGENT_TIMEOUT,
+        parent_session_key: str | None = None,
     ) -> str:
-        """Run one subagent; returns its final answer or an error string."""
+        """Run one subagent; returns its final answer or an error string.
+
+        The subagent gets its own session_key (``sub-{ts}``) so it has
+        independent workspace / permission / todo state from its parent
+        (Plan J thread-safety).
+        """
+        sub_session_key = f"sub-{int(time.time())}-{id(self)}"
         with self._semaphore:
             with self._lock:
                 self.active += 1
             try:
-                return self._run_limited(task, tool_map, context, timeout)
+                return self._run_limited(task, tool_map, context, timeout, sub_session_key)
             finally:
                 with self._lock:
                     self.active -= 1
@@ -68,6 +76,7 @@ class SubagentPool:
         tool_map: list[Tool],
         context: str,
         timeout: float,
+        session_key: str,
     ) -> str:
         agent = (
             self._agent_factory()
@@ -78,6 +87,7 @@ class SubagentPool:
                 system_prompt=SUBAGENT_SYSTEM_PROMPT,
                 use_skills=False,
                 memory_nudge_interval=0,
+                permission_manager=None,  # agent constructs its own
             )
         )
         messages: list[dict[str, str]] = []
@@ -94,6 +104,7 @@ class SubagentPool:
                     messages,
                     max_turns=SUBAGENT_MAX_TURNS,
                     cancel_event=cancel_event,
+                    session_key=session_key,
                 )
                 result["answer"] = agent.last_text(history)
             except Exception as exc:

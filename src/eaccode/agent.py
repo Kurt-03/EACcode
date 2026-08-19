@@ -356,7 +356,8 @@ class Agent:
         max_output_tokens: int = MAX_OUTPUT_TOKENS,
         cancel_event: Any | None = None,
         on_token: Any = None,
-        on_chunk: Any = None,
+        on_chunk: Any | None = None,
+        session_key: str | None = None,
     ) -> list[dict[str, Any]]:
         """Run the loop; returns the full conversation including tool results.
 
