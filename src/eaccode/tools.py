@@ -132,13 +132,52 @@ def list_files(path: str = ".") -> str:
     return "\n".join(lines) or "(empty)"
 
 
-def search_files(pattern: str, path: str = ".") -> str:
-    """Find files under path whose text contains pattern (max 50 hits)."""
+def search_files(
+    pattern: str,
+    path: str = ".",
+    file_types: str | None = None,
+    use_regex: bool = True,
+    max_results: int = 200,
+) -> str:
+    """Search ``path`` for ``pattern`` using ripgrep (or Python fallback).
+
+    Args:
+        pattern: Regex by default; set ``use_regex=False`` for literal text.
+        path: Workspace-relative path (default: workspace root).
+        file_types: Optional glob like ``"*.py"`` to restrict file types.
+        max_results: Cap on number of matches returned (default 200).
+
+    Output format: ``path:line:text`` (matches ripgrep's ``--line-number``).
+    """
+    import shutil as _sh
+    import subprocess as _sp
+
     from eaccode.workspace import WorkspaceError, rewrite_path
 
-    matches: list[str] = []
     try:
         root = rewrite_path(path, _get_workspace())
+    except WorkspaceError as exc:
+        return f"Error: {exc}"
+
+    if _sh.which("rg"):
+        cmd = ["rg", "--no-heading", "--line-number", "--hidden"]
+        if not use_regex:
+            cmd.append("--fixed-strings")
+        if file_types:
+            cmd.extend(["-g", file_types])
+        cmd.extend([pattern, str(root)])
+        try:
+            result = _sp.run(cmd, capture_output=True, text=True, timeout=15)
+            if result.returncode in (0, 1):
+                lines = result.stdout.splitlines()[:max_results]
+                return "\n".join(lines) or "no matches"
+        except (_sp.TimeoutExpired, OSError):
+            pass  # fall through
+
+    # Python fallback (literal substring search).
+    matches: list[str] = []
+    needle = pattern
+    try:
         for candidate in root.rglob("*"):
             if not candidate.is_file():
                 continue
