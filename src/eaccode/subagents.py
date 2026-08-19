@@ -31,6 +31,37 @@ class SubagentError(Exception):
     """Raised for subagent-level failures."""
 
 
+
+
+def _make_subagent_chunk_forwarder(
+    task: str,
+    session_key: str,
+    parent_on_chunk,
+):
+    """Return an on_chunk callback that wraps inner chunks with sub-agent info.
+
+    If parent_on_chunk is None (subagent invoked by model directly),
+    return None and the sub-agent's chunks are silently dropped.
+    """
+    if parent_on_chunk is None:
+        return None
+    from eaccode.providers.base import StreamChunk
+    from dataclasses import replace
+
+    def forward(chunk: StreamChunk) -> None:
+        if chunk.kind in {"text", "reasoning", "error", "done"}:
+            parent_on_chunk(chunk)
+            return
+        if chunk.kind in {"tool_start", "tool_end", "tool_error"}:
+            new_name = (
+                f"  \u21b3 {chunk.tool_name}" if chunk.tool_name else chunk.tool_name
+            )
+            parent_on_chunk(replace(chunk, tool_name=new_name))
+            return
+        parent_on_chunk(chunk)
+    return forward
+
+
 class SubagentPool:
     """Runs subagents with a concurrency limit and a per-run timeout."""
 
@@ -61,6 +92,7 @@ class SubagentPool:
         (Plan J thread-safety).
         """
         sub_session_key = f"sub-{int(time.time())}-{id(self)}"
+        sub_on_chunk = getattr(self, "_parent_on_chunk", None)
         with self._semaphore:
             with self._lock:
                 self.active += 1
@@ -98,6 +130,10 @@ class SubagentPool:
         cancel_event = threading.Event()
         result: dict[str, Any] = {}
 
+        # Plan K K.5: forward parent's on_chunk so sub-agent tool calls
+        # are visible in the TUI/CLI with sub_agent_id marker.
+        parent_on_chunk = getattr(self, "_parent_on_chunk", None)
+
         def work() -> None:
             try:
                 history = agent.run(
@@ -105,6 +141,9 @@ class SubagentPool:
                     max_turns=SUBAGENT_MAX_TURNS,
                     cancel_event=cancel_event,
                     session_key=session_key,
+                    on_chunk=_make_subagent_chunk_forwarder(
+                        task, session_key, parent_on_chunk,
+                    ),
                 )
                 result["answer"] = agent.last_text(history)
             except Exception as exc:
