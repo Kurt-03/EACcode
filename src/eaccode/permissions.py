@@ -84,6 +84,7 @@ def _is_readonly_mcp(tool_name: str) -> bool:
 ALWAYS_ASK_TOOLS = frozenset(
     {
         "run_command",
+        "spawn_subagent",       # Plan J follow-up: sub-agents always confirm
         "browser_click",
         "browser_type",
         "browser_navigate",
@@ -93,10 +94,20 @@ ALWAYS_ASK_TOOLS = frozenset(
 
 
 def is_always_ask(tool_name: str) -> bool:
-    """Critical tools prompt on every call (no session memory)."""
-    return tool_name in ALWAYS_ASK_TOOLS or (
-        tool_name.startswith("mcp__") and not _is_readonly_mcp(tool_name)
-    )
+    """Critical tools prompt on every call (no session memory).
+
+    Defensive: any tool name NOT in our known read-only list and NOT
+    explicitly safe is treated as "always ask". This catches internal
+    tools (spawn_subagent, mcp__*) and unknown future tools.
+    """
+    if tool_name in ALWAYS_ASK_TOOLS:
+        return True
+    if tool_name.startswith("mcp__") and not _is_readonly_mcp(tool_name):
+        return True
+    # Heuristic: tools that look like "delegate"/"spawn" are always_ask
+    if any(prefix in tool_name.lower() for prefix in ("spawn_", "delegate_")):
+        return True
+    return False
 
 
 # ---------------------------------------------------------------------------

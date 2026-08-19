@@ -11,6 +11,9 @@ stdio, ``url`` for SSE). Discovered tools become agent tools named
 
 from __future__ import annotations
 
+import os
+import subprocess
+
 import atexit
 import contextlib
 import json
@@ -156,6 +159,12 @@ class McpClient(McpClientBase):
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                # On Windows, force UTF-8 I/O so MCP stdio doesn't trip
+                # over cp1252 decoding of the JSON-RPC stream.
+                creationflags=(
+                    subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
+                    if hasattr(subprocess, "CREATE_NO_WINDOW") else 0
+                ) if os.name == "nt" else 0,
             )
         except OSError as exc:
             raise McpError(
