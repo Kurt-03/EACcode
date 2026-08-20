@@ -121,6 +121,14 @@ def _resolve_session_links(text: str) -> list[dict[str, Any]]:
     return context
 
 
+def _isatty(stream: TextIO) -> bool:
+    """Check if a stream is connected to a TTY (for ANSI color decisions)."""
+    try:
+        return stream.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
 def _handle_chat(
     text: str,
     agent: Agent,
@@ -131,12 +139,12 @@ def _handle_chat(
 ) -> None:
     """Send one user message to the agent and print the final answer.
 
-    Plan K K.3 + Plan M: tool calls + final text are pseudo-streamed
-    (sub-chunks with sleep) so the user perceives live streaming even
-    though the providers are synchronous.
+    Plan M.2: tool calls get ``⎿`` boxes, text gets a ``●`` turn marker,
+    the turn ends with ``⏺ N tools used · Xs``.
     """
-    from eaccode.render import render_chunk
-    from eaccode.agent import _pseudo_stream_text
+    import asyncio
+    import time
+    from eaccode.repl_render import ReplRenderer
 
     messages = list(chat_history) + [{"role": "user", "content": text}]
     with contextlib.suppress(Exception):
@@ -144,60 +152,19 @@ def _handle_chat(
         if linked:
             messages = list(chat_history) + linked + [{"role": "user", "content": text}]
 
-    # Buffer chunks so we can still print the final answer cleanly.
-    text_parts: list[str] = []
+    renderer = ReplRenderer(stdout=stdout, plain=not _isatty(stdout))
+    turn_start = time.monotonic()
 
     def on_chunk(chunk) -> None:
-        """Plan K K.3 + Plan M: live-stream text + tool events.
-
-        Same logic as CLI: text chunks are split into 12-char sub-chunks
-        with 60ms delay so user perceives streaming even when provider
-        sends the answer as one event.
-        """
-        if chunk.kind == "text" and chunk.content:
-            text_parts.append(chunk.content)
-            if verbose:
-                from eaccode.agent import _split_for_pseudo_stream
-                import time as _t
-                for piece in _split_for_pseudo_stream(chunk.content, chunk_size=12):
-                    stdout.write(piece)
-                    stdout.flush()
-                    _t.sleep(0.06)
-            return
-        if chunk.kind == "done":
-            return
-        # Tool events only render when verbose.
-        from eaccode.render import render_chunk
-        rendered = render_chunk(chunk, verbose=verbose)
-        if rendered:
-            stdout.write(rendered)
-            stdout.flush()
+        renderer.on_chunk(chunk)
 
     try:
-        import asyncio
         history = asyncio.run(agent.run_async(messages, on_chunk=on_chunk))
     except Exception as exc:  # agent failures must not kill the REPL
         stdout.write(f"Error: {exc}\n")
         return
-    # Pseudo-stream the final text if the provider didn't stream it.
-    if verbose and not text_parts:
-        final_text = agent.last_text(history)
-        if final_text:
-            _pseudo_stream_text(final_text, on_chunk=on_chunk)
-    # If verbose streaming already emitted text, skip the final summary;
-    # otherwise print it (legacy behaviour when no chunks arrived).
-    if verbose:
-        # Tool events and text already streamed via on_chunk - no need to reprint.
-        # Print a single "done" line for visual closure.
-        stdout.write("\n")
-    else:
-        # Default: just show a short summary like read X / wrote Y.
-        summary = _summarize_actions(history)
-        if summary:
-            stdout.write(f"eaccode> {summary}\n")
-        answer = agent.last_text(history)
-        if answer:
-            stdout.write(f"{answer}\n")
+    # Plan M.2: emit the ⏺ N tools used · Xs summary footer
+    renderer.finish(duration_s=time.monotonic() - turn_start)
     if session_id:
         with contextlib.suppress(Exception):
             # persist ONLY the new messages of this round — including tool
