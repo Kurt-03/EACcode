@@ -189,11 +189,19 @@ class ReplRenderer:
         self._current_tool_box_open = False
 
     def _handle_error(self, chunk: StreamChunk) -> None:
-        # Top-level agent error (e.g. connection issue)
-        if self._turn_text_started:
-            self._emit("\n")
-        msg = self._truncate(chunk.content or "(unknown error)", max_len=200)
-        self._emit(f"  {self._c(_A.RED, '✗')} {msg}\n")
+        # Top-level agent error (e.g. connection issue).
+        # If we just finished a turn with a footer, do not start a new one;
+        # the error belongs to that turn.
+        if self._turn_open:
+            # Turn is already open - emit error inline
+            if self._turn_text_started:
+                self._emit("\n")
+            msg = self._truncate(chunk.content or "(unknown error)", max_len=200)
+            self._emit(f"  {self._c(_A.RED, '✗')} {msg}\n")
+        else:
+            # No turn open - this is a standalone error
+            msg = self._truncate(chunk.content or "(unknown error)", max_len=200)
+            self._emit(f"{self._c(_A.RED, '✗ ' + msg)}\n")
 
     # -- formatters -------------------------------------------------------
 

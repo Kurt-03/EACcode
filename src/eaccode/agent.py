@@ -514,14 +514,16 @@ class Agent:
                 # Fixed-length fakes in tests - treat as no-completion
                 content, calls = "", []
             except Exception as exc:
-                # Emit error via on_chunk so the user sees it in the stream
+                # Let the user see the error in the turn output
+                # via the tool-error path, but don't pretend the model
+                # produced it.
                 if on_chunk is not None:
                     try:
                         from eaccode.providers.base import StreamChunk
-                        on_chunk(StreamChunk(kind="error", content=str(exc)))
+                        on_chunk(StreamChunk(kind="error", content=f"(agent error: {exc})"))
                     except Exception:
                         pass
-                history.append({"role": "assistant", "content": f"(error: {exc})"})
+                history.append({"role": "assistant", "content": f"(agent error: {exc})"})
                 return history
 
             if not calls:
